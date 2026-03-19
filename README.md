@@ -1,8 +1,7 @@
-<p align="center">
-	<a href="https://ssu.edu.ph" target="_blank">
+<!-- <p align="center">
 		<img src="https://github.com/noelorbong/biometric-system/tree/main/public/images/logo/banner_white_mode.png" width="400" alt="Biometric Banner">
-	</a>
-</p>
+	
+</p> -->
 
 ## Biometric Attendance System
 
