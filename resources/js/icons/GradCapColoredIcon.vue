@@ -1,0 +1,26 @@
+<template>
+<svg width="20" height="20" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="#000000">
+    <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+    <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+    <g id="SVGRepo_iconCarrier">
+      <g fill="none" fill-rule="evenodd">
+        <path fill="#80D25B"
+          d="M47.5044647,19.529591 C50.2658885,19.529591 52.5044647,17.1876959 52.5044647,14.2988218 C52.5044647,11.4099477 47.5044647,2.52959101 47.5044647,2.52959101 C47.5044647,2.52959101 42.5044647,11.4099477 42.5044647,14.2988218 C42.5044647,17.1876959 44.743041,19.529591 47.5044647,19.529591 Z"
+          transform="rotate(75 47.504 11.03)"></path>
+        <path fill="#80D25B"
+          d="M17.5044647,19.529591 C20.2658885,19.529591 22.5044647,17.1876959 22.5044647,14.2988218 C22.5044647,11.4099477 17.5044647,2.52959101 17.5044647,2.52959101 C17.5044647,2.52959101 12.5044647,11.4099477 12.5044647,14.2988218 C12.5044647,17.1876959 14.743041,19.529591 17.5044647,19.529591 Z"
+          transform="scale(-1 1) rotate(75 0 -11.783)"></path>
+        <path stroke="#22BA8E" stroke-linecap="round" stroke-width="2" d="M44,12 C37.372583,12 32,17.372583 32,24">
+        </path>
+        <path stroke="#22BA8E" stroke-linecap="round" stroke-width="2" d="M32,12 C25.372583,12 20,17.372583 20,24"
+          transform="matrix(-1 0 0 1 52 0)"></path>
+        <path fill="#0A3586"
+          d="M51.25,51.7999998 L51.25,35 L13.25,35 L13.25,51.8 C13.25,54.1195959 21.7565898,56 32.25,56 C42.7434102,56 51.25,54.1195959 51.25,51.8 Z">
+        </path>
+        <rect width="2" height="16" x="56.25" y="36" fill="#ED5144"></rect>
+        <circle cx="57.25" cy="53" r="3" fill="#D3D824"></circle>
+        <polygon fill="#325AA6" points="1 34.992 32.516 23 63.5 34.992 32.516 44.947"></polygon>
+      </g>
+    </g>
+  </svg>
+</template>
