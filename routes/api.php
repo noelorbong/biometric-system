@@ -61,6 +61,7 @@ Route::post('/machine/connect', [MachineController::class, 'testConnection'])->m
 Route::post('/machine/auto-sync-status', [MachineController::class, 'autoSyncStatus'])->middleware('auth:sanctum');
 Route::post('/machine/sync-attendance', [MachineController::class, 'syncAttendance'])->middleware('auth:sanctum');
 Route::post('/machine/download-users', [MachineController::class, 'downloadUsers'])->middleware('auth:sanctum');
+Route::post('/machine/download-users-progress', [MachineController::class, 'downloadUsersProgress'])->middleware('auth:sanctum');
 Route::post('/machine/clear-attendance', [MachineController::class, 'clearAttendanceLogs'])->middleware('auth:sanctum');
 Route::post('/machine/sync-user-templates', [MachineController::class, 'syncUserTemplates'])->middleware('auth:sanctum');
 Route::post('/machine/push-users', [MachineController::class, 'pushUsersToMachine'])->middleware('auth:sanctum');

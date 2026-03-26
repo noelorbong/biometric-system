@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -49,6 +50,7 @@ class ZKTecoService
 
     private int $sessionId = 0;
     private int $replyId   = 0;
+    private string $userDecodeProfile = 'auto';
 
     public function __construct(
         private readonly string $ip,
@@ -129,6 +131,54 @@ class ZKTecoService
     }
 
     /**
+     * Force a deterministic profile for user text decoding.
+     * Supported values: auto, latin_stride_even, latin_stride_odd, utf16le, gbk
+     */
+    public function setUserDecodeProfile(string $profile): void
+    {
+        $profile = strtolower(trim($profile));
+        $allowed = ['auto', 'latin_stride_even', 'latin_stride_odd', 'utf16le', 'gbk'];
+
+        $this->userDecodeProfile = in_array($profile, $allowed, true) ? $profile : 'auto';
+    }
+
+    /**
+     * Select a stable decode profile from firmware/product hints.
+     */
+    public function configureUserDecodeProfile(?string $firmVer, ?string $deviceName = null, ?string $produceKind = null): void
+    {
+        $signature = strtolower(trim(($firmVer ?? '') . ' ' . ($deviceName ?? '') . ' ' . ($produceKind ?? '')));
+
+        if ($signature === '') {
+            $this->setUserDecodeProfile('auto');
+
+            return;
+        }
+
+        // Older non-TFT firmware variants frequently store user-id/name with interleaved bytes.
+        if (str_contains($signature, 'tft')) {
+            $this->setUserDecodeProfile('auto');
+
+            return;
+        }
+
+        if (
+            str_contains($signature, 'face')
+            || str_contains($signature, 'iface')
+            || str_contains($signature, 'speedface')
+            || str_contains($signature, 'linux')
+            || str_contains($signature, 'android')
+            || str_contains($signature, 'granding')
+        ) {
+            $this->setUserDecodeProfile('latin_stride_even');
+
+            return;
+        }
+
+        $this->setUserDecodeProfile('auto');
+    }
+
+    /**
      * Close the TCP socket without sending CMD_EXIT.
      * Useful when a command should keep running on-device after request ends.
      */
@@ -152,6 +202,11 @@ class ZKTecoService
             'DeviceName' => 'DeviceName',
             '~Platform' => 'Platform',
             'WorkCode' => 'WorkCode',
+            '~OEMVendor' => 'Manufacturer',
+            'UserCount' => 'UserCount',
+            'FPCount' => 'FPCount',
+            'FaceCount' => 'FaceCount',
+            'ManagerCount' => 'ManagerCount',
         ];
         $info   = [];
 
@@ -216,40 +271,158 @@ class ZKTecoService
         $this->sendCommand(self::CMD_DISABLEDEVICE);
 
         try {
-            $raw = $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 5, 0);
-
-            if ($raw !== '') {
-                return $this->parseUserRecords($raw);
-            }
-
-            $payloads = [
-                hex2bin('0901000000000000000000'),
-                pack('cvVV', 1, 0x05, 0, 0),
+            $attempts = [
+                // Direct cmd9 is fast on FA1-PRO and some GT firmware variants.
+                ['label' => 'direct:cmd9', 'read' => fn (): string => $this->readUserDataDirect()],
+                ['label' => 'buffer:fct5:ext0', 'read' => fn (): string => $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 5, 0)],
+                ['label' => 'buffer:fct0:ext0', 'read' => fn (): string => $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 0, 0)],
+                ['label' => 'buffer:fct0:ext1', 'read' => fn (): string => $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 0, 1)],
+                ['label' => 'buffer:fct1:ext0', 'read' => fn (): string => $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 1, 0)],
+                ['label' => 'buffer:fct5:ext1', 'read' => fn (): string => $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 5, 1)],
+                ['label' => 'wrrq:0901', 'read' => fn (): string => $this->readUserDataByWrrq(hex2bin('0901000000000000000000'))],
+                ['label' => 'wrrq:0109', 'read' => fn (): string => $this->readUserDataByWrrq(hex2bin('0109000000000000000000'))],
+                ['label' => 'wrrq:pack-cvvv', 'read' => fn (): string => $this->readUserDataByWrrq(pack('cvVV', 1, self::CMD_USERTEMP_RRQ, 0, 0))],
             ];
 
-            $raw = '';
+            $lastRaw = '';
+            $bestParsed = [];
+            $bestQualityScore = -1;
+            $bestRank = -1;
 
-            foreach ($payloads as $payload) {
-                $reply = $this->sendCommand(self::CMD_DATA_WRRQ, $payload);
-                $raw = match ($reply['cmd']) {
-                    self::CMD_ACK_OK       => $this->receivePreparedData($reply['reply_id']),
-                    self::CMD_DATA         => $reply['data'] ?? '',
-                    self::CMD_PREPARE_DATA => $this->receiveChunkedData(
-                        $this->unpackUInt32LE($reply['data'] ?? ''),
-                        $reply['reply_id']
-                    ),
-                    default                => '',
-                };
+            foreach ($attempts as $attempt) {
+                $label = (string) ($attempt['label'] ?? 'unknown');
+                $reader = $attempt['read'] ?? null;
 
-                if ($raw !== '') {
-                    break;
+                if (!is_callable($reader)) {
+                    continue;
+                }
+
+                $raw = $reader();
+
+                if ($raw === '') {
+                    Log::debug('ZKTeco getUsers attempt returned empty payload', [
+                        'ip' => $this->ip,
+                        'label' => $label,
+                    ]);
+                    continue;
+                }
+
+                $lastRaw = $raw;
+                $parsed = $this->parseUserRecords($raw);
+
+                Log::debug('ZKTeco getUsers attempt payload stats', [
+                    'ip' => $this->ip,
+                    'label' => $label,
+                    'raw_bytes' => strlen($raw),
+                    'parsed_rows' => count($parsed),
+                ]);
+
+                if ($parsed !== []) {
+                    $qualityScore = $this->scoreUserListQuality($parsed);
+                    $rank = $this->rankUserList($parsed, $qualityScore);
+                    $parsedCount = count($parsed);
+                    $rawBytes = strlen($raw);
+                    $likelyTruncated = $this->isLikelyTruncatedUserPayload($rawBytes, $parsedCount, $label);
+                    
+                    // Store best result by blended score (quality + capped row count)
+                    if (
+                        $rank > $bestRank
+                        || ($rank === $bestRank && $qualityScore > $bestQualityScore)
+                        || ($rank === $bestRank && $qualityScore === $bestQualityScore && $parsedCount > count($bestParsed))
+                    ) {
+                        $bestRank = $rank;
+                        $bestQualityScore = $qualityScore;
+                        $bestParsed = $parsed;
+                    }
+
+                    // Fast return for clearly valid datasets.
+                    if (
+                        $parsedCount >= 5
+                        && $qualityScore >= 7
+                        && !$likelyTruncated
+                        && $parsedCount >= count($bestParsed)
+                    ) {
+                        Log::debug('ZKTeco returning users based on quality score', [
+                            'ip' => $this->ip,
+                            'label' => $label,
+                            'record_count' => $parsedCount,
+                            'quality_score' => $qualityScore,
+                            'rank' => $rank,
+                        ]);
+                        return $parsed;
+                    }
+
+                    if ($parsedCount >= 5 && $qualityScore >= 7 && $likelyTruncated) {
+                        Log::debug('ZKTeco deferring fast return due to likely truncated payload', [
+                            'ip' => $this->ip,
+                            'label' => $label,
+                            'record_count' => $parsedCount,
+                            'raw_bytes' => $rawBytes,
+                            'quality_score' => $qualityScore,
+                            'rank' => $rank,
+                        ]);
+                    }
+
+                    // FA1/older firmware sometimes scores ~5-6 but with stable full row count.
+                    if (
+                        $parsedCount >= 8
+                        && $qualityScore >= 5
+                        && !$likelyTruncated
+                        && $parsedCount >= count($bestParsed)
+                    ) {
+                        Log::debug('ZKTeco returning users based on stable row count', [
+                            'ip' => $this->ip,
+                            'label' => $label,
+                            'record_count' => $parsedCount,
+                            'quality_score' => $qualityScore,
+                            'rank' => $rank,
+                        ]);
+                        return $parsed;
+                    }
+
+                    // Keep probing other variants when result looks suspiciously small or low quality
+                    continue;
                 }
             }
 
-            return $this->parseUserRecords($raw);
+            // Return best result found if quality score reached minimum threshold
+            if ($bestParsed !== [] && $bestQualityScore >= 5) {
+                Log::debug('ZKTeco returning best parsed users', [
+                    'ip' => $this->ip,
+                    'record_count' => count($bestParsed),
+                    'quality_score' => $bestQualityScore,
+                    'rank' => $bestRank,
+                ]);
+                return $bestParsed;
+            }
+
+            return $bestParsed;
         } finally {
             $this->sendCommand(self::CMD_ENABLEDEVICE);
         }
+    }
+
+    /**
+     * Detect payload sizes that likely indicate a transfer cap rather than the
+     * true full user dataset. This prevents an early return from a high-quality
+     * but incomplete parse and allows trying fallback read variants.
+     */
+    private function isLikelyTruncatedUserPayload(int $rawBytes, int $parsedCount, string $label): bool
+    {
+        if ($rawBytes <= 0 || $parsedCount < 100) {
+            return false;
+        }
+
+        // Exact 64 KiB boundaries are a common symptom of capped transfers.
+        if (in_array($rawBytes, [65536, 131072, 196608], true)) {
+            return true;
+        }
+
+        if (str_starts_with($label, 'direct:') && $rawBytes % 65536 === 0) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -605,8 +778,9 @@ class ZKTecoService
     private function receiveChunkedData(int $expectedSize, int $replyId): string
     {
         $raw = '';
+        $reachedExpected = $expectedSize <= 0;
 
-        while ($expectedSize > 0 ? strlen($raw) < $expectedSize : true) {
+        while (true) {
             $reply = $this->readPacket();
             if ($reply === null) {
                 break;
@@ -614,6 +788,20 @@ class ZKTecoService
 
             if ($reply['cmd'] === self::CMD_DATA) {
                 $raw .= $reply['data'] ?? '';
+
+                if (!$reachedExpected && $expectedSize > 0 && strlen($raw) >= $expectedSize) {
+                    $reachedExpected = true;
+                }
+
+                continue;
+            }
+
+            if ($reply['cmd'] === self::CMD_PREPARE_DATA) {
+                $raw .= $this->receiveChunkedData(
+                    $this->unpackUInt32LE($reply['data'] ?? ''),
+                    $reply['reply_id']
+                );
+                $reachedExpected = true;
                 continue;
             }
 
@@ -621,9 +809,9 @@ class ZKTecoService
                 break;
             }
 
-            // For devices that do not declare total size up front,
-            // stop once we leave data frames.
-            if ($expectedSize <= 0) {
+            // For unknown-size transfers, or once we have already consumed the
+            // declared size, stop when leaving data frames.
+            if ($expectedSize <= 0 || $reachedExpected) {
                 break;
             }
         }
@@ -660,7 +848,7 @@ class ZKTecoService
         $reply = $this->sendCommand(self::CMD_DATA_WRRQ, $request);
 
         if ($reply['cmd'] === self::CMD_DATA) {
-            return $reply['data'] ?? '';
+            return $this->collectDataFrames($reply['data'] ?? '', $reply['reply_id']);
         }
 
         $size = $this->unpackUInt32LE($reply['data'] ?? '', 1);
@@ -685,7 +873,7 @@ class ZKTecoService
             $chunkReply = $this->sendCommand(self::CMD_DATA_RDY, pack('VV', $offset, $chunkSize));
 
             $data .= match ($chunkReply['cmd']) {
-                self::CMD_DATA         => $chunkReply['data'] ?? '',
+                self::CMD_DATA         => $this->collectDataFrames($chunkReply['data'] ?? '', $chunkReply['reply_id']),
                 self::CMD_ACK_OK       => $this->receivePreparedData($chunkReply['reply_id']),
                 self::CMD_PREPARE_DATA => $this->receiveChunkedData(
                     $this->unpackUInt32LE($chunkReply['data'] ?? ''),
@@ -844,79 +1032,526 @@ class ZKTecoService
             return [];
         }
 
-        $payload = $raw;
+        $bestUsers = [];
+        $bestQuality = -1;
+        $bestCount = 0;
+        $bestRank = -1;
+        $bestMeta = [];
+        $candidateIndex = 0;
+        foreach ($this->buildUserPayloadCandidates($raw) as $payload) {
+            $recordSize = $this->detectUserRecordSize($payload);
 
-        if (strlen($payload) >= 4) {
-            $declaredSize = $this->unpackUInt32LE($payload);
-
-            if ($declaredSize > 0 && $declaredSize <= strlen($payload) - 4) {
-                $candidate = substr($payload, 4, $declaredSize);
-
-                if ($this->detectUserRecordSize($candidate) !== null) {
-                    $payload = $candidate;
-                }
-            }
-        }
-
-        $recordSize = $this->detectUserRecordSize($payload);
-
-        if ($recordSize === null) {
-            return [];
-        }
-
-        $users = [];
-        $total = strlen($payload);
-
-        for ($offset = 0; $offset + $recordSize <= $total; $offset += $recordSize) {
-            $record = substr($payload, $offset, $recordSize);
-
-            if ($recordSize === 73) {
-                if (ord($record[0]) !== 2) {
-                    continue;
-                }
-
-                $record = substr($record, 1);
-            }
-
-            if ($recordSize === 28) {
-                $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
-                $privilege = ord(substr($record, 2, 1) ?: "\x00");
-                $password = rtrim(substr($record, 3, 5), "\x00 \r\n\t");
-                $name = rtrim(substr($record, 8, 8), "\x00 \r\n\t");
-                $card = unpack('V', substr($record, 16, 4))[1] ?? 0;
-                $pin = (string) (unpack('V', substr($record, 24, 4))[1] ?? 0);
-            } else {
-                $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
-                $privilege = ord(substr($record, 2, 1) ?: "\x00");
-                $password = rtrim(substr($record, 3, 8), "\x00 \r\n\t");
-                $name = rtrim(substr($record, 11, 24), "\x00 \r\n\t");
-                $card = unpack('V', substr($record, 35, 4))[1] ?? 0;
-                $pin = rtrim(substr($record, 48, 24), "\x00 \r\n\t");
-            }
-
-            if ($pin === '' && $uid > 0) {
-                $pin = (string) $uid;
-            }
-
-            if ($name === '' && $pin !== '') {
-                $name = 'NN-' . $pin;
-            }
-
-            if ($uid <= 0 && $pin === '' && $name === '') {
+            if ($recordSize === null) {
+                $candidateIndex++;
                 continue;
             }
 
-            $users[] = [
-                'uid' => (int) $uid,
-                'pin' => (string) $pin,
-                'name' => (string) $name,
-                'password' => (string) $password,
-                'privilege' => (int) $privilege,
-                'card' => (int) $card,
-            ];
+            $users = [];
+            $total = strlen($payload);
+            $debugLogRawRecord = null;
+
+            // For 73-byte records, detect the byte offset of the 72-byte user data block.
+            // FA1-PRO: STX at byte 0, data starts at byte 1 (offset = 1).
+            // GT100/GT200: extra header prefix, data may start at a higher offset.
+            $dataOffset73 = ($recordSize === 73) ? $this->detect73ByteUserDataOffset($payload) : 0;
+
+            for ($offset = 0; $offset + $recordSize <= $total; $offset += $recordSize) {
+                $record = substr($payload, $offset, $recordSize);
+                
+                // Capture first raw record for diagnostics
+                if ($offset === 0 && $debugLogRawRecord === null) {
+                    $debugLogRawRecord = bin2hex(substr($record, 0, min(72, strlen($record))));
+                }
+
+
+                if ($recordSize === 73) {
+                    // Verify the expected STX marker exists at (dataOffset73 - 1).
+                    // If not present, skip truly invalid records (e.g. padding/filler).
+                    $stxPos = $dataOffset73 - 1;
+                    if ($stxPos >= 0 && ord($record[$stxPos]) !== 2) {
+                        continue;
+                    }
+
+                    $record = substr($record, $dataOffset73);
+                }
+
+                if ($recordSize === 28) {
+                    $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
+                    $privilege = ord(substr($record, 2, 1) ?: "\x00");
+                    $passwordBytes = substr($record, 3, 5);
+                    $nameBytes = substr($record, 8, 8);
+                    $password = $this->decodeTextField($passwordBytes);
+                    $name = $this->decodeNameField($nameBytes);
+                    $card = unpack('V', substr($record, 16, 4))[1] ?? 0;
+                    $pin = (string) (unpack('V', substr($record, 24, 4))[1] ?? 0);
+                } else {
+                    $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
+                    $privilege = ord(substr($record, 2, 1) ?: "\x00");
+                    $passwordBytes = substr($record, 3, 8);
+                    
+                    // Try multiple offsets for name field (device firmware variations)
+                    $nameBytes = '';
+                    $nameOffset = 11; // fallback default
+                    foreach ([11, 13, 15, 35, 3, 5, 7, 20, 25, 30, 40, 45, 50] as $testOffset) {
+                        if ($testOffset + 24 > strlen($record)) continue;
+                        $candidate = substr($record, $testOffset, 24);
+                        if (strlen($candidate) === 24 && $candidate !== str_repeat("\x00", 24)) {
+                            $nameBytes = $candidate;
+                            $nameOffset = $testOffset;
+                            break;
+                        }
+                    }
+                    // Fallback to offset 11 if all are empty
+                    if ($nameBytes === '') {
+                        $nameBytes = substr($record, 11, 24);
+                        $nameOffset = 11;
+                    }
+                    
+                    $card = unpack('V', substr($record, 35, 4))[1] ?? 0;
+                    $pinBytes = substr($record, 48, 24);
+
+                    $password = $this->decodeTextField($passwordBytes);
+                    $name = $this->decodeNameField($nameBytes);
+                    $pin = $this->decodePinField($pinBytes);
+                    
+                    // Debug: Log full record structure to find actual name location
+                    if ($uid > 0 && count($users) < 5) {
+                        $offsetScan = [];
+                        for ($i = 0; $i <= 48; $i += 2) {
+                            if ($i + 24 <= strlen($record)) {
+                                $testBytes = substr($record, $i, 24);
+                                $offsetScan[$i] = bin2hex($testBytes);
+                            }
+                        }
+                        Log::debug('RECORD_FULL_SCAN', [
+                            'uid' => $uid,
+                            'record_size' => $recordSize,
+                            'record_hex' => substr(bin2hex($record), 0, 150),
+                            'uid_at_0_2' => bin2hex(substr($record, 0, 2)),
+                            'found_name_at_offset' => $nameOffset,
+                            'found_name_hex' => bin2hex($nameBytes),
+                            'decoded_name' => $name,
+                            'offset_samples' => $offsetScan,
+                        ]);
+                    }
+                }
+
+                if ($pin === '' && $uid > 0) {
+                    $pin = (string) $uid;
+                }
+
+                // GT100/GT200 nonstandard 73-byte layout can carry unreliable UID bytes
+                // while PIN is decoded correctly. In that layout, prefer numeric PIN as UID.
+                if (
+                    $recordSize === 73
+                    && $dataOffset73 > 1
+                    && preg_match('/^\d+$/', $pin) === 1
+                ) {
+                    $uid = (int) $pin;
+                }
+
+                if ($name === '' && $pin !== '') {
+                    $name = 'NN-' . $pin;
+                }
+
+                if ($uid <= 0 && $pin === '' && $name === '') {
+                    continue;
+                }
+
+                $users[] = [
+                    'uid' => (int) $uid,
+                    'pin' => (string) $pin,
+                    'name' => (string) $name,
+                    'password' => (string) $password,
+                    'privilege' => (int) $privilege,
+                    'card' => (int) $card,
+                ];
+            }
+
+            if ($users !== []) {
+                $users = $this->repairUnreliableUserIds($users);
+                $users = $this->repairSequentialUidFromPin($users);
+                $quality = $this->scoreUserListQuality($users);
+                $rank = $this->rankUserList($users, $quality);
+
+                Log::debug('PARSED_USER_RECORDS', [
+                    'payload_candidate_index' => $candidateIndex,
+                    'record_size' => $recordSize,
+                    'total_users' => count($users),
+                    'quality_score' => $quality,
+                    'rank' => $rank,
+                    'payload_length' => strlen($payload),
+                    'expected_records' => floor(strlen($payload) / $recordSize),
+                    'payload_start_hex' => substr(bin2hex($payload), 0, 48),
+                    'first_raw_record_hex' => $debugLogRawRecord,
+                    'first_user_name' => $users[0]['name'] ?? '(none)',
+                    'first_user_uid' => $users[0]['uid'] ?? 0,
+                ]);
+
+                $count = count($users);
+
+                if (
+                    $rank > $bestRank
+                    || ($rank === $bestRank && $quality > $bestQuality)
+                    || ($rank === $bestRank && $quality === $bestQuality && $count > $bestCount)
+                ) {
+                    $bestUsers = $users;
+                    $bestQuality = $quality;
+                    $bestCount = $count;
+                    $bestRank = $rank;
+                    $bestMeta = [
+                        'payload_candidate_index' => $candidateIndex,
+                        'record_size' => $recordSize,
+                        'quality_score' => $quality,
+                        'rank' => $rank,
+                    ];
+                }
+
+                // High-confidence parse; no need to keep scanning payload candidates.
+                if (count($users) >= 5 && $quality >= 8) {
+                    return $users;
+                }
+            }
+            
+            $candidateIndex++;
         }
 
+        if ($bestUsers !== []) {
+            Log::debug('PARSED_USER_RECORDS_SELECTED_BEST', [
+                'candidate' => $bestMeta,
+                'record_count' => $bestCount,
+                'quality_score' => $bestQuality,
+                'rank' => $bestRank,
+            ]);
+        }
+
+        return $bestUsers;
+    }
+
+    /**
+     * Some device layouts decode PIN reliably but produce unusable UID bytes
+     * (mostly 0 or large garbage values). When this pattern is dominant,
+     * normalize UID from numeric PIN for consistency in UI/import mapping.
+     *
+     * @param array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}> $users
+     * @return array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}>
+     */
+    private function repairUnreliableUserIds(array $users): array
+    {
+        if (count($users) < 5) {
+            return $users;
+        }
+
+        $numericPinCount = 0;
+        $invalidUidCount = 0;
+
+        foreach ($users as $user) {
+            $pin = (string) ($user['pin'] ?? '');
+
+            if (preg_match('/^\d+$/', $pin) !== 1) {
+                continue;
+            }
+
+            $numericPinCount++;
+            $uid = (int) ($user['uid'] ?? 0);
+
+            if ($uid <= 0 || $uid > 9999) {
+                $invalidUidCount++;
+            }
+        }
+
+        if ($numericPinCount < 5) {
+            return $users;
+        }
+
+        // Apply only when UID corruption is clearly dominant.
+        if (($invalidUidCount / $numericPinCount) < 0.6) {
+            return $users;
+        }
+
+        foreach ($users as &$user) {
+            $pin = (string) ($user['pin'] ?? '');
+
+            if (preg_match('/^\d+$/', $pin) === 1) {
+                $user['uid'] = (int) $pin;
+            }
+        }
+        unset($user);
+
         return $users;
+    }
+
+    /**
+     * Detect when the uid field contains sequential slot numbers (1, 2, 3 … N) while
+     * the PIN field contains the real, non-sequential user identifiers.  This layout
+     * appears on Granding GT200 devices whose direct:cmd9 payload uses slot-indexed
+     * UIDs but stores the true user number as a null-terminated string in the PIN
+     * field.  When detected, uid is overwritten with the numeric PIN value.
+     *
+     * @param array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}> $users
+     * @return array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}>
+     */
+    private function repairSequentialUidFromPin(array $users): array
+    {
+        if (count($users) < 5) {
+            return $users;
+        }
+
+        // Collect uids and check for strict 1-based sequential
+        $uids = array_column($users, 'uid');
+        sort($uids);
+        for ($i = 0, $n = count($uids); $i < $n; $i++) {
+            if ($uids[$i] !== $i + 1) {
+                return $users; // UIDs are not slot-sequential, nothing to repair
+            }
+        }
+
+        // All UIDs are sequential – now verify PINs are all numeric
+        $numericCount = 0;
+        $pinInts      = [];
+        foreach ($users as $user) {
+            $pin = (string) ($user['pin'] ?? '');
+            if (preg_match('/^\d+$/', $pin) === 1) {
+                $numericCount++;
+                $pinInts[] = (int) $pin;
+            }
+        }
+
+        if ($numericCount < count($users) * 0.9) {
+            return $users; // Not enough numeric PINs
+        }
+
+        // If PINs are ALSO sequential (1,2,3…) there is nothing to distinguish;
+        // leave the record as-is to avoid false positives.
+        $sorted = $pinInts;
+        sort($sorted);
+        $pinSequential = true;
+        for ($i = 0, $n = count($sorted); $i < $n; $i++) {
+            if ($sorted[$i] !== $i + 1) {
+                $pinSequential = false;
+                break;
+            }
+        }
+
+        if ($pinSequential) {
+            return $users;
+        }
+
+        // UIDs are slot-sequential but PINs differ → use PIN as the real UID
+        foreach ($users as &$user) {
+            $pin = (string) ($user['pin'] ?? '');
+            if (preg_match('/^\d+$/', $pin) === 1) {
+                $user['uid'] = (int) $pin;
+            }
+        }
+        unset($user);
+
+        return $users;
+    }
+
+    /**
+     * Score user list quality by analyzing name characteristics.
+     * Higher score = better quality names (less garbage, more readable).
+     * Score 0-10 scale.
+     * 
+     * @param array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}> $users
+     */
+    private function scoreUserListQuality(array $users): int
+    {
+        if (count($users) === 0) {
+            return 0;
+        }
+
+        $sample = array_slice($users, 0, min(10, count($users))); // Check first 10 users
+        $nameQualitySum = 0;
+
+        foreach ($sample as $user) {
+            $name = $user['name'] ?? '';
+            
+            if ($name === '' || strpos($name, 'NN-') === 0) {
+                // No real name (fallback generated name)
+                $nameQualitySum += 1;
+                continue;
+            }
+
+            $score = 0;
+
+            // Reward length (real names are typically longer than garbage)
+            $len = strlen($name);
+            if ($len >= 5) $score += 2;
+            if ($len >= 10) $score += 1;
+            if ($len >= 15) $score += 1;
+
+            // Reward uppercase letters (names often have them)
+            $upCount = preg_match_all('/[A-Z]/', $name);
+            if ($upCount > 0) $score += 1;
+            if ($upCount > 2) $score += 1;
+
+            // Reward simple spaces and punctuation (comma, period - typical in names)
+            if (preg_match('/[\s,.]/', $name)) $score += 1;
+
+            // Penalize numeric-only or mostly numeric
+            $digitRatio = preg_match_all('/[0-9]/', $name) / (strlen($name) ?: 1);
+            if ($digitRatio > 0.5) {
+                $score -= 2;
+            }
+            if ($digitRatio === 1.0) {
+                // All digits - garbage
+                $score = 0;
+            }
+
+            // Penalize control chars and high bytes (indicates wrong encoding)
+            if (preg_match('/[\x00-\x08\x0E-\x1F\x7F-\xFF]/', $name)) {
+                $score -= 1;
+            }
+
+            $nameQualitySum += max(0, $score);
+        }
+
+        $avgQuality = (int) ($nameQualitySum / count($sample));
+        return min(10, max(0, $avgQuality));
+    }
+
+    /**
+     * Blend name quality with a small count bonus so tiny high-quality subsets
+     * do not beat fuller valid user lists.
+     *
+     * @param array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}> $users
+     */
+    private function rankUserList(array $users, ?int $qualityScore = null): int
+    {
+        $quality = $qualityScore ?? $this->scoreUserListQuality($users);
+        $countBonus = min(12, count($users));
+
+        return ($quality * 6) + $countBonus;
+    }
+
+    private function buildUserPayloadCandidates(string $raw): array
+    {
+        $candidates = [$raw];
+        $length = strlen($raw);
+
+        if ($length >= 4) {
+            $declaredSize = $this->unpackUInt32LE($raw, 0);
+
+            if ($declaredSize > 0 && $declaredSize <= $length - 4) {
+                $candidates[] = substr($raw, 4, $declaredSize);
+            }
+        }
+
+        if ($length >= 8) {
+            $declaredSize = $this->unpackUInt32LE($raw, 4);
+
+            if ($declaredSize > 0 && $declaredSize <= $length - 8) {
+                $candidates[] = substr($raw, 8, $declaredSize);
+            }
+        }
+
+        $sizes = [73, 72, 28];
+        $final = [];
+
+        foreach ($candidates as $candidate) {
+            $final[] = $candidate;
+
+            foreach ($sizes as $size) {
+                $mod = strlen($candidate) % $size;
+
+                if ($mod === 0) {
+                    // Try scanning for correct STX alignment for 73-byte records
+                    if ($size === 73) {
+                        for ($align = 1; $align < 73 && $align < strlen($candidate); $align++) {
+                            if (ord($candidate[$align]) === 0x02 && (strlen($candidate) - $align) % 73 === 0) {
+                                $aligned = substr($candidate, $align);
+                                if (strlen($aligned) >= 73) {
+                                    $final[] = $aligned;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                $trimmedHead = substr($candidate, $mod);
+                if (strlen($trimmedHead) >= $size) {
+                    $final[] = $trimmedHead;
+                }
+
+                $trimmedTail = substr($candidate, 0, strlen($candidate) - $mod);
+                if (strlen($trimmedTail) >= $size) {
+                    $final[] = $trimmedTail;
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($final, static fn (string $item): bool => $item !== '')));
+    }
+
+    private function readUserDataByWrrq(string $payload): string
+    {
+        $reply = $this->sendCommand(self::CMD_DATA_WRRQ, $payload);
+
+        return match ($reply['cmd']) {
+            self::CMD_ACK_OK       => $this->receivePreparedData($reply['reply_id']),
+            self::CMD_DATA         => $this->collectDataFrames($reply['data'] ?? '', $reply['reply_id']),
+            self::CMD_PREPARE_DATA => $this->receiveChunkedData(
+                $this->unpackUInt32LE($reply['data'] ?? ''),
+                $reply['reply_id']
+            ),
+            default                => '',
+        };
+    }
+
+    private function readUserDataDirect(): string
+    {
+        $reply = $this->sendCommand(self::CMD_USERTEMP_RRQ);
+
+        return match ($reply['cmd']) {
+            self::CMD_ACK_OK       => $this->receivePreparedData($reply['reply_id']),
+            self::CMD_DATA         => $this->collectDataFrames($reply['data'] ?? '', $reply['reply_id']),
+            self::CMD_PREPARE_DATA => $this->receiveChunkedData(
+                $this->unpackUInt32LE($reply['data'] ?? ''),
+                $reply['reply_id']
+            ),
+            default                => '',
+        };
+    }
+
+    /**
+     * Some firmware streams one logical payload across multiple CMD_DATA frames.
+     */
+    private function collectDataFrames(string $firstChunk, int $replyId): string
+    {
+        $data = $firstChunk;
+
+        while (true) {
+            $next = $this->readPacket();
+
+            if ($next === null) {
+                break;
+            }
+
+            if ($next['cmd'] === self::CMD_DATA) {
+                $data .= $next['data'] ?? '';
+                continue;
+            }
+
+            if ($next['cmd'] === self::CMD_PREPARE_DATA) {
+                $data .= $this->receiveChunkedData(
+                    $this->unpackUInt32LE($next['data'] ?? ''),
+                    $next['reply_id']
+                );
+                break;
+            }
+
+            if ($next['cmd'] === self::CMD_ACK_OK && $next['reply_id'] === $replyId) {
+                break;
+            }
+
+            break;
+        }
+
+        return $data;
     }
 
     private function detectUserRecordSize(string $payload): ?int
@@ -930,6 +1565,356 @@ class ZKTecoService
         }
 
         return null;
+    }
+
+    /**
+     * For 73-byte record payloads, detect the byte offset within each 73-byte slot
+     * where the actual 72-byte user data block begins, by scanning for consistent
+     * ASCII name characters. Some Granding firmware variants (GT100, GT200) use a
+     * different header prefix length than the standard STX-at-byte-0 format.
+     */
+    private function detect73ByteUserDataOffset(string $payload): int
+    {
+        // Vote for which byte position within the 73-byte record consistently holds 0x02 (STX).
+        // FA1-PRO:     STX at position 0  -> data starts at position 1
+        // GT100/GT200: STX at position 11 -> data starts at position 12
+        $sampleCount = min(30, (int)(strlen($payload) / 73));
+        $stxVotes = [];
+
+        for ($r = 0; $r < $sampleCount; $r++) {
+            $record = substr($payload, $r * 73, 73);
+            // Only consider positions 0-20 as plausible STX locations
+            for ($b = 0; $b <= 20; $b++) {
+                if (ord($record[$b]) === 0x02) {
+                    $stxVotes[$b] = ($stxVotes[$b] ?? 0) + 1;
+                    break; // take first STX found per record
+                }
+            }
+        }
+
+        if (empty($stxVotes)) {
+            return 1; // fallback: standard layout
+        }
+
+        // Pick the position that appears in the most records
+        arsort($stxVotes);
+        $stxPos = (int) array_key_first($stxVotes);
+        return $stxPos + 1; // data starts immediately after STX
+    }
+
+    /**
+     * Convert device-provided text into safe UTF-8 for JSON responses.
+     */
+    private function normalizeTextField(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        $value = trim($value);
+
+        // Many devices return UTF-16LE strings (ASCII bytes interleaved with nulls).
+        if ($this->looksLikeUtf16($value)) {
+            $utf16 = @mb_convert_encoding($value, 'UTF-8', 'UTF-16LE');
+
+            if (is_string($utf16) && $utf16 !== '' && preg_match('//u', $utf16) === 1) {
+                return $this->sanitizeDisplayText($utf16);
+            }
+        }
+
+        if (preg_match('//u', $value) === 1) {
+            return $this->sanitizeDisplayText($value);
+        }
+
+        if (function_exists('mb_convert_encoding')) {
+            foreach (['UTF-16LE', 'UTF-16BE', 'UTF-8', 'GBK', 'GB2312', 'ISO-8859-1', 'Windows-1252'] as $from) {
+                $converted = @mb_convert_encoding($value, 'UTF-8', $from);
+
+                if (is_string($converted) && $converted !== '' && preg_match('//u', $converted) === 1) {
+                    return $this->sanitizeDisplayText($converted);
+                }
+            }
+        }
+        $cleaned = iconv('UTF-8', 'UTF-8//IGNORE', $value);
+        if (is_string($cleaned) && $cleaned !== '') {
+            return $this->sanitizeDisplayText($cleaned);
+        }
+
+        return $this->sanitizeDisplayText(preg_replace('/[^\x20-\x7E]/', '', $value) ?? '');
+    }
+
+    private function decodeTextField(string $bytes): string
+    {
+        return $this->normalizeTextField(rtrim($bytes, "\x00 \r\n\t"));
+    }
+
+    private function decodeNameField(string $bytes): string
+    {
+        $candidates = $this->buildDecodeCandidates($bytes);
+
+        if ($candidates === []) {
+            return '';
+        }
+
+        $best = '';
+        $bestScore = PHP_INT_MIN;
+
+        foreach ($candidates as $candidate) {
+            $score = $this->scoreNameCandidate($candidate);
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $candidate;
+            }
+        }
+
+        return $this->normalizeDecodedName($best);
+    }
+
+    private function normalizeDecodedName(string $name): string
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        // Some firmware variants leak numeric bytes into the beginning of names
+        // (example: "1763VELARDE, GAIL B."). Remove only the prefix when the
+        // remainder clearly looks like a human name.
+        if (preg_match('/^(\d{3,6})([A-Za-z][A-Za-z ,.-]{3,})$/', $name, $m) === 1) {
+            $candidate = trim($m[2]);
+
+            if (
+                (str_contains($candidate, ',') || str_contains($candidate, ' '))
+                && preg_match('/[A-Za-z]{3,}/', $candidate) === 1
+            ) {
+                return $candidate;
+            }
+        }
+
+        return $name;
+    }
+
+    private function decodePinField(string $bytes): string
+    {
+        if ($this->userDecodeProfile === 'latin_stride_even') {
+            $fixed = $this->normalizeTextField($this->everySecondByte($bytes, 0));
+            if ($fixed !== '') {
+                return preg_replace('/[^0-9A-Za-z._-]/u', '', $fixed) ?? $fixed;
+            }
+        }
+
+        if ($this->userDecodeProfile === 'latin_stride_odd') {
+            $fixed = $this->normalizeTextField($this->everySecondByte($bytes, 1));
+            if ($fixed !== '') {
+                return preg_replace('/[^0-9A-Za-z._-]/u', '', $fixed) ?? $fixed;
+            }
+        }
+
+        // Some Granding GT devices (e.g. GT200) pack the PIN field as a null-terminated
+        // C-string followed by a device identifier string (e.g. "2\0RAISA A. GUIO...").
+        // Reading only up to the first null gives the real PIN and discards the trailer.
+        $firstNull = strpos($bytes, "\x00");
+        if ($firstNull !== false && $firstNull > 0 && $firstNull < 16) {
+            $prefix = substr($bytes, 0, $firstNull);
+            if (preg_match('/^[0-9A-Za-z._-]+$/', $prefix) === 1) {
+                return $prefix;
+            }
+        }
+
+        $candidates = $this->buildDecodeCandidates($bytes);
+
+        if ($candidates === []) {
+            return '';
+        }
+
+        $best = '';
+        $bestScore = PHP_INT_MIN;
+
+        foreach ($candidates as $candidate) {
+            $score = $this->scorePinCandidate($candidate);
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $candidate;
+            }
+        }
+
+        if ($best === '') {
+            return '';
+        }
+
+        $clean = preg_replace('/[^0-9A-Za-z._-]/u', '', $best) ?? '';
+
+        return $clean !== '' ? $clean : $best;
+    }
+
+    private function buildDecodeCandidates(string $bytes): array
+    {
+        $trimmed = rtrim($bytes, "\x00 \r\n\t");
+
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $candidates = [];
+
+        // For Granding devices, try UTF-16LE FIRST before plain ASCII (empirical observation from hex dumps)
+        if (function_exists('mb_convert_encoding')) {
+            $utf16Attempt = @mb_convert_encoding($bytes, 'UTF-8', 'UTF-16LE');
+            if (is_string($utf16Attempt)) {
+                $cleaned = $this->sanitizeDisplayText($utf16Attempt);
+                if ($cleaned !== '') {
+                    $candidates[] = $cleaned;
+                }
+            }
+        }
+
+        // Try plain ASCII/Latin-1 extraction second
+        $plainAscii = $this->extractPlainAscii($bytes);
+        if ($plainAscii !== '') {
+            $candidates[] = $plainAscii;
+        }
+
+        if ($this->userDecodeProfile === 'latin_stride_even') {
+            $candidates[] = $this->normalizeTextField($this->everySecondByte($bytes, 0));
+            $candidates[] = $this->normalizeTextField($trimmed);
+            $candidates[] = $this->normalizeTextField($this->everySecondByte($bytes, 1));
+        } elseif ($this->userDecodeProfile === 'latin_stride_odd') {
+            $candidates[] = $this->normalizeTextField($this->everySecondByte($bytes, 1));
+            $candidates[] = $this->normalizeTextField($trimmed);
+            $candidates[] = $this->normalizeTextField($this->everySecondByte($bytes, 0));
+        } else {
+            $candidates[] = $this->normalizeTextField($trimmed);
+            $candidates[] = $this->normalizeTextField($this->everySecondByte($bytes, 0));
+            $candidates[] = $this->normalizeTextField($this->everySecondByte($bytes, 1));
+        }
+
+        if (function_exists('mb_convert_encoding')) {
+            $fromEncodings = match ($this->userDecodeProfile) {
+                'utf16le' => ['UTF-16LE', 'UTF-16BE', 'GBK', 'GB2312'],
+                'gbk' => ['GBK', 'GB2312', 'UTF-16LE', 'UTF-16BE'],
+                default => ['UTF-16LE', 'UTF-16BE', 'GBK', 'GB2312'],
+            };
+
+            foreach ($fromEncodings as $fromEncoding) {
+                $converted = @mb_convert_encoding($bytes, 'UTF-8', $fromEncoding);
+
+                if (is_string($converted)) {
+                    $candidates[] = $this->sanitizeDisplayText($converted);
+                }
+            }
+        }
+
+        $ascii = preg_replace('/[^\x20-\x7E]/', '', $bytes) ?? '';
+        $candidates[] = $this->sanitizeDisplayText($ascii);
+
+        $candidates = array_values(array_unique(array_filter($candidates, static fn (string $v): bool => $v !== '')));
+
+        return $candidates;
+    }
+
+    /**
+     * Extract plain ASCII/Latin-1 text from device bytes, matching official Granding app.
+     */
+    private function extractPlainAscii(string $bytes): string
+    {
+        $result = '';
+        $length = strlen($bytes);
+
+        for ($i = 0; $i < $length; $i++) {
+            $ch = ord($bytes[$i]);
+
+            // Printable ASCII (space to ~) and extended Latin-1
+            if (($ch >= 0x20 && $ch <= 0x7E) || ($ch >= 0xA0 && $ch <= 0xFF)) {
+                $result .= $bytes[$i];
+            } elseif ($ch === 0x00) {
+                // Null terminator marks end of field
+                break;
+            }
+        }
+
+        return trim($result);
+    }
+
+    private function everySecondByte(string $bytes, int $start): string
+    {
+        $result = '';
+        $length = strlen($bytes);
+
+        for ($i = $start; $i < $length; $i += 2) {
+            $result .= $bytes[$i];
+        }
+
+        return $result;
+    }
+
+    private function scorePinCandidate(string $value): int
+    {
+        $len = strlen($value);
+
+        if ($len === 0) {
+            return -1000;
+        }
+
+        $allowed = preg_match_all('/[0-9A-Za-z._-]/u', $value) ?: 0;
+        $digits = preg_match_all('/\d/u', $value) ?: 0;
+        $others = max(0, $len - $allowed);
+
+        return ($allowed * 4) + ($digits * 2) - ($others * 5);
+    }
+
+    private function scoreNameCandidate(string $value): int
+    {
+        $len = strlen($value);
+
+        if ($len === 0) {
+            return -1000;
+        }
+
+        $latin = preg_match_all('/[A-Za-z0-9 ._-]/u', $value) ?: 0;
+        $letters = preg_match_all('/[A-Za-z]/u', $value) ?: 0;
+        $digits = preg_match_all('/\d/u', $value) ?: 0;
+        $nonAscii = preg_match_all('/[^\x00-\x7F]/u', $value) ?: 0;
+        $ctrl = preg_match_all('/[[:cntrl:]]/u', $value) ?: 0;
+        $punctuation = preg_match_all('/[.,;:\'-]/u', $value) ?: 0;
+
+        $digitOnlyPenalty = 0;
+        if ($digits > 0 && $letters === 0) {
+            $digitOnlyPenalty = $digits * 3;
+        }
+
+        // Boost score for names with letters and real name-like punctuation
+        $realNameBonus = 0;
+        if ($letters >= 2 && ($punctuation > 0 || preg_match('/\s/', $value))) {
+            $realNameBonus = 20;
+        }
+
+        return ($latin * 3) + ($letters * 5) - ($nonAscii * 2) - ($ctrl * 5) - $digitOnlyPenalty + $realNameBonus;
+    }
+
+    private function looksLikeUtf16(string $value): bool
+    {
+        $length = strlen($value);
+
+        if ($length < 2) {
+            return false;
+        }
+
+        $nullBytes = substr_count($value, "\x00");
+
+        // Heuristic: interleaved-null strings are usually UTF-16 from device firmware.
+        return $nullBytes > 0 && $nullBytes >= intdiv($length, 4);
+    }
+
+    private function sanitizeDisplayText(string $value): string
+    {
+        $value = str_replace("\x00", '', $value);
+        $value = preg_replace('/[[:cntrl:]&&[^\r\n\t]]/u', '', $value) ?? $value;
+        $value = trim($value);
+
+        return preg_replace('/\s{2,}/u', ' ', $value) ?? $value;
     }
 
     /**
@@ -1162,8 +2147,9 @@ class ZKTecoService
     {
         $data = rtrim($data, "\x00\r\n ");
         $pos  = strpos($data, '=');
+        $value = $pos !== false ? substr($data, $pos + 1) : $data;
 
-        return $pos !== false ? substr($data, $pos + 1) : $data;
+        return trim($value, "\x00\r\n ");
     }
 
     /**

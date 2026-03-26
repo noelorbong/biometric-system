@@ -7,6 +7,7 @@ use App\Models\Checkinout;
 use App\Models\Machine;
 use App\Models\User;
 use App\Models\UserBiometricInfo;
+use App\Models\UserProfile;
 use App\Services\ZKTecoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -125,8 +126,14 @@ class MachineController extends Controller
             $updates = array_filter([
                 'sn'              => $info['SerialNumber'] ?? null,
                 'FirmwareVersion' => $info['FirmVer']      ?? null,
-                'ProductType'     => $info['DeviceName']   ?? null,
-                'ProduceKind'     => $info['ProduceKind']  ?? null,
+                'ProductType'     => $info['DeviceName']   ?? ($info['Platform'] ?? null),
+                'ProduceKind'     => $info['ProduceKind']  ?? ($info['Platform'] ?? null),
+                'pushver'         => $info['Platform']     ?? null,
+                'Purpose'         => $info['WorkCode']     ?? null,
+                'managercount'    => isset($info['ManagerCount']) && is_numeric($info['ManagerCount']) ? (int) $info['ManagerCount'] : null,
+                'usercount'       => isset($info['UserCount']) && is_numeric($info['UserCount']) ? (int) $info['UserCount'] : null,
+                'fingercount'     => isset($info['FPCount']) && is_numeric($info['FPCount']) ? (int) $info['FPCount'] : null,
+                'SecretCount'     => isset($info['FaceCount']) && is_numeric($info['FaceCount']) ? (int) $info['FaceCount'] : null,
             ]);
 
             if ($updates) {
@@ -322,12 +329,16 @@ class MachineController extends Controller
      */
     public function downloadUsers(Request $request)
     {
+        @set_time_limit(0);
+
         $validated = $request->validate([
             'ID' => ['nullable', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
             'ip' => ['nullable', 'ip', 'required_without:ID'],
             'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'password' => ['nullable', 'string'],
             'preview_only' => ['nullable', 'boolean'],
+            'include_templates' => ['nullable', 'boolean'],
+            'preview_rows' => ['nullable', 'array'],
             'selected_user_ids' => ['nullable', 'array'],
             'selected_user_ids.*' => ['integer', 'min:1'],
             'include_unmatched' => ['nullable', 'boolean'],
@@ -338,9 +349,35 @@ class MachineController extends Controller
         $machineIp = $machine?->IP ?? ($validated['ip'] ?? null);
         $machinePort = $machine?->Port ?? ($validated['port'] ?? 4370);
         $machinePassword = $machine?->CommPassword ?? ($validated['password'] ?? '0');
+        $progressKey = $this->downloadUsersProgressKey(
+            $machine?->ID,
+            (int) auth()->id(),
+            $machineIp
+        );
 
         if (!$machineIp) {
             return response()->json(['message' => 'Machine has no IP address configured.'], 422);
+        }
+
+        if ($previewOnly) {
+            Cache::forget($progressKey);
+        } else {
+            $this->putDownloadUsersProgress($progressKey, [
+                'state' => 'running',
+                'phase' => 'fetching_device_users',
+                'total' => 0,
+                'processed' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'created_users' => 0,
+                'restored_users' => 0,
+                'templates_downloaded' => 0,
+                'templates_created' => 0,
+                'templates_updated' => 0,
+                'templates_failed' => 0,
+                'templates_enabled' => (bool) ($validated['include_templates'] ?? false),
+                'message' => 'Fetching device users...',
+            ]);
         }
 
         $zk = new ZKTecoService(
@@ -350,14 +387,45 @@ class MachineController extends Controller
             password: blank($machinePassword) ? '0' : (string) $machinePassword
         );
 
-        try {
-            $zk->connect();
-            $deviceUsers = $zk->getUsers();
-            $zk->disconnect();
-        } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'User download failed: ' . $e->getMessage(),
-            ], 502);
+        $deviceUsers = [];
+        $usePreviewRows = !$previewOnly && is_array($validated['preview_rows'] ?? null) && ($validated['preview_rows'] ?? []) !== [];
+
+        if ($usePreviewRows) {
+            $deviceUsers = array_values(array_map(static function (array $row): array {
+                return [
+                    'uid' => (int) ($row['uid'] ?? 0),
+                    'pin' => (string) ($row['pin'] ?? ''),
+                    'name' => (string) ($row['name'] ?? ''),
+                    'password' => (string) ($row['password'] ?? ''),
+                    'privilege' => (int) ($row['privilege'] ?? 0),
+                    'card' => (int) ($row['card'] ?? 0),
+                ];
+            }, $validated['preview_rows'] ?? []));
+        } else {
+            try {
+                $zk->connect();
+                $deviceInfo = [];
+
+                try {
+                    $deviceInfo = $zk->getDeviceInfo();
+                } catch (\Throwable) {
+                    $deviceInfo = [];
+                }
+
+                $zk->configureUserDecodeProfile(
+                    $deviceInfo['FirmVer'] ?? $machine?->FirmwareVersion,
+                    $deviceInfo['DeviceName'] ?? $machine?->ProductType,
+                    $deviceInfo['ProduceKind'] ?? $machine?->ProduceKind
+                );
+
+                $deviceUsers = $zk->getUsers();
+                $deviceUsers = $this->normalizeConflictedDevicePins($deviceUsers);
+                $zk->disconnect();
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'message' => 'User download failed: ' . $e->getMessage(),
+                ], 502);
+            }
         }
 
         if ($deviceUsers === []) {
@@ -378,6 +446,8 @@ class MachineController extends Controller
                 'templates_failed' => 0,
                 'skipped_unmatched' => 0,
                 'skipped_invalid' => 0,
+                'conflict_count' => 0,
+                'conflicts' => [],
                 'device_users' => [],
                 'unmatched_users' => [],
             ]);
@@ -390,6 +460,7 @@ class MachineController extends Controller
             fn (array $deviceUser) => $this->buildDeviceUserPreviewRow($deviceUser, $activeUserIds, $softDeletedUserIds, $existingBiometricIds),
             $deviceUsers
         );
+        $conflicts = $this->detectDeviceUserConflicts($previewRows);
 
         $plannedCreate = count(array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'create'));
         $plannedUpdate = count(array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'update'));
@@ -414,6 +485,8 @@ class MachineController extends Controller
                 'planned_restore' => $plannedRestore,
                 'skipped_unmatched' => count($unmatchedUsers),
                 'skipped_invalid' => $skippedInvalid,
+                'conflict_count' => count($conflicts),
+                'conflicts' => array_slice($conflicts, 0, 200),
                 'device_users' => $previewRows,
                 'unmatched_users' => array_slice($unmatchedUsers, 0, 10),
             ]);
@@ -421,6 +494,7 @@ class MachineController extends Controller
 
         $selectedUserIds = array_values(array_unique(array_map('intval', $validated['selected_user_ids'] ?? [])));
         $includeUnmatched = (bool) ($validated['include_unmatched'] ?? false);
+        $includeTemplates = (bool) ($validated['include_templates'] ?? false);
         $rowsForImport = $previewRows;
 
         if ($selectedUserIds !== []) {
@@ -430,6 +504,34 @@ class MachineController extends Controller
 
                 return $resolved > 0 && isset($selectedLookup[$resolved]);
             }));
+        }
+
+        $rowsToProcess = array_values(array_filter($rowsForImport, function (array $row) use ($includeUnmatched): bool {
+            return in_array($row['planned_action'], ['create', 'update', 'restore'], true)
+                || ($includeUnmatched && $row['planned_action'] === 'unmatched');
+        }));
+
+        $progressTotal = count($rowsToProcess);
+        $processed = 0;
+
+        if (!$previewOnly) {
+            $this->putDownloadUsersProgress($progressKey, [
+                'state' => 'running',
+                'phase' => 'importing',
+                'started_at' => now()->toIso8601String(),
+                'total' => $progressTotal,
+                'processed' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'created_users' => 0,
+                'restored_users' => 0,
+                'templates_downloaded' => 0,
+                'templates_created' => 0,
+                'templates_updated' => 0,
+                'templates_failed' => 0,
+                'templates_enabled' => $includeTemplates,
+                'message' => $progressTotal > 0 ? 'Starting import...' : 'No selected users to import.',
+            ]);
         }
 
         $created = 0;
@@ -444,7 +546,7 @@ class MachineController extends Controller
 
         $templateSessionReady = false;
 
-        if ($rowsForImport !== []) {
+        if ($includeTemplates && $rowsForImport !== []) {
             try {
                 $zk->connect();
                 $zk->disableDevice();
@@ -454,17 +556,14 @@ class MachineController extends Controller
             }
         }
 
-        foreach ($rowsForImport as $previewRow) {
-            if (
-                !in_array($previewRow['planned_action'], ['create', 'update', 'restore'], true)
-                && !($includeUnmatched && $previewRow['planned_action'] === 'unmatched')
-            ) {
-                continue;
-            }
+        $importError = null;
 
+        try {
+            foreach ($rowsToProcess as $previewRow) {
             $resolvedUserId = (int) $previewRow['resolved_user_id'];
 
             if ($resolvedUserId <= 0) {
+                $processed++;
                 continue;
             }
 
@@ -500,6 +599,20 @@ class MachineController extends Controller
                 }
             }
 
+            // Upsert UserProfile with parsed name components for every imported user.
+            $deviceName = (string) ($previewRow['name'] ?? '');
+            if ($deviceName !== '') {
+                $nameParts = $this->parseDeviceName($deviceName);
+                UserProfile::updateOrCreate(
+                    ['user_id' => $resolvedUserId],
+                    array_filter([
+                        'first_name'  => $nameParts['first_name']  ?: null,
+                        'last_name'   => $nameParts['last_name']   ?: null,
+                        'middle_name' => $nameParts['middle_name'] ?: null,
+                    ], fn ($v) => $v !== null)
+                );
+            }
+
             $payload = $this->buildBiometricPayload($previewRow, $resolvedUserId);
             $record = UserBiometricInfo::withTrashed()->where('USERID', $resolvedUserId)->first();
 
@@ -515,7 +628,7 @@ class MachineController extends Controller
                 $created++;
             }
 
-            if ($templateSessionReady) {
+            if ($includeTemplates && $templateSessionReady) {
                 $templateStats = $this->downloadAndStoreUserTemplates(
                     $zk,
                     $resolvedUserId,
@@ -527,6 +640,48 @@ class MachineController extends Controller
                 $templatesUpdated += $templateStats['updated'];
                 $templatesFailed += $templateStats['failed'];
             }
+
+            $processed++;
+
+            // Update progress every 5 rows and on completion.
+            if ($processed % 5 === 0 || $processed === $progressTotal) {
+                $this->putDownloadUsersProgress($progressKey, [
+                    'state' => 'running',
+                    'phase' => 'importing',
+                    'total' => $progressTotal,
+                    'processed' => $processed,
+                    'created' => $created,
+                    'updated' => $updated,
+                    'created_users' => $createdUsers,
+                    'restored_users' => $restoredUsers,
+                    'templates_downloaded' => $templatesDownloaded,
+                    'templates_created' => $templatesCreated,
+                    'templates_updated' => $templatesUpdated,
+                    'templates_failed' => $templatesFailed,
+                    'templates_enabled' => $includeTemplates,
+                    'message' => "Imported {$processed} of {$progressTotal} users",
+                ]);
+            }
+        }
+        } catch (\Throwable $e) {
+            $importError = $e;
+
+            $this->putDownloadUsersProgress($progressKey, [
+                'state' => 'failed',
+                'phase' => 'importing',
+                'total' => $progressTotal,
+                'processed' => $processed,
+                'created' => $created,
+                'updated' => $updated,
+                'created_users' => $createdUsers,
+                'restored_users' => $restoredUsers,
+                'templates_downloaded' => $templatesDownloaded,
+                'templates_created' => $templatesCreated,
+                'templates_updated' => $templatesUpdated,
+                'templates_failed' => $templatesFailed,
+                'templates_enabled' => $includeTemplates,
+                'message' => $e->getMessage(),
+            ]);
         }
 
         if ($templateSessionReady) {
@@ -538,7 +693,13 @@ class MachineController extends Controller
             }
         }
 
-        return response()->json([
+        if ($importError instanceof \Throwable) {
+            return response()->json([
+                'message' => 'User import failed: ' . $importError->getMessage(),
+            ], 500);
+        }
+
+        $response = [
             'message' => 'User download complete.',
             'preview_only' => false,
             'total_device_users' => count($deviceUsers),
@@ -553,11 +714,220 @@ class MachineController extends Controller
             'templates_created' => $templatesCreated,
             'templates_updated' => $templatesUpdated,
             'templates_failed' => $templatesFailed,
+            'templates_enabled' => $includeTemplates,
             'skipped_unmatched' => count($unmatchedUsers),
             'skipped_invalid' => $skippedInvalid,
+            'conflict_count' => count($conflicts),
+            'conflicts' => array_slice($conflicts, 0, 200),
             'device_users' => $previewRows,
             'unmatched_users' => array_slice($unmatchedUsers, 0, 10),
+        ];
+
+        $this->putDownloadUsersProgress($progressKey, [
+            'state' => 'completed',
+            'phase' => 'done',
+            'total' => $progressTotal,
+            'processed' => $processed,
+            'created' => $created,
+            'updated' => $updated,
+            'created_users' => $createdUsers,
+            'restored_users' => $restoredUsers,
+            'templates_downloaded' => $templatesDownloaded,
+            'templates_created' => $templatesCreated,
+            'templates_updated' => $templatesUpdated,
+            'templates_failed' => $templatesFailed,
+            'templates_enabled' => $includeTemplates,
+            'message' => 'User import complete.',
         ]);
+
+        return response()->json($response);
+    }
+
+    public function downloadUsersProgress(Request $request)
+    {
+        $validated = $request->validate([
+            'ID' => ['nullable', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
+            'ip' => ['nullable', 'ip', 'required_without:ID'],
+        ]);
+
+        $machine = isset($validated['ID']) ? Machine::find($validated['ID']) : null;
+        $machineIp = $machine?->IP ?? ($validated['ip'] ?? null);
+        $key = $this->downloadUsersProgressKey($machine?->ID, (int) auth()->id(), $machineIp);
+        $progress = Cache::get($key);
+
+        if (!is_array($progress)) {
+            $progress = [
+                'state' => 'idle',
+                'phase' => 'idle',
+                'total' => 0,
+                'processed' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'created_users' => 0,
+                'restored_users' => 0,
+                'templates_downloaded' => 0,
+                'templates_created' => 0,
+                'templates_updated' => 0,
+                'templates_failed' => 0,
+                'templates_enabled' => false,
+                'message' => 'No active import.',
+            ];
+        }
+
+        return response()->json($progress);
+    }
+
+    private function downloadUsersProgressKey(?int $machineId, int $userId, ?string $machineIp = null): string
+    {
+        if ($machineId !== null && $machineId > 0) {
+            return "machine:download-users:progress:user:{$userId}:machine:{$machineId}";
+        }
+
+        $hash = md5((string) ($machineIp ?? 'unknown'));
+        return "machine:download-users:progress:user:{$userId}:ip:{$hash}";
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function putDownloadUsersProgress(string $key, array $state): void
+    {
+        $existing = Cache::get($key);
+        if (is_array($existing) && !isset($state['started_at']) && isset($existing['started_at'])) {
+            $state['started_at'] = $existing['started_at'];
+        }
+
+        if (!isset($state['started_at'])) {
+            $state['started_at'] = now()->toIso8601String();
+        }
+
+        $state['updated_at'] = now()->toIso8601String();
+        Cache::put($key, $state, now()->addMinutes(30));
+    }
+
+    /**
+     * Detect conflicting device rows, mainly duplicate PINs mapped to multiple
+     * names or resolved IDs.
+     *
+     * @param array<int, array<string, mixed>> $previewRows
+     * @return array<int, array<string, mixed>>
+     */
+    private function detectDeviceUserConflicts(array $previewRows): array
+    {
+        $byPin = [];
+
+        foreach ($previewRows as $row) {
+            $pin = trim((string) ($row['pin'] ?? ''));
+
+            if ($pin === '') {
+                continue;
+            }
+
+            $byPin[$pin][] = [
+                'uid' => (int) ($row['uid'] ?? 0),
+                'resolved_user_id' => (int) ($row['resolved_user_id'] ?? 0),
+                'name' => (string) ($row['name'] ?? ''),
+                'planned_action' => (string) ($row['planned_action'] ?? ''),
+            ];
+        }
+
+        $conflicts = [];
+
+        foreach ($byPin as $pin => $rows) {
+            if (count($rows) <= 1) {
+                continue;
+            }
+
+            $distinctNames = [];
+            $distinctResolvedIds = [];
+
+            foreach ($rows as $r) {
+                $nameKey = strtolower(trim((string) ($r['name'] ?? '')));
+                if ($nameKey !== '') {
+                    $distinctNames[$nameKey] = true;
+                }
+
+                $resolvedId = (int) ($r['resolved_user_id'] ?? 0);
+                if ($resolvedId > 0) {
+                    $distinctResolvedIds[(string) $resolvedId] = true;
+                }
+            }
+
+            $isConflict = count($distinctNames) > 1 || count($distinctResolvedIds) > 1;
+
+            if (!$isConflict) {
+                continue;
+            }
+
+            $conflicts[] = [
+                'type' => 'duplicate_pin',
+                'pin' => $pin,
+                'count' => count($rows),
+                'rows' => $rows,
+            ];
+        }
+
+        usort($conflicts, static fn (array $a, array $b): int => ($b['count'] ?? 0) <=> ($a['count'] ?? 0));
+
+        return $conflicts;
+    }
+
+    /**
+     * Decode-oriented repair for duplicate numeric PIN rows seen on some firmware:
+     * one row is valid while another row carries a trailing artifact digit.
+     *
+     * @param array<int, array<string, mixed>> $deviceUsers
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeConflictedDevicePins(array $deviceUsers): array
+    {
+        $groups = [];
+
+        foreach ($deviceUsers as $idx => $row) {
+            $pin = trim((string) ($row['pin'] ?? ''));
+            if ($pin !== '' && ctype_digit($pin)) {
+                $groups[$pin][] = $idx;
+            }
+        }
+
+        foreach ($groups as $pin => $indexes) {
+            if (count($indexes) < 2 || strlen($pin) < 2) {
+                continue;
+            }
+
+            $suspicious = [];
+            $normal = [];
+
+            foreach ($indexes as $idx) {
+                $password = (string) ($deviceUsers[$idx]['password'] ?? '');
+                if ($password !== '' && preg_match('/[^\x20-\x7E]/', $password) === 1) {
+                    $suspicious[] = $idx;
+                } else {
+                    $normal[] = $idx;
+                }
+            }
+
+            // If exactly one row in this duplicate pin group looks garbled,
+            // treat it as a decode artifact and trim the trailing artifact digit.
+            if (count($suspicious) !== 1 || $normal === []) {
+                continue;
+            }
+
+            $idx = $suspicious[0];
+            $trimmed = ltrim(substr($pin, 0, -1), '0');
+            if ($trimmed === '') {
+                $trimmed = '0';
+            }
+
+            $deviceUsers[$idx]['pin'] = $trimmed;
+
+            $currentUid = (int) ($deviceUsers[$idx]['uid'] ?? 0);
+            if ($currentUid <= 0 || (string) $currentUid === (string) $pin) {
+                $deviceUsers[$idx]['uid'] = (int) $trimmed;
+            }
+        }
+
+        return $deviceUsers;
     }
 
     /**
@@ -576,10 +946,32 @@ class MachineController extends Controller
         array $existingBiometricIds
     ): array
     {
-        $resolvedUserId = (int) ($deviceUser['uid'] ?? 0);
+        $rawUid = (int) ($deviceUser['uid'] ?? 0);
+        $pin = trim((string) ($deviceUser['pin'] ?? ''));
+        $name = trim((string) ($deviceUser['name'] ?? ''));
+        $card = (int) ($deviceUser['card'] ?? 0);
 
-        if ($resolvedUserId <= 0 && ctype_digit((string) ($deviceUser['pin'] ?? ''))) {
-            $resolvedUserId = (int) $deviceUser['pin'];
+        $resolvedUserId = $rawUid;
+
+        if ($resolvedUserId <= 0 && $pin !== '' && ctype_digit($pin)) {
+            $resolvedUserId = (int) $pin;
+        }
+
+        if ($resolvedUserId <= 0 && $pin !== '') {
+            $pinDigits = preg_replace('/\D+/', '', $pin) ?? '';
+            if ($pinDigits !== '' && ctype_digit($pinDigits)) {
+                $resolvedUserId = (int) $pinDigits;
+            }
+        }
+
+        if ($resolvedUserId <= 0 && $card > 0) {
+            $resolvedUserId = $card;
+        }
+
+        if ($resolvedUserId <= 0 && ($pin !== '' || $name !== '')) {
+            // Keep generated IDs inside signed INT range while avoiding common real IDs.
+            $seed = $pin !== '' ? $pin : $name;
+            $resolvedUserId = 1900000000 + (crc32($seed) % 100000000);
         }
 
         $plannedAction = 'invalid';
@@ -602,13 +994,13 @@ class MachineController extends Controller
         }
 
         return [
-            'uid' => (int) ($deviceUser['uid'] ?? 0),
+            'uid' => $rawUid > 0 ? $rawUid : $resolvedUserId,
             'resolved_user_id' => $resolvedUserId,
-            'pin' => (string) ($deviceUser['pin'] ?? ''),
-            'name' => (string) ($deviceUser['name'] ?? ''),
+            'pin' => $pin,
+            'name' => $name,
             'password' => (string) ($deviceUser['password'] ?? ''),
             'privilege' => (int) ($deviceUser['privilege'] ?? 0),
-            'card' => (int) ($deviceUser['card'] ?? 0),
+            'card' => $card,
             'planned_action' => $plannedAction,
             'status_label' => $statusLabel,
         ];
@@ -650,6 +1042,68 @@ class MachineController extends Controller
         }
 
         return $candidate;
+    }
+
+    /**
+     * Parse a device name (e.g. "ABAIGAR, APRIL D.") into name components.
+     *
+     * Supported formats (case-insensitive input, output is title-cased):
+     *   "LAST, FIRST MIDDLE"   → last=Last  first=First  middle=Middle
+     *   "LAST, FIRST M."       → last=Last  first=First  middle=M
+     *   "LAST, FIRST"          → last=Last  first=First  middle=''
+     *   "FIRST LAST"           → last=Last  first=First  middle=''
+     *
+     * @return array{first_name:string,last_name:string,middle_name:string}
+     */
+    private function parseDeviceName(string $name): array
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return ['first_name' => '', 'last_name' => '', 'middle_name' => ''];
+        }
+
+        // Title-case each whitespace-separated word individually.
+        $toTitle = static function (string $segment): string {
+            return implode(' ', array_map(
+                static fn (string $w) => mb_strtoupper(mb_substr($w, 0, 1)) . mb_strtolower(mb_substr($w, 1)),
+                array_filter(explode(' ', $segment))
+            ));
+        };
+
+        // Format: "LASTNAME, FIRSTNAME [MIDDLE...]"
+        if (str_contains($name, ',')) {
+            [$rawLast, $rawRest] = explode(',', $name, 2);
+            $last  = $toTitle(trim($rawLast));
+            $parts = array_values(array_filter(explode(' ', trim($rawRest))));
+
+            $first  = isset($parts[0]) ? $toTitle($parts[0]) : '';
+            $middle = '';
+
+            if (count($parts) > 1) {
+                // Combine remaining parts; strip trailing period from bare initials ("D." → "D")
+                $middleParts = array_slice($parts, 1);
+                $middle = implode(' ', array_map(static function (string $p) use ($toTitle): string {
+                    $p = rtrim($p, '.');
+                    return $p !== '' ? $toTitle($p) : '';
+                }, $middleParts));
+                $middle = trim($middle);
+            }
+
+            return ['first_name' => $first, 'last_name' => $last, 'middle_name' => $middle];
+        }
+
+        // Format: "FIRSTNAME LASTNAME" (no comma — fall back to simple split)
+        $parts = array_values(array_filter(explode(' ', $name)));
+        if (count($parts) === 1) {
+            return ['first_name' => $toTitle($parts[0]), 'last_name' => '', 'middle_name' => ''];
+        }
+
+        $first = $toTitle(array_shift($parts));
+        $last  = $toTitle(array_pop($parts));
+        $middle = implode(' ', array_map($toTitle, $parts));
+
+        return ['first_name' => $first, 'last_name' => $last, 'middle_name' => $middle];
     }
 
     private function downloadAndStoreUserTemplates(ZKTecoService $zk, int $userId, ?string $machineMarker): array

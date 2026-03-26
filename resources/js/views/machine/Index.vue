@@ -946,11 +946,63 @@ const collectPreviewSelection = (container) => {
   const checked = Array.from(container?.querySelectorAll('.sync-user-checkbox:checked') || [])
   const selected_user_ids = checked.map((el) => Number(el.getAttribute('data-user-id'))).filter((id) => Number.isFinite(id) && id > 0)
   const include_unmatched = checked.some((el) => (el.getAttribute('data-plan') || '') === 'unmatched')
+  const include_templates = Boolean(container?.querySelector('#sync-include-templates')?.checked)
 
   return {
     selected_user_ids,
     include_unmatched,
+    include_templates,
   }
+}
+
+const renderImportProgressHtml = (progress = {}) => {
+  const total = Math.max(0, Number(progress.total || 0))
+  const processed = Math.max(0, Number(progress.processed || 0))
+  const percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0
+  const indeterminate = total === 0
+  const created = Number(progress.created || 0)
+  const updated = Number(progress.updated || 0)
+  const templatesDownloaded = Number(progress.templates_downloaded || 0)
+  const templatesEnabled = Boolean(progress.templates_enabled)
+  const phase = progress.phase || ''
+  const defaultMsg = phase === 'fetching_device_users' ? 'Fetching users from device...' : 'Preparing import...'
+  const message = progress.message || defaultMsg
+  const startedAt = progress.started_at ? new Date(progress.started_at) : null
+  const elapsedSec = startedAt && !Number.isNaN(startedAt.getTime())
+    ? Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000))
+    : 0
+  const etaSec = processed > 0 && total > processed
+    ? Math.max(0, Math.round((elapsedSec / processed) * (total - processed)))
+    : 0
+  const formatDuration = (sec) => {
+    const s = Math.max(0, Number(sec || 0))
+    const m = Math.floor(s / 60)
+    const r = s % 60
+    return `${m}m ${r}s`
+  }
+  const barInner = indeterminate
+    ? `<div class="h-full w-full rounded-full bg-sky-400 animate-pulse"></div>`
+    : `<div class="h-full rounded-full bg-sky-500 transition-all duration-300" style="width:${percent}%"></div>`
+
+  return `<div class="space-y-3 text-left">
+    <p class="text-sm text-slate-600">${escapeHtml(message)}</p>
+    <div class="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+      ${barInner}
+    </div>
+    <div class="flex items-center justify-between text-xs text-slate-500">
+      <span>Progress</span>
+      <span>${indeterminate ? 'Starting…' : `${processed} / ${total} (${percent}%)`}</span>
+    </div>
+    <div class="flex items-center justify-between text-xs text-slate-500">
+      <span>Elapsed: ${formatDuration(elapsedSec)}</span>
+      <span>${processed > 0 && total > processed ? `ETA: ${formatDuration(etaSec)}` : 'ETA: --'}</span>
+    </div>
+    <div class="grid grid-cols-2 gap-2 text-sm">
+      <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">Created: <strong>${created}</strong></div>
+      <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">Updated: <strong>${updated}</strong></div>
+      <div class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 col-span-2">Template uploads: <strong>${templatesEnabled ? templatesDownloaded : 0}</strong>${templatesEnabled ? '' : ' (disabled)'}</div>
+    </div>
+  </div>`
 }
 
 const showDownloadUsersResult = async (data) => {
@@ -986,7 +1038,20 @@ const showDownloadUsersResult = async (data) => {
 const downloadUsersFromDevice = async (machine) => {
   downloadingUserIds.value = new Set([...downloadingUserIds.value, machine.ID])
 
+  Swal.fire({
+    title: 'Reading Device Users',
+    html: '<p class="text-sm text-slate-600">Fetching users from the machine...</p>',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => {
+      Swal.showLoading()
+    },
+  })
+
   const previewResp = await machineStore.downloadUsers({ ID: machine.ID, preview_only: true })
+
+  Swal.close()
 
   downloadingUserIds.value = new Set([...downloadingUserIds.value].filter((id) => id !== machine.ID))
 
@@ -1045,6 +1110,10 @@ const downloadUsersFromDevice = async (machine) => {
           <p class="mt-1 text-lg font-semibold text-amber-700">${Number(skipped_unmatched || 0) + Number(skipped_invalid || 0)}</p>
         </div>
       </div>
+      <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+        <input id="sync-include-templates" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" checked />
+        Download and import templates for selected users (slower)
+      </label>
       ${renderDeviceUserPreviewTable(device_users || [])}
     </div>`,
     showCancelButton: true,
@@ -1074,11 +1143,68 @@ const downloadUsersFromDevice = async (machine) => {
 
   downloadingUserIds.value = new Set([...downloadingUserIds.value, machine.ID])
 
+  let progressTimer = null
+  // Guard flag: prevents in-flight requests from touching the DOM or re-queuing
+  // after the import finishes. Must be set BEFORE clearInterval so any concurrent
+  // async updateProgress invocation bails out immediately after its await resolves.
+  let pollingStopped = false
+
+  const updateProgress = async () => {
+    if (pollingStopped) return
+    const progressResp = await machineStore.downloadUsersProgress({ ID: machine.ID })
+    if (pollingStopped) return  // check again — import may have finished during the await
+    if (!progressResp.success) return
+    const popup = Swal.getPopup()
+    const body = popup?.querySelector('#download-users-progress-body')
+    if (body) {
+      body.innerHTML = renderImportProgressHtml(progressResp.data || {})
+    }
+    // Auto-stop when backend signals completion so polling never leaks
+    if (['completed', 'failed'].includes(progressResp.data?.state)) {
+      pollingStopped = true
+      clearInterval(progressTimer)
+      progressTimer = null
+    }
+  }
+
+  Swal.fire({
+    title: 'Importing Users',
+    html: '<div id="download-users-progress-body"></div>',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    showConfirmButton: false,
+    didOpen: () => {
+      // Set interval SYNCHRONOUSLY before the first async call so that the outer
+      // cleanup code always has a valid timer ID to cancel, avoiding the race where
+      // the import finishes before the first updateProgress() network round-trip.
+      progressTimer = window.setInterval(updateProgress, 1200)
+      updateProgress()  // fire immediately for instant first render
+    },
+    willClose: () => {
+      pollingStopped = true
+      if (progressTimer) {
+        clearInterval(progressTimer)
+        progressTimer = null
+      }
+    },
+  })
+
   const importResp = await machineStore.downloadUsers({
     ID: machine.ID,
     selected_user_ids: selectionPayload?.selected_user_ids || [],
     include_unmatched: !!selectionPayload?.include_unmatched,
+    include_templates: !!selectionPayload?.include_templates,
+    preview_rows: device_users || [],
   })
+
+  // Stop polling before closing the modal so no requests fire after teardown
+  pollingStopped = true
+  if (progressTimer) {
+    clearInterval(progressTimer)
+    progressTimer = null
+  }
+
+  Swal.close()
 
   downloadingUserIds.value = new Set([...downloadingUserIds.value].filter((id) => id !== machine.ID))
 
@@ -1390,7 +1516,7 @@ onUnmounted(() => {
           </div>
 
           <div class="space-y-5 p-5">
-            <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="grid grid-cols-2 gap-3 text-sm lg:grid-cols-3">
               <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Machine No</p>
                 <p class="mt-1 font-medium text-slate-800 dark:text-slate-100">{{ machine.MachineNumber ?? '-' }}</p>
@@ -1406,6 +1532,37 @@ onUnmounted(() => {
               <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Firmware</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.FirmwareVersion || '-' }}</p>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Produce Kind</p>
+                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProduceKind || '-' }}</p>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
+                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.pushver || '-' }}</p>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Purpose</p>
+                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.Purpose || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Users</p>
+                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.usercount ?? 0 }}</p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Managers</p>
+                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.managercount ?? 0 }}</p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Fingerprints</p>
+                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.fingercount ?? 0 }}</p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Face/Secret</p>
+                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.SecretCount ?? 0 }}</p>
               </div>
             </div>
 
