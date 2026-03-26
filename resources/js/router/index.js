@@ -1,6 +1,7 @@
 // #region Imports
 import { createWebHistory, createRouter } from 'vue-router'
 import { useAuthStore } from '@/store/AuthStore'
+import { useLicenseStore } from '@/store/LicenseStore'
 import { getActivePinia } from "pinia"
 //#endregion
 
@@ -8,6 +9,12 @@ const AdminLayout = () => import('@/layouts/admin-account/AdminLayout.vue');
 const PublicLayout = () => import('@/layouts/public-account/FullScreenLayout.vue')
 const PublicScreenLayout = () => import('@/layouts/public-account/PublicScreenLayout.vue')
 const routes = [
+  {
+    path: '/license',
+    name: 'License',
+    component: () => import('../views/license/Activate.vue'),
+    meta: { title: 'Activate License', skipLicenseCheck: true, middleware: 'guest' },
+  },
   {
     path: "/",
     component: () => import('@/layouts/public-account/FullScreenLayout.vue'),
@@ -118,13 +125,26 @@ const router = createRouter({
   routes, // short for `routes: routes`
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
+  const licenseStore = useLicenseStore()
   const currentRole = Number(authStore.user?.role ?? -1)
   const currentUserId = Number(authStore.user?.id ?? 0)
 
-  document.title = to.meta.title || 'Church Accounting'
+  document.title = to.meta.title || 'Biometric System'
 
+  // ── License gate — always re-fetch so server-side changes (deactivation) are picked up ──
+  if (!to.meta.skipLicenseCheck) {
+    if (!licenseStore.license_loaded) {
+      await licenseStore.loadStatus()
+    }
+
+    if (licenseStore.isExpired) {
+      next({ name: 'License' })
+      return
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────────────────────
 
   if (to.meta.middleware === 'guest') {
     next()

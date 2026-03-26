@@ -32,6 +32,7 @@ class ZKTecoService
     private const CMD_DATA_WRRQ      = 1503;
     private const CMD_DATA_RDY       = 1504;
     private const CMD_USER_WRQ       = 8;
+    private const CMD_USERTEMP_RRQ   = 9;
     private const CMD_ATTLOG_RRQ     = 13;
     private const CMD_CLEAR_ATTLOG   = 15;
     private const CMD_DELETE_USER    = 18;
@@ -206,6 +207,52 @@ class ZKTecoService
     }
 
     /**
+     * Download user records stored on the device.
+     *
+     * @return array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}>
+     */
+    public function getUsers(): array
+    {
+        $this->sendCommand(self::CMD_DISABLEDEVICE);
+
+        try {
+            $raw = $this->readWithBuffer(self::CMD_USERTEMP_RRQ, 5, 0);
+
+            if ($raw !== '') {
+                return $this->parseUserRecords($raw);
+            }
+
+            $payloads = [
+                hex2bin('0901000000000000000000'),
+                pack('cvVV', 1, 0x05, 0, 0),
+            ];
+
+            $raw = '';
+
+            foreach ($payloads as $payload) {
+                $reply = $this->sendCommand(self::CMD_DATA_WRRQ, $payload);
+                $raw = match ($reply['cmd']) {
+                    self::CMD_ACK_OK       => $this->receivePreparedData($reply['reply_id']),
+                    self::CMD_DATA         => $reply['data'] ?? '',
+                    self::CMD_PREPARE_DATA => $this->receiveChunkedData(
+                        $this->unpackUInt32LE($reply['data'] ?? ''),
+                        $reply['reply_id']
+                    ),
+                    default                => '',
+                };
+
+                if ($raw !== '') {
+                    break;
+                }
+            }
+
+            return $this->parseUserRecords($raw);
+        } finally {
+            $this->sendCommand(self::CMD_ENABLEDEVICE);
+        }
+    }
+
+    /**
      * Disable the device UI so records are not missed during bulk operations.
      */
     public function disableDevice(): void
@@ -327,6 +374,48 @@ class ZKTecoService
     }
 
     /**
+     * Trigger on-device face enrollment for a specific user.
+     *
+     * Different ZKTeco firmwares map face enrollment to different backup numbers,
+     * so this method tries commonly used values until one is accepted.
+     *
+     * @throws RuntimeException if the device rejects all known face backup codes.
+     */
+    public function startFaceEnrollment(int $uid, string $userId = ''): void
+    {
+        $userId = (string) ($userId !== '' ? $userId : $uid);
+
+        // Common backup numbers observed for face capture across firmware variants.
+        $faceBackupCandidates = [111, 50, 12, 15];
+
+        $tcpUser = substr(str_pad($userId, 24, "\x00"), 0, 24);
+        $numericUser = ctype_digit($userId) ? (int) $userId : $uid;
+        $lastCmd = null;
+
+        foreach ($faceBackupCandidates as $backupNumber) {
+            $variants = [
+                pack('a24CC', $tcpUser, $backupNumber, 1),
+                pack('VV', $numericUser, $backupNumber),
+                pack('vC', $uid, $backupNumber),
+                pack('vC', $uid, $backupNumber) . $tcpUser,
+            ];
+
+            foreach ($variants as $payload) {
+                $reply = $this->sendCommand(self::CMD_STARTENROLL, $payload);
+                $lastCmd = $reply['cmd'] ?? null;
+
+                if ($lastCmd === self::CMD_ACK_OK) {
+                    return;
+                }
+            }
+        }
+
+        throw new RuntimeException(
+            "Device rejected face enrollment for UID {$uid} (last_cmd={$lastCmd})"
+        );
+    }
+
+    /**
      * Cancel any ongoing capture/enrollment session on the device.
      */
     public function cancelCapture(): void
@@ -379,8 +468,21 @@ class ZKTecoService
     {
         $fingerId = max(0, min(9, $fingerId));
 
+        return $this->getUserTemplateByBackupNumber($uid, $fingerId);
+    }
+
+    /**
+     * Download a single biometric template by backup number.
+     *
+     * Fingerprint slots are usually 0-9 while face templates can use other IDs
+     * depending on firmware (for example 50 or 111).
+     */
+    public function getUserTemplateByBackupNumber(int $uid, int $backupNumber): ?string
+    {
+        $backupNumber = max(0, min(255, $backupNumber));
+
         for ($attempt = 0; $attempt < 3; $attempt++) {
-            $reply = $this->sendCommand(self::CMD_GET_USERTEMP, pack('vC', $uid, $fingerId));
+            $reply = $this->sendCommand(self::CMD_GET_USERTEMP, pack('vC', $uid, $backupNumber));
 
             if ($reply['cmd'] === self::CMD_ACK_ERROR) {
                 continue;
@@ -718,6 +820,110 @@ class ZKTecoService
         $length = strlen($payload);
 
         foreach ([40, 16, 8] as $candidate) {
+            if ($length >= $candidate && $length % $candidate === 0) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse raw device user records.
+     *
+     * Supported layouts:
+     * - 72-byte TFT user records
+     * - 73-byte high-rate user records prefixed with STX (0x02)
+     * - payloads prefixed with a 4-byte declared size
+     *
+     * @return array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}>
+     */
+    private function parseUserRecords(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+
+        $payload = $raw;
+
+        if (strlen($payload) >= 4) {
+            $declaredSize = $this->unpackUInt32LE($payload);
+
+            if ($declaredSize > 0 && $declaredSize <= strlen($payload) - 4) {
+                $candidate = substr($payload, 4, $declaredSize);
+
+                if ($this->detectUserRecordSize($candidate) !== null) {
+                    $payload = $candidate;
+                }
+            }
+        }
+
+        $recordSize = $this->detectUserRecordSize($payload);
+
+        if ($recordSize === null) {
+            return [];
+        }
+
+        $users = [];
+        $total = strlen($payload);
+
+        for ($offset = 0; $offset + $recordSize <= $total; $offset += $recordSize) {
+            $record = substr($payload, $offset, $recordSize);
+
+            if ($recordSize === 73) {
+                if (ord($record[0]) !== 2) {
+                    continue;
+                }
+
+                $record = substr($record, 1);
+            }
+
+            if ($recordSize === 28) {
+                $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
+                $privilege = ord(substr($record, 2, 1) ?: "\x00");
+                $password = rtrim(substr($record, 3, 5), "\x00 \r\n\t");
+                $name = rtrim(substr($record, 8, 8), "\x00 \r\n\t");
+                $card = unpack('V', substr($record, 16, 4))[1] ?? 0;
+                $pin = (string) (unpack('V', substr($record, 24, 4))[1] ?? 0);
+            } else {
+                $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
+                $privilege = ord(substr($record, 2, 1) ?: "\x00");
+                $password = rtrim(substr($record, 3, 8), "\x00 \r\n\t");
+                $name = rtrim(substr($record, 11, 24), "\x00 \r\n\t");
+                $card = unpack('V', substr($record, 35, 4))[1] ?? 0;
+                $pin = rtrim(substr($record, 48, 24), "\x00 \r\n\t");
+            }
+
+            if ($pin === '' && $uid > 0) {
+                $pin = (string) $uid;
+            }
+
+            if ($name === '' && $pin !== '') {
+                $name = 'NN-' . $pin;
+            }
+
+            if ($uid <= 0 && $pin === '' && $name === '') {
+                continue;
+            }
+
+            $users[] = [
+                'uid' => (int) $uid,
+                'pin' => (string) $pin,
+                'name' => (string) $name,
+                'password' => (string) $password,
+                'privilege' => (int) $privilege,
+                'card' => (int) $card,
+            ];
+        }
+
+        return $users;
+    }
+
+    private function detectUserRecordSize(string $payload): ?int
+    {
+        $length = strlen($payload);
+
+        foreach ([73, 72, 28] as $candidate) {
             if ($length >= $candidate && $length % $candidate === 0) {
                 return $candidate;
             }

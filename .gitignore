@@ -1,7 +1,7 @@
 /.phpunit.cache
 /node_modules
+/dist
 /public/hot
-/public/uploads
 /public/storage
 /public/output/
 /public/output/*
@@ -21,3 +21,4 @@ package-lock.json
 /.nova
 /.vscode
 /.zed
+.end-dev

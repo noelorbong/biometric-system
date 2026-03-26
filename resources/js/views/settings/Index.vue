@@ -1,12 +1,21 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import Swal from 'sweetalert2'
 import 'sweetalert2/src/sweetalert2.scss'
 import Button from '@/components/ui/Button.vue'
 import { useAppSettingStore } from '@/store/AppSettingStore'
+import { useLicenseStore } from '@/store/LicenseStore'
 
 const appSettingStore = useAppSettingStore()
+const licenseStore = useLicenseStore()
+
+const licenseStatus     = computed(() => licenseStore.status)
+const licenseKey        = computed(() => licenseStore.licenseKey)
+const licenseExpiry     = computed(() => licenseStore.licenseExpiry)
+const licenseDaysLeft   = computed(() => licenseStore.licenseDaysLeft)
+const trialDaysLeft     = computed(() => licenseStore.trialDaysLeft)
+const trialExpiresAt    = computed(() => licenseStore.trialExpiresAt)
 const {
   companySchoolName,
   machineAutoSyncStatusTimerEnabled,
@@ -32,6 +41,75 @@ const patching = ref(false)
 const patchResults = ref([])
 const updating = ref(false)
 const updateResults = ref([])
+const deactivating = ref(false)
+const replacing = ref(false)
+
+const formatDate = (iso) => {
+  if (!iso) return null
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+const maskedKey = computed(() => {
+  const key = licenseKey.value
+  if (!key) return null
+  if (key.length <= 8) return '••••-' + key.slice(-4)
+  return key.slice(0, 4) + '-••••-••••-' + key.slice(-4)
+})
+
+const handleReplaceLicense = async () => {
+  const { value: newKey } = await Swal.fire({
+    title: 'Replace License',
+    text: 'Enter your new license key to replace the current one.',
+    input: 'text',
+    inputPlaceholder: 'XXXX-XXXX-XXXX-XXXX',
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonText: 'Replace',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#0284c7',
+    inputValidator: (value) => {
+      if (!value || !value.trim()) {
+        return 'License key cannot be empty'
+      }
+    },
+  })
+
+  if (!newKey) return
+
+  replacing.value = true
+  try {
+    await licenseStore.activate(newKey.trim())
+    toastResult('License replaced successfully', 'success')
+  } catch (e) {
+    toastResult(e?.response?.data?.message || 'Failed to replace license', 'error')
+  } finally {
+    replacing.value = false
+  }
+}
+
+const handleDeactivateLicense = async () => {
+  const confirmation = await Swal.fire({
+    title: 'Remove License?',
+    text: 'This will deactivate the current license key. You will need to re-enter it to regain access.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Remove',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#e11d48',
+  })
+
+  if (!confirmation.isConfirmed) return
+
+  deactivating.value = true
+  try {
+    await licenseStore.deactivate()
+    toastResult('License removed', 'success')
+  } catch (e) {
+    toastResult('Failed to remove license', 'error')
+  } finally {
+    deactivating.value = false
+  }
+}
 
 const Toast = Swal.mixin({
   toast: true,
@@ -211,6 +289,112 @@ onMounted(async () => {
             <p class="mt-1 text-xs text-slate-300">Settings persistence</p>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ── License Info ── -->
+    <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="text-base font-semibold text-slate-800 dark:text-white">License</h2>
+          <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Current activation status for this installation.</p>
+        </div>
+        <!-- Plan badge -->
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+          :class="{
+            'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300': licenseStatus === 'licensed',
+            'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300': licenseStatus === 'trial',
+            'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300': licenseStatus === 'expired',
+          }"
+        >
+          <span class="h-1.5 w-1.5 rounded-full"
+            :class="{
+              'bg-emerald-500': licenseStatus === 'licensed',
+              'bg-sky-500': licenseStatus === 'trial',
+              'bg-rose-500': licenseStatus === 'expired',
+            }"
+          ></span>
+          {{ licenseStatus === 'licensed' ? 'Licensed' : licenseStatus === 'trial' ? 'Free Trial' : 'Expired' }}
+        </span>
+      </div>
+
+      <div class="grid gap-4 px-5 py-5 sm:grid-cols-3">
+        <!-- Type -->
+        <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Plan Type</p>
+          <p class="mt-1.5 text-sm font-semibold text-slate-800 dark:text-white">
+            {{ licenseStatus === 'licensed' ? 'Paid License' : licenseStatus === 'trial' ? 'Free Trial (7 days)' : 'Trial Expired' }}
+          </p>
+        </div>
+
+        <!-- Expiry / Trial expiry -->
+        <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Expires</p>
+          <p class="mt-1.5 text-sm font-semibold text-slate-800 dark:text-white">
+            <template v-if="licenseStatus === 'licensed'">
+              {{ licenseExpiry ? formatDate(licenseExpiry) : 'Never' }}
+            </template>
+            <template v-else-if="licenseStatus === 'trial'">
+              {{ trialExpiresAt ? formatDate(trialExpiresAt) : '—' }}
+            </template>
+            <template v-else>—</template>
+          </p>
+        </div>
+
+        <!-- Days left -->
+        <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Days Remaining</p>
+          <p class="mt-1.5 text-sm font-semibold"
+            :class="{
+              'text-emerald-600 dark:text-emerald-400': licenseStatus === 'licensed' && (licenseDaysLeft === null || licenseDaysLeft > 30),
+              'text-amber-600 dark:text-amber-400': licenseStatus === 'licensed' && licenseDaysLeft !== null && licenseDaysLeft <= 30 && licenseDaysLeft > 7,
+              'text-rose-600 dark:text-rose-400': (licenseStatus === 'licensed' && licenseDaysLeft !== null && licenseDaysLeft <= 7) || licenseStatus === 'expired',
+              'text-sky-600 dark:text-sky-400': licenseStatus === 'trial',
+            }"
+          >
+            <template v-if="licenseStatus === 'licensed'">
+              {{ licenseDaysLeft === null ? 'Unlimited' : `${licenseDaysLeft} day${licenseDaysLeft !== 1 ? 's' : ''}` }}
+            </template>
+            <template v-else-if="licenseStatus === 'trial'">
+              {{ trialDaysLeft }} day{{ trialDaysLeft !== 1 ? 's' : '' }}
+            </template>
+            <template v-else>0 days</template>
+          </p>
+        </div>
+      </div>
+
+      <!-- Licensed: show key + replace + deactivate -->
+      <div v-if="licenseStatus === 'licensed'" class="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-xs text-slate-400 dark:text-slate-500">License Key</p>
+          <p class="mt-0.5 font-mono text-sm font-semibold tracking-widest text-slate-700 dark:text-slate-200">{{ maskedKey }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            @click="handleReplaceLicense"
+            :disabled="replacing"
+            class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-4 text-xs font-semibold text-sky-600 transition hover:bg-sky-100 disabled:opacity-60 dark:border-sky-800/40 dark:bg-sky-950/20 dark:text-sky-400 dark:hover:bg-sky-950/40"
+          >
+            {{ replacing ? 'Replacing…' : 'Replace' }}
+          </button>
+          <button
+            @click="handleDeactivateLicense"
+            :disabled="deactivating"
+            class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-60 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-400 dark:hover:bg-rose-950/40"
+          >
+            {{ deactivating ? 'Removing…' : 'Remove' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Trial/Expired: prompt to activate -->
+      <div v-else class="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          <template v-if="licenseStatus === 'trial'">Upgrade to a paid license to continue after your trial ends.</template>
+          <template v-else>Your trial has expired. Enter a license key to continue.</template>
+          <router-link to="/license" class="ml-1 font-medium text-sky-600 hover:underline dark:text-sky-400">Activate License →</router-link>
+        </p>
       </div>
     </section>
 

@@ -36,6 +36,7 @@ export const useAuthStore = defineStore('auth', {
         this.authenticated = true
         return { success: true, data: resp.data }
       } catch (resp) {
+        console.error('Failed to check auth:', resp)
         if (resp.response?.data?.message === 'Unauthenticated.') {
           this.user = {}
           this.authenticated = false

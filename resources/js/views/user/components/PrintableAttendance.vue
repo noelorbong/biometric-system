@@ -132,12 +132,10 @@
                             <td style="border: 1px solid #111827; font-size: 6pt; text-align: center; ">
                                 {{ getRecordValue(day, 'pm_out') }}
                             </td>
-                            <td
-                                style="border: 1px solid #111827;  font-size: 6pt; text-align: center;">
+                            <td style="border: 1px solid #111827; font-size: 6pt; text-align: center;">
                                 {{ getRecordValue(day, 'undertime_hrs') }}
                             </td>
-                            <td
-                                style="border: 1px solid #111827;  font-size: 6pt; text-align: center;">
+                            <td style="border: 1px solid #111827;  font-size: 6pt; text-align: center;">
                                 {{ getRecordValue(day, 'undertime_min') }}
                             </td>
                         </tr>
@@ -201,6 +199,11 @@ const props = defineProps({
         type: Boolean,
         default: true,
     }
+    ,
+    overrides: {
+        type: Array,
+        default: () => [],
+    },
 })
 
 // Computed Properties
@@ -222,8 +225,84 @@ const totalDaysInMonth = computed(() => {
 })
 
 // Methods
+const formatOverrideTime = (dateTimeValue) => {
+    const date = new Date(dateTimeValue)
+    if (Number.isNaN(date.getTime())) {
+        return ''
+    }
+    return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+    })
+}
+
+const getDateKey = (dateValue) => {
+    const date = new Date(dateValue)
+    if (Number.isNaN(date.getTime())) {
+        return null
+    }
+
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+}
+
+const resolveOverrideSlot = (overrideRow) => {
+    const type = String(overrideRow?.new_checktype || '').trim().toUpperCase()
+    const date = new Date(overrideRow?.new_checktime)
+    if (Number.isNaN(date.getTime())) {
+        return null
+    }
+
+    const hour = date.getHours()
+
+    if (type === 'I') {
+        return hour < 12 ? 'am_in' : 'pm_in'
+    }
+
+    if (type === 'O') {
+        return hour <= 12 ? 'am_out' : 'pm_out'
+    }
+
+    return null
+}
+
+const getOverrideValue = (day, field) => {
+    if (!Array.isArray(props.overrides) || !props.overrides.length) {
+        return ''
+    }
+
+    const dayStr = String(day).padStart(2, '0')
+    const monthStr = String(props.selectedMonth).padStart(2, '0')
+    const targetDate = `${props.selectedYear}-${monthStr}-${dayStr}`
+
+    const matched = props.overrides
+        .filter((row) => getDateKey(row?.new_checktime) === targetDate)
+        .filter((row) => resolveOverrideSlot(row) === field)
+        .sort((a, b) => {
+            const aTime = new Date(a?.updated_at || a?.created_at || a?.new_checktime).getTime()
+            const bTime = new Date(b?.updated_at || b?.created_at || b?.new_checktime).getTime()
+            return bTime - aTime
+        })
+
+    if (!matched.length) {
+        return ''
+    }
+
+    return formatOverrideTime(matched[0].new_checktime)
+}
+
 const getRecordValue = (day, field) => {
     if (!props.attendanceRecords || !Array.isArray(props.attendanceRecords)) return ''
+
+    if (field === 'am_in' || field === 'am_out' || field === 'pm_in' || field === 'pm_out') {
+        const overrideValue = getOverrideValue(day, field)
+        if (overrideValue) {
+            return overrideValue
+        }
+    }
 
     // Find attendance record for this day
     const dayStr = String(day).padStart(2, '0')

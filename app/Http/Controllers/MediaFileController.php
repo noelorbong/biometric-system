@@ -18,7 +18,9 @@ class MediaFileController extends Controller
             'file' => 'required|file',
         ]);
 
-        $disk = 'uploads';
+        // $disk = 'uploads';
+
+        $disk = 'public';
 
         $year  = date('Y');
         $month = date('m');
@@ -26,7 +28,8 @@ class MediaFileController extends Controller
 
         $mainFolder      = 'library_files';
         $thumbnailFolder = 'thumbnails';
-        $main_folder = '/storage/uploads/';
+        $main_folder = '/uploads/';
+        // $main_folder = '/storage/uploads/';
 
         $uploadedFile = $request->file('file');
         $extension    = strtolower($uploadedFile->getClientOriginalExtension());

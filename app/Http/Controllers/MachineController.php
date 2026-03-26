@@ -11,6 +11,7 @@ use App\Services\ZKTecoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class MachineController extends Controller
@@ -317,6 +318,410 @@ class MachineController extends Controller
     }
 
     /**
+     * Download users stored on a biometric device and import matching local biometric rows.
+     */
+    public function downloadUsers(Request $request)
+    {
+        $validated = $request->validate([
+            'ID' => ['nullable', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
+            'ip' => ['nullable', 'ip', 'required_without:ID'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'password' => ['nullable', 'string'],
+            'preview_only' => ['nullable', 'boolean'],
+            'selected_user_ids' => ['nullable', 'array'],
+            'selected_user_ids.*' => ['integer', 'min:1'],
+            'include_unmatched' => ['nullable', 'boolean'],
+        ]);
+
+        $previewOnly = (bool) ($validated['preview_only'] ?? false);
+        $machine = isset($validated['ID']) ? Machine::findOrFail($validated['ID']) : null;
+        $machineIp = $machine?->IP ?? ($validated['ip'] ?? null);
+        $machinePort = $machine?->Port ?? ($validated['port'] ?? 4370);
+        $machinePassword = $machine?->CommPassword ?? ($validated['password'] ?? '0');
+
+        if (!$machineIp) {
+            return response()->json(['message' => 'Machine has no IP address configured.'], 422);
+        }
+
+        $zk = new ZKTecoService(
+            ip: $machineIp,
+            port: $machinePort,
+            timeout: 20,
+            password: blank($machinePassword) ? '0' : (string) $machinePassword
+        );
+
+        try {
+            $zk->connect();
+            $deviceUsers = $zk->getUsers();
+            $zk->disconnect();
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'User download failed: ' . $e->getMessage(),
+            ], 502);
+        }
+
+        if ($deviceUsers === []) {
+            return response()->json([
+                'message' => $previewOnly ? 'No users found on device preview.' : 'No users found on device.',
+                'preview_only' => $previewOnly,
+                'total_device_users' => 0,
+                'planned_create' => 0,
+                'planned_update' => 0,
+                'planned_restore' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'created_users' => 0,
+                'restored_users' => 0,
+                'templates_downloaded' => 0,
+                'templates_created' => 0,
+                'templates_updated' => 0,
+                'templates_failed' => 0,
+                'skipped_unmatched' => 0,
+                'skipped_invalid' => 0,
+                'device_users' => [],
+                'unmatched_users' => [],
+            ]);
+        }
+
+        $activeUserIds = User::query()->pluck('id')->flip()->all();
+        $softDeletedUserIds = User::onlyTrashed()->pluck('id')->flip()->all();
+        $existingBiometricIds = UserBiometricInfo::withTrashed()->pluck('USERID')->flip()->all();
+        $previewRows = array_map(
+            fn (array $deviceUser) => $this->buildDeviceUserPreviewRow($deviceUser, $activeUserIds, $softDeletedUserIds, $existingBiometricIds),
+            $deviceUsers
+        );
+
+        $plannedCreate = count(array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'create'));
+        $plannedUpdate = count(array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'update'));
+        $plannedRestore = count(array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'restore'));
+        $skippedInvalid = count(array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'invalid'));
+        $unmatchedUsers = array_values(array_map(
+            fn (array $row) => [
+                'uid' => $row['resolved_user_id'],
+                'pin' => $row['pin'],
+                'name' => $row['name'],
+            ],
+            array_filter($previewRows, fn (array $row) => $row['planned_action'] === 'unmatched')
+        ));
+
+        if ($previewOnly) {
+            return response()->json([
+                'message' => 'Device user preview generated.',
+                'preview_only' => true,
+                'total_device_users' => count($deviceUsers),
+                'planned_create' => $plannedCreate,
+                'planned_update' => $plannedUpdate,
+                'planned_restore' => $plannedRestore,
+                'skipped_unmatched' => count($unmatchedUsers),
+                'skipped_invalid' => $skippedInvalid,
+                'device_users' => $previewRows,
+                'unmatched_users' => array_slice($unmatchedUsers, 0, 10),
+            ]);
+        }
+
+        $selectedUserIds = array_values(array_unique(array_map('intval', $validated['selected_user_ids'] ?? [])));
+        $includeUnmatched = (bool) ($validated['include_unmatched'] ?? false);
+        $rowsForImport = $previewRows;
+
+        if ($selectedUserIds !== []) {
+            $selectedLookup = array_flip($selectedUserIds);
+            $rowsForImport = array_values(array_filter($previewRows, function (array $row) use ($selectedLookup) {
+                $resolved = (int) ($row['resolved_user_id'] ?? 0);
+
+                return $resolved > 0 && isset($selectedLookup[$resolved]);
+            }));
+        }
+
+        $created = 0;
+        $updated = 0;
+        $createdUsers = 0;
+        $restoredUsers = 0;
+        $templatesDownloaded = 0;
+        $templatesCreated = 0;
+        $templatesUpdated = 0;
+        $templatesFailed = 0;
+        $templateMachineMarker = $machine?->MachineNumber === null ? null : (string) $machine->MachineNumber;
+
+        $templateSessionReady = false;
+
+        if ($rowsForImport !== []) {
+            try {
+                $zk->connect();
+                $zk->disableDevice();
+                $templateSessionReady = true;
+            } catch (\Throwable) {
+                $templateSessionReady = false;
+            }
+        }
+
+        foreach ($rowsForImport as $previewRow) {
+            if (
+                !in_array($previewRow['planned_action'], ['create', 'update', 'restore'], true)
+                && !($includeUnmatched && $previewRow['planned_action'] === 'unmatched')
+            ) {
+                continue;
+            }
+
+            $resolvedUserId = (int) $previewRow['resolved_user_id'];
+
+            if ($resolvedUserId <= 0) {
+                continue;
+            }
+
+            if ($previewRow['planned_action'] === 'restore') {
+                $softDeletedUser = User::withTrashed()->find($resolvedUserId);
+
+                if ($softDeletedUser && $softDeletedUser->trashed()) {
+                    $softDeletedUser->restore();
+                    $restoredUsers++;
+                }
+            }
+
+            if ($previewRow['planned_action'] === 'unmatched') {
+                $existingUser = User::withTrashed()->find($resolvedUserId);
+
+                if ($existingUser) {
+                    if ($existingUser->trashed()) {
+                        $existingUser->restore();
+                        $restoredUsers++;
+                    }
+                } else {
+                    $newUser = new User([
+                        'name' => (string) ($previewRow['name'] ?: ('Imported User ' . $resolvedUserId)),
+                        'email' => $this->buildImportedUserEmail($resolvedUserId, (string) ($previewRow['pin'] ?? '')),
+                        'password' => Str::random(16),
+                        'role' => 0,
+                        'status' => true,
+                    ]);
+
+                    $newUser->id = $resolvedUserId;
+                    $newUser->save();
+                    $createdUsers++;
+                }
+            }
+
+            $payload = $this->buildBiometricPayload($previewRow, $resolvedUserId);
+            $record = UserBiometricInfo::withTrashed()->where('USERID', $resolvedUserId)->first();
+
+            if ($record) {
+                if ($record->trashed()) {
+                    $record->restore();
+                }
+
+                $record->update($payload);
+                $updated++;
+            } else {
+                UserBiometricInfo::create($payload);
+                $created++;
+            }
+
+            if ($templateSessionReady) {
+                $templateStats = $this->downloadAndStoreUserTemplates(
+                    $zk,
+                    $resolvedUserId,
+                    $templateMachineMarker
+                );
+
+                $templatesDownloaded += $templateStats['downloaded'];
+                $templatesCreated += $templateStats['created'];
+                $templatesUpdated += $templateStats['updated'];
+                $templatesFailed += $templateStats['failed'];
+            }
+        }
+
+        if ($templateSessionReady) {
+            try {
+                $zk->enableDevice();
+                $zk->disconnect();
+            } catch (\Throwable) {
+                // keep user import result resilient if template session cleanup fails
+            }
+        }
+
+        return response()->json([
+            'message' => 'User download complete.',
+            'preview_only' => false,
+            'total_device_users' => count($deviceUsers),
+            'planned_create' => $plannedCreate,
+            'planned_update' => $plannedUpdate,
+            'planned_restore' => $plannedRestore,
+            'created' => $created,
+            'updated' => $updated,
+            'created_users' => $createdUsers,
+            'restored_users' => $restoredUsers,
+            'templates_downloaded' => $templatesDownloaded,
+            'templates_created' => $templatesCreated,
+            'templates_updated' => $templatesUpdated,
+            'templates_failed' => $templatesFailed,
+            'skipped_unmatched' => count($unmatchedUsers),
+            'skipped_invalid' => $skippedInvalid,
+            'device_users' => $previewRows,
+            'unmatched_users' => array_slice($unmatchedUsers, 0, 10),
+        ]);
+    }
+
+    /**
+     * Build a preview row describing how one device user would map into local records.
+     *
+     * @param array{uid?:mixed,pin?:mixed,name?:mixed,password?:mixed,privilege?:mixed,card?:mixed} $deviceUser
+     * @param array<int, mixed> $activeUserIds
+     * @param array<int, mixed> $softDeletedUserIds
+     * @param array<int, mixed> $existingBiometricIds
+     * @return array<string, mixed>
+     */
+    private function buildDeviceUserPreviewRow(
+        array $deviceUser,
+        array $activeUserIds,
+        array $softDeletedUserIds,
+        array $existingBiometricIds
+    ): array
+    {
+        $resolvedUserId = (int) ($deviceUser['uid'] ?? 0);
+
+        if ($resolvedUserId <= 0 && ctype_digit((string) ($deviceUser['pin'] ?? ''))) {
+            $resolvedUserId = (int) $deviceUser['pin'];
+        }
+
+        $plannedAction = 'invalid';
+        $statusLabel = 'Invalid';
+
+        if ($resolvedUserId > 0) {
+            if (isset($softDeletedUserIds[$resolvedUserId])) {
+                $plannedAction = 'restore';
+                $statusLabel = 'Restore';
+            } elseif (!isset($activeUserIds[$resolvedUserId])) {
+                $plannedAction = 'unmatched';
+                $statusLabel = 'Unmatched';
+            } elseif (isset($existingBiometricIds[$resolvedUserId])) {
+                $plannedAction = 'update';
+                $statusLabel = 'Update';
+            } else {
+                $plannedAction = 'create';
+                $statusLabel = 'Create';
+            }
+        }
+
+        return [
+            'uid' => (int) ($deviceUser['uid'] ?? 0),
+            'resolved_user_id' => $resolvedUserId,
+            'pin' => (string) ($deviceUser['pin'] ?? ''),
+            'name' => (string) ($deviceUser['name'] ?? ''),
+            'password' => (string) ($deviceUser['password'] ?? ''),
+            'privilege' => (int) ($deviceUser['privilege'] ?? 0),
+            'card' => (int) ($deviceUser['card'] ?? 0),
+            'planned_action' => $plannedAction,
+            'status_label' => $statusLabel,
+        ];
+    }
+
+    /**
+     * Build the local biometric payload for a matched device user.
+     *
+     * @param array<string, mixed> $deviceUser
+     * @return array<string, mixed>
+     */
+    private function buildBiometricPayload(array $deviceUser, int $resolvedUserId): array
+    {
+        $payload = [
+            'USERID' => $resolvedUserId,
+            'Badgenumber' => (string) (($deviceUser['pin'] ?? '') !== '' ? $deviceUser['pin'] : $resolvedUserId),
+            'PASSWORD' => (string) ($deviceUser['password'] ?? ''),
+            'privilege' => (int) ($deviceUser['privilege'] ?? 0),
+            'CardNo' => (int) ($deviceUser['card'] ?? 0) > 0 ? (string) $deviceUser['card'] : null,
+        ];
+
+        if ((string) ($deviceUser['name'] ?? '') !== '') {
+            $payload['Name'] = (string) $deviceUser['name'];
+        }
+
+        return $payload;
+    }
+
+    private function buildImportedUserEmail(int $resolvedUserId, string $pin): string
+    {
+        $seed = ctype_digit($pin) ? $pin : (string) $resolvedUserId;
+        $base = 'device' . $seed;
+        $candidate = $base . '@biometric.local';
+        $suffix = 1;
+
+        while (User::withTrashed()->where('email', $candidate)->exists()) {
+            $candidate = $base . '+' . $suffix . '@biometric.local';
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function downloadAndStoreUserTemplates(ZKTecoService $zk, int $userId, ?string $machineMarker): array
+    {
+        $stats = [
+            'downloaded' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'failed' => 0,
+        ];
+
+        foreach (range(0, 9) as $fingerId) {
+            try {
+                $templateRaw = $zk->getUserTemplate($userId, $fingerId);
+            } catch (\Throwable) {
+                $stats['failed']++;
+                continue;
+            }
+
+            if ($templateRaw === null || $templateRaw === '') {
+                continue;
+            }
+
+            $result = $this->upsertDownloadedTemplate($userId, $fingerId, $templateRaw, $machineMarker);
+            $stats['downloaded']++;
+
+            if ($result === 'created') {
+                $stats['created']++;
+            } else {
+                $stats['updated']++;
+            }
+        }
+
+        return $stats;
+    }
+
+    private function upsertDownloadedTemplate(int $userId, int $fingerId, string $templateRaw, ?string $machineMarker): string
+    {
+        $query = BiometricTemplate::query()
+            ->where('USERID', $userId)
+            ->where('FINGERID', $fingerId);
+
+        if ($machineMarker === null) {
+            $query->whereNull('EMACHINENUM');
+        } else {
+            $query->where('EMACHINENUM', $machineMarker);
+        }
+
+        $row = $query->first();
+
+        if (!$row) {
+            $row = new BiometricTemplate([
+                'USERID' => $userId,
+                'FINGERID' => $fingerId,
+                'EMACHINENUM' => $machineMarker,
+            ]);
+            $result = 'created';
+        } else {
+            $result = 'updated';
+        }
+
+        $row->TEMPLATE = $templateRaw;
+        $row->TEMPLATE4 = $templateRaw;
+        $row->USETYPE = 0;
+        $row->Flag = 1;
+        $row->DivisionFP = 10;
+        $row->save();
+
+        return $result;
+    }
+
+    /**
      * Push all users from the local biometric info table to one or all machines.
      * POST /api/machine/push-users
      * Body: { machine_id: int|null }   null or omitted means all enabled machines.
@@ -525,10 +930,12 @@ class MachineController extends Controller
         }
 
         $biometric = $user->biometricInfo;
-        $displayName = trim(implode(' ', array_filter([
-            $user->profile?->first_name,
-            $user->profile?->last_name,
-        ]))) ?: ($user->name ?? '');
+        // $displayName = trim(implode(' ', array_filter([
+        //     $user->profile?->first_name,
+        //     $user->profile?->last_name,
+        // ]))) ?: ($user->name ?? '');
+
+        $displayName = ($user->name ?? '');
 
         $payload = [
             'uid' => (int) $user->id,
@@ -835,6 +1242,257 @@ class MachineController extends Controller
             'finger_label' => $fingerLabel,
             'instructions' => "The device is now ready. Ask {$displayName} to place their {$fingerLabel} on the scanner when the device prompts. The scan will repeat 3 times.",
         ]);
+    }
+
+    /**
+     * Push user info to a machine then trigger on-device face enrollment.
+     * POST /api/machine/enroll-face
+     * Body: { user_id, machine_id }
+     */
+    public function enrollFace(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'machine_id' => ['required', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
+        ]);
+
+        $user = User::query()->with(['profile', 'biometricInfo'])->findOrFail($validated['user_id']);
+        $machine = Machine::query()->findOrFail($validated['machine_id']);
+
+        if (!$machine->Enabled) {
+            return response()->json(['message' => 'Selected machine is disabled.'], 422);
+        }
+
+        if (!$machine->IP) {
+            return response()->json(['message' => 'Selected machine has no IP address configured.'], 422);
+        }
+
+        $biometric = $user->biometricInfo;
+        $displayName = trim(implode(' ', array_filter([
+            $user->profile?->first_name,
+            $user->profile?->last_name,
+        ]))) ?: ($user->name ?? '');
+
+        $badgeNumber = (string) ($biometric?->Badgenumber ?: $user->id);
+
+        $userPayload = [
+            'uid' => (int) $user->id,
+            'badgenumber' => $badgeNumber,
+            'name' => $displayName,
+            'password' => $biometric?->PASSWORD ?? '',
+            'card' => $biometric?->CardNo ?? '',
+            'privilege' => (int) ($biometric?->privilege ?? 0),
+        ];
+
+        try {
+            $zk = new ZKTecoService(
+                ip: $machine->IP,
+                port: $machine->Port ?? 4370,
+                timeout: 20,
+                password: blank($machine->CommPassword) ? '0' : (string) $machine->CommPassword
+            );
+
+            $zk->connect();
+            $zk->disableDevice();
+
+            try {
+                $zk->setUserInfo($userPayload);
+            } catch (\Throwable) {
+                $zk->deleteUserInfo((int) $user->id);
+                $zk->setUserInfo($userPayload);
+            }
+
+            $zk->enableDevice();
+            $zk->registerEvents(0xFFFF);
+            $zk->startFaceEnrollment((int) $user->id, $badgeNumber);
+            $zk->disconnect();
+        } catch (\Throwable $e) {
+            $status = str_contains($e->getMessage(), 'rejected face enrollment') ? 422 : 502;
+
+            return response()->json([
+                'message' => 'Face enrollment trigger failed: ' . $e->getMessage(),
+            ], $status);
+        }
+
+        return response()->json([
+            'message' => 'Face enrollment started on device.',
+            'user' => [
+                'id' => $user->id,
+                'name' => $displayName,
+                'badge_number' => $badgeNumber,
+            ],
+            'machine' => [
+                'id' => $machine->ID,
+                'name' => $machine->MachineAlias,
+                'ip' => $machine->IP,
+            ],
+            'instructions' => "The device is ready. Ask {$displayName} to face the camera and complete the on-screen face capture prompts.",
+        ]);
+    }
+
+    /**
+     * Check whether a face template has been saved in local template table.
+     * If missing, optionally tries pulling from device and then saves it locally.
+     */
+    public function enrollmentFaceStatus(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'machine_id' => ['required', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
+            'local_only' => ['nullable', 'boolean'],
+            'debug' => ['nullable', 'boolean'],
+        ]);
+
+        $machine = Machine::query()->findOrFail($validated['machine_id']);
+        $targetMarker = $machine->MachineNumber === null ? null : (string) $machine->MachineNumber;
+        $faceSlots = $this->faceTemplateBackupCandidates();
+        $debugEnabled = (bool) ($validated['debug'] ?? false);
+        $debugData = [
+            'user_id' => (int) $validated['user_id'],
+            'machine_id' => (int) $validated['machine_id'],
+            'local_only' => (bool) ($validated['local_only'] ?? false),
+            'machine_enabled' => (bool) $machine->Enabled,
+            'machine_ip' => $machine->IP,
+            'target_marker' => $targetMarker,
+            'candidate_slot_count' => count($faceSlots),
+            'attempted_slots' => [],
+            'found_slot' => null,
+            'pulled_from_device' => false,
+            'device_pull_error' => null,
+            'local_rows_before' => 0,
+            'local_rows_after' => 0,
+        ];
+
+        $rows = BiometricTemplate::query()
+            ->where('USERID', (int) $validated['user_id'])
+            ->where(function ($query) use ($faceSlots) {
+                $query->whereIn('FINGERID', $faceSlots)
+                    ->orWhere('FINGERID', '>', 9);
+            })
+            ->orderByDesc('TEMPLATEID')
+            ->get();
+
+        $debugData['local_rows_before'] = $rows->count();
+
+        if ($rows->isEmpty()) {
+            $localOnly = (bool) ($validated['local_only'] ?? false);
+
+            if ($localOnly) {
+                $response = [
+                    'found' => false,
+                    'saved' => false,
+                    'local_only' => true,
+                    'target_marker' => $targetMarker,
+                    'message' => 'Face template not found in local table.',
+                ];
+
+                if ($debugEnabled) {
+                    $response['debug'] = $debugData;
+                }
+
+                return response()->json($response);
+            }
+
+            if ($machine->Enabled && $machine->IP) {
+                try {
+                    $zk = new ZKTecoService(
+                        ip: $machine->IP,
+                        port: $machine->Port ?? 4370,
+                        timeout: 20,
+                        password: blank($machine->CommPassword) ? '0' : (string) $machine->CommPassword
+                    );
+
+                    $zk->connect();
+                    $foundFromDevice = false;
+
+                    foreach ($faceSlots as $slot) {
+                        $debugData['attempted_slots'][] = $slot;
+                        $templateRaw = $zk->getUserTemplateByBackupNumber((int) $validated['user_id'], (int) $slot);
+
+                        if ($templateRaw === null || $templateRaw === '') {
+                            continue;
+                        }
+
+                        $this->upsertDownloadedTemplate((int) $validated['user_id'], (int) $slot, $templateRaw, $targetMarker);
+                        $foundFromDevice = true;
+                        $debugData['found_slot'] = $slot;
+                        break;
+                    }
+
+                    $debugData['pulled_from_device'] = $foundFromDevice;
+
+                    $zk->disconnect();
+
+                    if ($foundFromDevice) {
+                        $rows = BiometricTemplate::query()
+                            ->where('USERID', (int) $validated['user_id'])
+                            ->where(function ($query) use ($faceSlots) {
+                                $query->whereIn('FINGERID', $faceSlots)
+                                    ->orWhere('FINGERID', '>', 9);
+                            })
+                            ->orderByDesc('TEMPLATEID')
+                            ->get();
+                    }
+                } catch (\Throwable $e) {
+                    $debugData['device_pull_error'] = $e->getMessage();
+                    // Keep polling behavior resilient; caller can retry.
+                }
+            }
+
+            $debugData['local_rows_after'] = $rows->count();
+
+            if ($rows->isEmpty()) {
+                $response = [
+                    'found' => false,
+                    'saved' => false,
+                    'target_marker' => $targetMarker,
+                    'face_slots' => $faceSlots,
+                    'message' => 'Face template not found yet. Continue face capture on the device.',
+                ];
+
+                if ($debugEnabled) {
+                    $response['debug'] = $debugData;
+                }
+
+                return response()->json($response);
+            }
+        }
+
+        $selected = $targetMarker !== null
+            ? ($rows->firstWhere('EMACHINENUM', $targetMarker) ?? $rows->first())
+            : $rows->first();
+
+        $response = [
+            'found' => true,
+            'saved' => true,
+            'target_marker' => $targetMarker,
+            'face_slots' => $faceSlots,
+            'template' => [
+                'template_id' => $selected->TEMPLATEID,
+                'user_id' => $selected->USERID,
+                'backup_number' => $selected->FINGERID,
+                'machine_marker' => $selected->EMACHINENUM,
+            ],
+            'message' => 'Face template saved in local template table.',
+        ];
+
+        if ($debugEnabled) {
+            $debugData['local_rows_after'] = max($debugData['local_rows_after'], 1);
+            $response['debug'] = $debugData;
+        }
+
+        return response()->json($response);
+    }
+
+    private function faceTemplateBackupCandidates(): array
+    {
+        return array_values(array_unique(array_merge(
+            range(10, 29),
+            range(50, 59),
+            range(70, 79),
+            [97, 98, 99],
+            range(110, 129)
+        )));
     }
 
     /**

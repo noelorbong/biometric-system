@@ -158,6 +158,7 @@ const addUser = () => {
 }
 
 const editUser = (event) => {
+
   isUserAddModal.value = true;
   isEditUser.value = true;
   user.value = {
@@ -285,11 +286,26 @@ const chooseMachineAction = async (selectedUser) => {
   return Swal.fire({
     title: 'Choose Machine Action',
     html: `<p class="text-sm text-gray-600">Select what you want to do for <strong>${selectedUser.name}</strong>.</p>`,
+    input: 'select',
+    inputOptions: {
+      upload: 'Upload User + Template',
+      fingerprint: 'Register Fingerprint',
+      face: 'Register Face',
+    },
+    inputValue: 'upload',
+    inputPlaceholder: 'Choose machine action',
     showCancelButton: true,
-    showDenyButton: true,
-    confirmButtonText: 'Upload User + Template',
-    denyButtonText: 'Register Fingerprint',
+    confirmButtonText: 'Continue',
     focusConfirm: false,
+    preConfirm: () => {
+      const value = Swal.getInput()?.value
+      if (!value) {
+        Swal.showValidationMessage('Select a machine action.')
+        return false
+      }
+
+      return value
+    },
   })
 }
 
@@ -370,7 +386,8 @@ const chooseUploadMachines = async (selectedUser, availableMachines) => {
   })
 }
 
-const chooseRegisterMachine = async (selectedUser, availableMachines) => {
+const chooseRegisterMachine = async (selectedUser, availableMachines, registrationType = 'fingerprint') => {
+  const registrationLabel = registrationType === 'face' ? 'face registration' : 'fingerprint registration'
   const machineOptions = availableMachines.reduce((carry, machine) => {
     carry[machine.ID] = buildMachineLabel(machine)
     return carry
@@ -378,7 +395,7 @@ const chooseRegisterMachine = async (selectedUser, availableMachines) => {
 
   return Swal.fire({
     title: 'Select Registration Machine',
-    html: `<p class="text-sm text-gray-600">Choose one biometric device for fingerprint registration of <strong>${selectedUser.name}</strong>.</p>`,
+    html: `<p class="text-sm text-gray-600">Choose one biometric device for ${registrationLabel} of <strong>${selectedUser.name}</strong>.</p>`,
     input: 'select',
     inputOptions: machineOptions,
     inputPlaceholder: 'Choose target machine',
@@ -516,9 +533,11 @@ const openMachineAction = async (selectedUser) => {
     return;
   }
 
+  const selectedAction = actionResult.value
+
   // Register Fingerprint — open the finger-selection modal instead of a direct API call
-  if (actionResult.isDenied) {
-    const machineResult = await chooseRegisterMachine(selectedUser, availableMachines)
+  if (selectedAction === 'fingerprint') {
+    const machineResult = await chooseRegisterMachine(selectedUser, availableMachines, 'fingerprint')
 
     if (machineResult.isDismissed) {
       return
@@ -549,6 +568,123 @@ const openMachineAction = async (selectedUser) => {
       token: modalToken,
     })
     return;
+  }
+
+  if (selectedAction === 'face') {
+    const machineResult = await chooseRegisterMachine(selectedUser, availableMachines, 'face')
+
+    if (machineResult.isDismissed) {
+      return
+    }
+
+    const machineId = Number(machineResult.value)
+    if (Number.isNaN(machineId)) {
+      return
+    }
+
+    Swal.fire({
+      title: 'Starting Face Registration',
+      html: `<p class="text-sm text-gray-600">Triggering face registration for <strong>${selectedUser.name}</strong>...</p>`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        Swal.showLoading()
+      },
+    })
+
+    const response = await machineStore.enrollFace({
+      user_id: selectedUser.id,
+      machine_id: machineId,
+    })
+
+    Swal.close()
+
+    if (!response.success) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Face Registration Failed',
+        text: response?.data?.response?.data?.message || 'Unable to trigger face registration on the selected machine.',
+        confirmButtonText: 'OK',
+      })
+      return
+    }
+
+    const payload = response.data || {}
+
+    const captureResult = await Swal.fire({
+      icon: 'info',
+      title: 'Complete Face Capture',
+      html: `<div class="space-y-2 text-left text-sm text-gray-600">
+        <p><strong>User:</strong> ${selectedUser.name}</p>
+        <p><strong>Machine:</strong> ${payload?.machine?.name || 'Selected Machine'}</p>
+        <p>${payload.instructions || 'Follow the machine prompts to complete face capture.'}</p>
+        <p>The app will not check the machine until you confirm capture is finished.</p>
+      </div>`,
+      confirmButtonText: 'I Finished Face Capture',
+      cancelButtonText: 'Close',
+      showCancelButton: true,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+    })
+
+    if (captureResult.isDismissed) {
+      return
+    }
+
+    Swal.fire({
+      title: 'Checking Saved Face Template',
+      html: `<div class="space-y-2 text-left text-sm text-gray-600">
+        <p>Checking whether the face template was saved locally.</p>
+        <p>The app will poll lightly and only contact the machine occasionally.</p>
+      </div>`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        Swal.showLoading()
+      },
+    })
+
+    const waitResult = await waitForFaceTemplateSaved({
+      userId: selectedUser.id,
+      machineId,
+      timeoutMs: 5000,
+      initialDelayMs: 5000,
+      pollIntervalMs: 12000,
+      remotePullEvery: 2,
+    })
+
+    Swal.close()
+
+    if (!waitResult.found) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Face Capture Triggered',
+        html: `<div class="space-y-2 text-left text-sm text-gray-600">
+          <p><strong>User:</strong> ${selectedUser.name}</p>
+          <p><strong>Machine:</strong> ${payload?.machine?.name || 'Selected Machine'}</p>
+          <p>Face registration was triggered, but the face template is not in local table yet.</p>
+          <p>Please complete the capture on the device, then try again if needed.</p>
+        </div>`,
+        confirmButtonText: 'OK',
+      })
+      return
+    }
+
+    const saved = waitResult.data || {}
+    await Swal.fire({
+      icon: 'success',
+      title: 'Face Registration Success',
+      html: `<div class="space-y-2 text-left text-sm text-gray-600">
+        <p><strong>User:</strong> ${selectedUser.name}</p>
+        <p><strong>Machine:</strong> ${payload?.machine?.name || 'Selected Machine'}</p>
+        <p>${saved.message || 'Face template saved in local template table.'}</p>
+        <p><strong>Template Slot:</strong> ${saved?.template?.backup_number ?? '-'}</p>
+        <p>${payload.instructions || 'Follow the machine prompts to complete face capture.'}</p>
+      </div>`,
+      confirmButtonText: 'OK',
+    })
+
+    return
   }
 
   const uploadResult = await chooseUploadMachines(selectedUser, availableMachines)
@@ -615,6 +751,40 @@ const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, timeou
     }
 
     await sleep(2000)
+  }
+
+  return { found: false }
+}
+
+const waitForFaceTemplateSaved = async ({
+  userId,
+  machineId,
+  timeoutMs = 240000,
+  initialDelayMs = 30000,
+  pollIntervalMs = 10000,
+  remotePullEvery = 3,
+}) => {
+  const startedAt = Date.now()
+  let pollCount = 0
+
+  if (initialDelayMs > 0) {
+    await sleep(initialDelayMs)
+  }
+
+  while (Date.now() - startedAt < timeoutMs) {
+    pollCount += 1
+    const shouldPullFromDevice = pollCount % remotePullEvery === 0
+    const status = await machineStore.enrollmentFaceStatus({
+      user_id: userId,
+      machine_id: machineId,
+      local_only: !shouldPullFromDevice,
+    })
+
+    if (status.success && status?.data?.found) {
+      return { found: true, data: status.data }
+    }
+
+    await sleep(pollIntervalMs)
   }
 
   return { found: false }

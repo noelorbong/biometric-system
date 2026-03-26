@@ -29,11 +29,9 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { useAdmissionStore } from '@/store/AdmissionStore'
 import { useLoadingStore } from '@/store/LoadingStore'
 
 const loadingStore = useLoadingStore();
-const admissionStore = useAdmissionStore();
 
 onMounted(() => {
   admissionStore.all();

@@ -31,6 +31,7 @@ const selectedUserIds = ref([])
 const biometricModalOpen = ref(false)
 const biometricModalLoading = ref(false)
 const biometricLogRows = ref([])
+const biometricLogOverrides = ref([])
 const biometricLogUser = ref(null)
 
 const Toast = Swal.mixin({
@@ -106,6 +107,7 @@ const generateReport = async () => {
     if (!reportUsers.value.length) {
       toastResult('No users found for selected filters', 'info')
     }
+        await fetchOverridesForUsers(reportUsers.value)
   } catch (error) {
     reportUsers.value = []
     toastResult(error?.response?.data?.message || 'Unable to generate report', 'error')
@@ -113,6 +115,20 @@ const generateReport = async () => {
     loading.value = false
   }
 }
+    const fetchOverridesForUsers = async (users) => {
+      for (const user of users) {
+        try {
+          const resp = await axios.post('/api/user/checkinout', {
+            user_id: user.id,
+            year: Number(filters.value.year),
+            month: Number(filters.value.month),
+          })
+          user._overrides = resp?.data?.overrides || []
+        } catch (err) {
+          user._overrides = []
+        }
+      }
+    }
 
 const printReport = async () => {
   if (!reportUsers.value.length) {
@@ -212,8 +228,8 @@ const formatLogDateTime = (value) => {
 
 const normalizeCheckType = (value) => String(value || '').trim().toUpperCase()
 
-const checkInCount = computed(() => biometricLogRows.value.filter((log) => normalizeCheckType(log?.CHECKTYPE) === 'I').length)
-const checkOutCount = computed(() => biometricLogRows.value.filter((log) => normalizeCheckType(log?.CHECKTYPE) === 'O').length)
+const checkInCount = computed(() => mergedBiometricLogs.value.filter((log) => normalizeCheckType(log?.CHECKTYPE) === 'I').length)
+const checkOutCount = computed(() => mergedBiometricLogs.value.filter((log) => normalizeCheckType(log?.CHECKTYPE) === 'O').length)
 
 const formatCheckTypeLabel = (value) => {
   const normalized = normalizeCheckType(value)
@@ -233,11 +249,27 @@ const checkTypeBadgeClass = (value) => {
   return 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
 }
 
+const mergedBiometricLogs = computed(() => {
+  const withActions = [...biometricLogRows.value]
+  const overrideMap = new Map()
+  biometricLogOverrides.value.forEach((override) => {
+    const key = String(override.checkinout_id || '').trim()
+    if (key) {
+      overrideMap.set(key, override.action_type)
+    }
+  })
+  return withActions.map((log) => ({
+    ...log,
+    _override_action: overrideMap.get(String(log.id || '').trim()) || null,
+  }))
+})
+
 const openBiometricLogs = async (user) => {
   biometricModalOpen.value = true
   biometricModalLoading.value = true
   biometricLogUser.value = user
   biometricLogRows.value = []
+  biometricLogOverrides.value = []
 
   try {
     const resp = await axios.post('/api/user/checkinout', {
@@ -247,8 +279,10 @@ const openBiometricLogs = async (user) => {
     })
 
     biometricLogRows.value = resp?.data?.checkinouts || []
+    biometricLogOverrides.value = resp?.data?.overrides || []
   } catch (error) {
     biometricLogRows.value = []
+    biometricLogOverrides.value = []
     toastResult(error?.response?.data?.message || 'Unable to load biometric logs', 'error')
   } finally {
     biometricModalLoading.value = false
@@ -259,6 +293,7 @@ const closeBiometricLogs = () => {
   biometricModalOpen.value = false
   biometricModalLoading.value = false
   biometricLogRows.value = []
+  biometricLogOverrides.value = []
   biometricLogUser.value = null
 }
 </script>
@@ -448,15 +483,15 @@ const closeBiometricLogs = () => {
               <div class="grid grid-cols-3 gap-3 sm:min-w-[340px]">
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
                   <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Total</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{ biometricLogRows.length }}</p>
+                  <p class="mt-1 text-2xl font-semibold text-white">{{ mergedBiometricLogs.length }}</p>
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
                   <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Check In</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{ checkInCount }}</p>
+                  <p class="mt-1 text-2xl font-semibold text-white">{{ mergedBiometricLogs.filter(log => normalizeCheckType(log?.CHECKTYPE) === 'I').length }}</p>
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
                   <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Check Out</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{ checkOutCount }}</p>
+                  <p class="mt-1 text-2xl font-semibold text-white">{{ mergedBiometricLogs.filter(log => normalizeCheckType(log?.CHECKTYPE) === 'O').length }}</p>
                 </div>
               </div>
             </div>
@@ -487,15 +522,20 @@ const closeBiometricLogs = () => {
                   <tr v-if="biometricModalLoading">
                     <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">Loading biometric logs...</td>
                   </tr>
-                  <tr v-else-if="!biometricLogRows.length">
+                  <tr v-else-if="!mergedBiometricLogs.length">
                     <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No biometric logs for selected user and period.</td>
                   </tr>
-                  <tr v-else v-for="(log, index) in biometricLogRows" :key="`log-${index}-${log.CHECKTIME}`" class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr v-else v-for="(log, index) in mergedBiometricLogs" :key="`log-${index}-${log.CHECKTIME}`" class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td class="px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200">{{ index + 1 }}</td>
                     <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                      <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em]" :class="checkTypeBadgeClass(log.CHECKTYPE)">
-                        {{ formatCheckTypeLabel(log.CHECKTYPE) }}
-                      </span>
+                      <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em]" :class="checkTypeBadgeClass(log.CHECKTYPE)">
+                          {{ formatCheckTypeLabel(log.CHECKTYPE) }}
+                        </span>
+                        <span v-if="log._override_action" class="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                          {{ log._override_action === 'add' ? 'added' : log._override_action }}
+                        </span>
+                      </div>
                     </td>
                     <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME) }}</td>
                   </tr>
@@ -518,6 +558,7 @@ const closeBiometricLogs = () => {
         :attendance-records="user.attendance_records || []"
         :company-name="companySchoolName"
         :show-controls="false"
+        :overrides="user._overrides || []"
       />
     </div>
   </div>

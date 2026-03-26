@@ -25,7 +25,7 @@
                         <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
                             <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Account</h5>
                             <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 items-start">
-                                <div class="lg:col-span-1">
+                                <div v-if="!props.isEditUser || authStore.user.role === 0 || authStore.user.role === 1" class="lg:col-span-1">
                                     <input type="file" @change="uploadImage($event)" name="image" id="image" accept="image/png, image/gif, image/jpeg" hidden />
                                     <label for="image" class="w-full h-32 group cursor-pointer grid items-center rounded bg-yellow-50/10 border-2 border-dashed border-yellow-300">
                                         <div v-if="!form_data.image" class="text-yellow-300 group-hover:scale-105 transition-all">
@@ -38,37 +38,39 @@
                                     </label>
                                 </div>
 
-                                <div class="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                    <div>
-                                        <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Email<span class="text-error-500">*</span></label>
-                                        <input id="email" required type="email" v-model="form_data.email"
-                                            class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
-                                    </div>
-                                    <div>
-                                        <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">{{ isEditUser ? 'New ' : '' }}Password<span class="text-error-500">*</span></label>
-                                        <div class="relative">
-                                            <input :required="!isEditUser" v-model="form_data.password" :type="showPassword ? 'text' : 'password'" id="password" autocomplete="new-password"
-                                                class="h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-4 pr-11 text-sm" />
-                                            <span @click="togglePasswordVisibility" class="absolute z-30 text-gray-500 -translate-y-1/2 cursor-pointer right-4 top-1/2">
-                                                {{ showPassword ? 'Hide' : 'Show' }}
-                                            </span>
+                                <div class="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-3" >
+                                    <div class="col-span-2 grid grid-cols-2 gap-2" v-if="!props.isEditUser || authStore.user.role === 0 || authStore.user.role === 1">
+                                        <div>
+                                            <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Email<span class="text-error-500">*</span></label>
+                                            <input id="email" required type="email" v-model="form_data.email"
+                                                class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+                                        </div>
+                                        <div>
+                                            <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">{{ isEditUser ? 'New ' : '' }}Password<span class="text-error-500">*</span></label>
+                                            <div class="relative">
+                                                <input :required="!isEditUser" v-model="form_data.password" :type="showPassword ? 'text' : 'password'" id="password" autocomplete="new-password"
+                                                    class="h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-4 pr-11 text-sm" />
+                                                <span @click="togglePasswordVisibility" class="absolute z-30 text-gray-500 -translate-y-1/2 cursor-pointer right-4 top-1/2">
+                                                    {{ showPassword ? 'Hide' : 'Show' }}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div>
+                                    <div v-if="authStore.user.role == 1">
                                         <label for="status" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Status<span class="text-error-500">*</span></label>
                                         <select v-model="form_data.status" id="status" required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
                                             <option :value="1">Active</option>
                                             <option :value="0">Inactive</option>
                                         </select>
                                     </div>
-                                    <div>
+                                    <div v-if="authStore.user.role == 1">
                                         <label for="role" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Role<span class="text-error-500">*</span></label>
                                         <select v-model="form_data.role" id="role" required class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
                                             <option :value="0">User</option>
                                             <option :value="1">Super Admin</option>
                                         </select>
                                     </div>
-                                    <div class="lg:col-span-2">
+                                    <div class="lg:col-span-2" v-if="authStore.user.role == 1">
                                         <label for="office_shift_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Office Shift</label>
                                         <select v-model="form_data.office_shift_id" id="office_shift_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
                                             <option :value="null">No Shift</option>
@@ -77,7 +79,7 @@
                                             </option>
                                         </select>
                                     </div>
-                                    <div>
+                                    <div v-if="authStore.user.role == 1">
                                         <label for="department_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Department</label>
                                         <select v-model="form_data.department_id" id="department_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
                                             <option :value="null">No Department</option>
@@ -86,7 +88,7 @@
                                             </option>
                                         </select>
                                     </div>
-                                    <div>
+                                    <div v-if="authStore.user.role == 1">
                                         <label for="college_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">College</label>
                                         <select v-model="form_data.college_id" id="college_id" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
                                             <option :value="null">No College</option>
@@ -99,7 +101,7 @@
                             </div>
                         </section>
 
-                        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700" v-if="authStore.user.role == 1">
                             <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Profile</h5>
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 <div>
@@ -134,7 +136,7 @@
                             </div>
                         </section>
 
-                        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                        <section v-if="!props.isEditUser || authStore.user.role === 0 || authStore.user.role === 1" class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
                             <div class="mb-3 flex items-center justify-between">
                                 <h5 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Contacts</h5>
                                 <button type="button" @click="addContact" class="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600">Add Contact</button>
@@ -166,7 +168,7 @@
                             </div>
                         </section>
 
-                        <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+                        <section v-if="!props.isEditUser || authStore.user.role === 0 || authStore.user.role === 1" class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
                             <div class="mb-3 flex items-center justify-between">
                                 <h5 class="text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Addresses</h5>
                                 <button type="button" @click="addAddress" class="rounded-lg border border-brand-300 px-3 py-1.5 text-xs font-medium text-brand-600">Add Address</button>
@@ -231,6 +233,8 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useAuthStore } from '@/store/AuthStore'
+const authStore = useAuthStore();
 import Modal from '@/components/common/Modal.vue'
 
 const props = defineProps({

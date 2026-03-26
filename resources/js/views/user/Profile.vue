@@ -22,7 +22,7 @@ const { isLoading, text } = storeToRefs(loadingStore)
 
 const l_college = ref()
 const isUserAddModal = ref(false);
-
+const l_user = ref({});
 
 onMounted(async() => {
   // await userStore.profileUser(user.value);
@@ -69,6 +69,41 @@ const saveUser = async (event) => {
   isLoading.value = false;
 }
 
+const editUser = (event) => {
+
+  isUserAddModal.value = true;
+  l_user.value = {
+    id: event.id,
+    name: event.name,
+    email: event.email,
+    role: event.role,
+    status: Number(event.status),
+    office_shift_id: event.office_shift_id ?? null,
+    department_id: event.department_id ?? null,
+    college_id: event.college_id ?? null,
+    password: '',
+    first_name: event.profile?.first_name || '',
+    middle_name: event.profile?.middle_name || '',
+    last_name: event.profile?.last_name || '',
+    name_extension: event.profile?.name_extension || '',
+    dob: event.profile?.dob || '',
+    gender: event.profile?.gender || '',
+    image: event.profile?.image || '',
+    thumbnail: event.profile?.thumbnail || '',
+    contact_type: event.primary_contact?.type || '',
+    contact_value: event.primary_contact?.value || '',
+    contacts: event.contacts?.length ? JSON.parse(JSON.stringify(event.contacts)) : [{ id: null, type: 'mobile', value: '', is_primary: true }],
+    address_label: event.primary_address?.label || '',
+    address1: event.primary_address?.address1 || '',
+    address2: event.primary_address?.address2 || '',
+    barangay: event.primary_address?.barangay || '',
+    municipality: event.primary_address?.municipality || '',
+    province: event.primary_address?.province || '',
+    zipcode: event.primary_address?.zipcode || '',
+    addresses: event.addresses?.length ? JSON.parse(JSON.stringify(event.addresses)) : [{ id: null, label: 'home', address1: '', address2: '', barangay: '', municipality: '', province: '', zipcode: '', is_primary: true }],
+  };
+}
+
 const selectedCollege = (event) => {
   l_college.value = event;
 }
@@ -95,7 +130,7 @@ const selectedCollege = (event) => {
           </button>
           <button
             type="button"
-            @click="isUserAddModal = true"
+            @click="editUser(user)"
             class="inline-flex h-11 items-center gap-2 rounded-2xl border border-sky-300/30 bg-sky-400/20 px-4 text-sm font-medium text-sky-50 shadow-sm backdrop-blur-sm transition hover:bg-sky-400/30 focus:outline-none focus:ring-2 focus:ring-white/30"
           >
             <PencilIcon />
@@ -146,7 +181,7 @@ const selectedCollege = (event) => {
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Profile Information</h2>
         <button
           type="button"
-          @click="isUserAddModal = true"
+           @click="editUser(user)"
           class="inline-flex items-center gap-2 rounded-lg border border-sky-200 px-3 py-1.5 text-sm font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"
         >
           <PencilIcon />
@@ -157,7 +192,7 @@ const selectedCollege = (event) => {
       <ProfileCard :user="user" />
     </section>
 
-    <ModalUser :authUser="authStore.user" :isEditUser="true" :user="user" v-if="isUserAddModal" @save="saveUser"
+    <ModalUser :authUser="authStore.user" :isEditUser="true" :user="l_user" v-if="isUserAddModal" @save="saveUser"
       @close="isUserAddModal = false" :edit_type="2" :campuses="[]" :colleges="[]"/>
   </div>
 </template>

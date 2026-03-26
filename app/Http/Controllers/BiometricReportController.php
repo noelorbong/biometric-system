@@ -26,7 +26,8 @@ class BiometricReportController extends Controller
 
         $year = (int) $validated['year'];
         $month = (int) $validated['month'];
-        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $daysInMonth = date('t', mktime(0, 0, 0, $month, 1, $year));
+        // $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 
         $usersQuery = User::query()
             ->with([

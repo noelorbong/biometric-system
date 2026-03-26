@@ -21,6 +21,7 @@ const selectedMachine = ref(null)
 
 const connectingIds = ref(new Set())
 const syncingIds = ref(new Set())
+const downloadingUserIds = ref(new Set())
 const clearingLogIds = ref(new Set())
 const pushingUsers = ref(false)
 const pushingUserIds = ref(new Set())
@@ -777,6 +778,323 @@ const clearAttendanceLogs = async (machine) => {
   toastResult(resp?.data?.message || 'Device logs cleared')
 }
 
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const isDefaultSelectedPlan = (plan) => ['create', 'update', 'restore'].includes(plan)
+
+const matchedPlans = ['create', 'update', 'restore']
+
+const rowVisibleForFilter = (plan, filter) => {
+  if (filter === 'all') return true
+  if (filter === 'matched') return matchedPlans.includes(plan)
+  if (filter === 'unmatched') return plan === 'unmatched'
+  if (filter === 'invalid') return plan === 'invalid'
+  return true
+}
+
+const renderDeviceUserPreviewTable = (deviceUsers = []) => {
+  if (!deviceUsers.length) {
+    return '<div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No device users returned.</div>'
+  }
+
+  const countByPlan = deviceUsers.reduce((acc, user) => {
+    const plan = user.planned_action || 'invalid'
+    acc[plan] = (acc[plan] || 0) + 1
+    return acc
+  }, {})
+
+  const rows = deviceUsers.map((user, index) => {
+    const statusClass = user.planned_action === 'create'
+      ? 'bg-emerald-100 text-emerald-700'
+      : user.planned_action === 'update'
+        ? 'bg-sky-100 text-sky-700'
+        : user.planned_action === 'restore'
+          ? 'bg-indigo-100 text-indigo-700'
+        : user.planned_action === 'unmatched'
+          ? 'bg-amber-100 text-amber-700'
+          : 'bg-rose-100 text-rose-700'
+
+    const isSelectable = user.planned_action !== 'invalid'
+    const isChecked = isSelectable && isDefaultSelectedPlan(user.planned_action)
+    const checkboxHtml = isSelectable
+      ? `<input type="checkbox" class="sync-user-checkbox h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" data-user-id="${escapeHtml(user.resolved_user_id)}" data-plan="${escapeHtml(user.planned_action)}" ${isChecked ? 'checked' : ''} />`
+      : '<span class="text-xs text-slate-400">-</span>'
+
+    return `<tr class="preview-row border-b border-slate-100 last:border-b-0" data-plan="${escapeHtml(user.planned_action)}">
+      <td class="px-3 py-2 text-sm">${checkboxHtml}</td>
+      <td class="px-3 py-2 text-xs text-slate-500">${index + 1}</td>
+      <td class="px-3 py-2 text-sm font-medium text-slate-700">${escapeHtml(user.uid)}</td>
+      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.resolved_user_id || '-')}</td>
+      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.pin || '-')}</td>
+      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.name || 'Unnamed')}</td>
+      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.privilege)}</td>
+      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.card || '-')}</td>
+      <td class="px-3 py-2 text-right"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}">${escapeHtml(user.status_label || user.planned_action)}</span></td>
+    </tr>`
+  }).join('')
+
+  return `<div class="space-y-3">
+    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+        <input type="checkbox" class="sync-select-all h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+        Select all visible rows
+      </label>
+      <div class="flex flex-wrap gap-1.5">
+        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="all">All (${deviceUsers.length})</button>
+        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="matched">Matched (${(countByPlan.create || 0) + (countByPlan.update || 0) + (countByPlan.restore || 0)})</button>
+        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="unmatched">Unmatched (${countByPlan.unmatched || 0})</button>
+        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="invalid">Invalid (${countByPlan.invalid || 0})</button>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-xl border border-slate-200">
+    <div class="max-h-80 overflow-auto">
+      <table class="min-w-full bg-white text-left">
+        <thead class="sticky top-0 bg-slate-50">
+          <tr>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Sync</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">#</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">UID</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Local ID</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">PIN</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Privilege</th>
+            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Card</th>
+            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Import Plan</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    </div>
+  </div>`
+}
+
+const wirePreviewTableInteractions = (container) => {
+  if (!container) return
+
+  let activeFilter = 'all'
+  const rowEls = Array.from(container.querySelectorAll('.preview-row'))
+  const filterBtns = Array.from(container.querySelectorAll('.preview-filter-btn'))
+  const selectAll = container.querySelector('.sync-select-all')
+
+  const getVisibleCheckboxes = () => rowEls
+    .filter((row) => row.style.display !== 'none')
+    .map((row) => row.querySelector('.sync-user-checkbox'))
+    .filter(Boolean)
+
+  const refreshSelectAllState = () => {
+    const visible = getVisibleCheckboxes()
+
+    if (!selectAll) return
+
+    if (!visible.length) {
+      selectAll.checked = false
+      selectAll.indeterminate = false
+      return
+    }
+
+    const checkedCount = visible.filter((el) => el.checked).length
+    selectAll.checked = checkedCount === visible.length
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < visible.length
+  }
+
+  const applyFilter = (filter) => {
+    activeFilter = filter
+
+    rowEls.forEach((row) => {
+      const plan = row.getAttribute('data-plan') || 'invalid'
+      row.style.display = rowVisibleForFilter(plan, activeFilter) ? '' : 'none'
+    })
+
+    filterBtns.forEach((btn) => {
+      const selected = btn.getAttribute('data-filter') === activeFilter
+      btn.classList.toggle('bg-sky-100', selected)
+      btn.classList.toggle('text-sky-700', selected)
+      btn.classList.toggle('border-sky-200', selected)
+    })
+
+    refreshSelectAllState()
+  }
+
+  filterBtns.forEach((btn) => {
+    btn.addEventListener('click', () => applyFilter(btn.getAttribute('data-filter') || 'all'))
+  })
+
+  if (selectAll) {
+    selectAll.addEventListener('change', (event) => {
+      const checked = !!event.target.checked
+      getVisibleCheckboxes().forEach((el) => {
+        el.checked = checked
+      })
+      refreshSelectAllState()
+    })
+  }
+
+  container.querySelectorAll('.sync-user-checkbox').forEach((checkbox) => {
+    checkbox.addEventListener('change', refreshSelectAllState)
+  })
+
+  applyFilter('all')
+}
+
+const collectPreviewSelection = (container) => {
+  const checked = Array.from(container?.querySelectorAll('.sync-user-checkbox:checked') || [])
+  const selected_user_ids = checked.map((el) => Number(el.getAttribute('data-user-id'))).filter((id) => Number.isFinite(id) && id > 0)
+  const include_unmatched = checked.some((el) => (el.getAttribute('data-plan') || '') === 'unmatched')
+
+  return {
+    selected_user_ids,
+    include_unmatched,
+  }
+}
+
+const showDownloadUsersResult = async (data) => {
+  const {
+    total_device_users,
+    created,
+    updated,
+    created_users,
+    restored_users,
+    skipped_unmatched,
+    skipped_invalid,
+    unmatched_users,
+  } = data
+  const unmatchedHtml = (unmatched_users || []).length
+    ? `<div class="mt-3 text-left"><p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Unmatched device users</p><ul class="space-y-1 text-sm text-gray-600">${unmatched_users.map((user) => `<li>UID ${escapeHtml(user.uid)} · PIN ${escapeHtml(user.pin || '-')} · ${escapeHtml(user.name || 'Unnamed')}</li>`).join('')}</ul></div>`
+    : ''
+
+  await Swal.fire({
+    icon: skipped_unmatched === 0 && skipped_invalid === 0 ? 'success' : 'warning',
+    title: 'User Import Complete',
+    html: `<p class="text-sm text-gray-600">Users found on device: <strong>${total_device_users}</strong></p>
+           <p class="text-sm text-gray-600">Created local biometric rows: <strong class="text-green-600">${created}</strong></p>
+           <p class="text-sm text-gray-600">Updated local biometric rows: <strong class="text-sky-600">${updated}</strong></p>
+          <p class="text-sm text-gray-600">Created user accounts: <strong class="text-indigo-600">${created_users || 0}</strong></p>
+          <p class="text-sm text-gray-600">Restored soft-deleted users: <strong class="text-indigo-600">${restored_users || 0}</strong></p>
+           <p class="text-sm text-gray-600">Skipped unmatched local users: <strong class="text-amber-600">${skipped_unmatched}</strong></p>
+           <p class="text-sm text-gray-600">Skipped invalid records: <strong>${skipped_invalid}</strong></p>
+           ${unmatchedHtml}`,
+    confirmButtonText: 'OK',
+  })
+}
+
+const downloadUsersFromDevice = async (machine) => {
+  downloadingUserIds.value = new Set([...downloadingUserIds.value, machine.ID])
+
+  const previewResp = await machineStore.downloadUsers({ ID: machine.ID, preview_only: true })
+
+  downloadingUserIds.value = new Set([...downloadingUserIds.value].filter((id) => id !== machine.ID))
+
+  if (!previewResp.success) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Preview Users Failed',
+      text: previewResp?.data?.response?.data?.message || 'Unable to read users from device.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+
+  const {
+    total_device_users,
+    planned_create,
+    planned_update,
+    planned_restore,
+    skipped_unmatched,
+    skipped_invalid,
+    device_users,
+  } = previewResp.data
+
+  const importableCount = Number(planned_create || 0) + Number(planned_update || 0) + Number(planned_restore || 0) + Number(skipped_unmatched || 0)
+  let selectionPayload = null
+
+  const previewConfirm = await Swal.fire({
+    icon: total_device_users > 0 ? 'info' : 'warning',
+    title: `Preview Users from ${machine.MachineAlias || machine.IP}`,
+    width: '960px',
+    html: `<div class="space-y-3 text-left">
+      <p class="text-sm text-gray-600">This is the live device data. Nothing has been imported yet.</p>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Device Users</p>
+          <p class="mt-1 text-lg font-semibold text-slate-800">${total_device_users}</p>
+        </div>
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Will Create</p>
+          <p class="mt-1 text-lg font-semibold text-emerald-700">${planned_create}</p>
+        </div>
+        <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-700">Will Update</p>
+          <p class="mt-1 text-lg font-semibold text-sky-700">${planned_update}</p>
+        </div>
+        <div class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Will Restore</p>
+          <p class="mt-1 text-lg font-semibold text-indigo-700">${planned_restore || 0}</p>
+        </div>
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Unmatched</p>
+          <p class="mt-1 text-lg font-semibold text-amber-700">${Number(skipped_unmatched || 0)}</p>
+        </div>
+        <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-rose-700">Invalid</p>
+          <p class="mt-1 text-lg font-semibold text-amber-700">${Number(skipped_unmatched || 0) + Number(skipped_invalid || 0)}</p>
+        </div>
+      </div>
+      ${renderDeviceUserPreviewTable(device_users || [])}
+    </div>`,
+    showCancelButton: true,
+    showConfirmButton: importableCount > 0,
+    confirmButtonText: 'Import Selected Users',
+    cancelButtonText: importableCount > 0 ? 'Cancel' : 'Close',
+    didOpen: (popup) => {
+      wirePreviewTableInteractions(popup)
+    },
+    preConfirm: () => {
+      const popup = Swal.getPopup()
+      const selected = collectPreviewSelection(popup)
+
+      if (!selected.selected_user_ids.length) {
+        Swal.showValidationMessage('Select at least one user to sync.')
+        return false
+      }
+
+      selectionPayload = selected
+      return true
+    },
+  })
+
+  if (!previewConfirm.isConfirmed) {
+    return
+  }
+
+  downloadingUserIds.value = new Set([...downloadingUserIds.value, machine.ID])
+
+  const importResp = await machineStore.downloadUsers({
+    ID: machine.ID,
+    selected_user_ids: selectionPayload?.selected_user_ids || [],
+    include_unmatched: !!selectionPayload?.include_unmatched,
+  })
+
+  downloadingUserIds.value = new Set([...downloadingUserIds.value].filter((id) => id !== machine.ID))
+
+  if (!importResp.success) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Import Users Failed',
+      text: importResp?.data?.response?.data?.message || 'Unable to import users from device.',
+      confirmButtonText: 'OK',
+    })
+    return
+  }
+
+  await showDownloadUsersResult(importResp.data)
+}
+
 const pushUsersToAllMachines = async () => {
   const confirm = await Swal.fire({
     icon: 'question',
@@ -1110,7 +1428,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="connectingIds.has(machine.ID) || syncingIds.has(machine.ID)"
                 :title="connectingIds.has(machine.ID) ? 'Connecting…' : 'Test Connection'"
-                class="col-span-2 flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class=" flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
                 :class="connectingIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30'"
@@ -1118,6 +1436,52 @@ onUnmounted(() => {
                 <span v-if="connectingIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent"></span>
                 <PlugInIcon v-else class="h-4 w-4" />
                 <span>{{ connectingIds.has(machine.ID) ? 'Connecting…' : 'Connect' }}</span>
+              </button>
+              <button
+                @click="toggleAutoDownload(machine)"
+                type="button"
+                :disabled="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)"
+                :title="machine.AutoDownload ? 'Disable automatic background download' : 'Enable automatic background download'"
+                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                :class="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)
+                  ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
+                  : machine.AutoDownload
+                    ? 'bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700'"
+              >
+                <span>{{ autoToggleIds.has(machine.ID) ? 'Saving…' : machine.AutoDownload ? `Auto Sync On (${machine.AutoDownloadInterval || 60}s)` : 'Auto Sync Off' }}</span>
+              </button>
+
+              
+
+              <button
+                @click="downloadUsersFromDevice(machine)"
+                type="button"
+                :disabled="downloadingUserIds.has(machine.ID) || connectingIds.has(machine.ID) || pushingUserIds.has(machine.ID)"
+                :title="downloadingUserIds.has(machine.ID) ? 'Downloading users…' : 'Download Users from Device'"
+                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                :class="downloadingUserIds.has(machine.ID)
+                  ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
+                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30'"
+              >
+                <span v-if="downloadingUserIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent"></span>
+                <RefreshIcon v-else class="h-4 w-4" />
+                <span>{{ downloadingUserIds.has(machine.ID) ? 'Downloading…' : 'Download Users' }}</span>
+              </button>
+
+              <button
+                @click="pushUsersToDivice(machine)"
+                type="button"
+                :disabled="pushingUserIds.has(machine.ID) || syncingIds.has(machine.ID) || connectingIds.has(machine.ID)"
+                :title="pushingUserIds.has(machine.ID) ? 'Pushing users…' : 'Push Users to Device'"
+                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                :class="pushingUserIds.has(machine.ID)
+                  ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
+                  : 'bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-900/20 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/30'"
+              >
+                <span v-if="pushingUserIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-fuchsia-400 border-t-transparent"></span>
+                <RefreshIcon v-else class="h-4 w-4" />
+                <span>{{ pushingUserIds.has(machine.ID) ? 'Pushing…' : 'Push Users' }}</span>
               </button>
 
               <button
@@ -1150,35 +1514,9 @@ onUnmounted(() => {
                 <span>{{ clearingLogIds.has(machine.ID) ? 'Clearing…' : 'Clear Logs' }}</span>
               </button>
 
-              <button
-                @click="toggleAutoDownload(machine)"
-                type="button"
-                :disabled="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)"
-                :title="machine.AutoDownload ? 'Disable automatic background download' : 'Enable automatic background download'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
-                :class="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)
-                  ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                  : machine.AutoDownload
-                    ? 'bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700'"
-              >
-                <span>{{ autoToggleIds.has(machine.ID) ? 'Saving…' : machine.AutoDownload ? `Auto On (${machine.AutoDownloadInterval || 60}s)` : 'Auto Off' }}</span>
-              </button>
+              
 
-              <button
-                @click="pushUsersToDivice(machine)"
-                type="button"
-                :disabled="pushingUserIds.has(machine.ID) || syncingIds.has(machine.ID) || connectingIds.has(machine.ID)"
-                :title="pushingUserIds.has(machine.ID) ? 'Pushing users…' : 'Push Users to Device'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
-                :class="pushingUserIds.has(machine.ID)
-                  ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                  : 'bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-900/20 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/30'"
-              >
-                <span v-if="pushingUserIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-fuchsia-400 border-t-transparent"></span>
-                <RefreshIcon v-else class="h-4 w-4" />
-                <span>{{ pushingUserIds.has(machine.ID) ? 'Pushing…' : 'Push Users' }}</span>
-              </button>
+              
             </div>
           </div>
         </article>

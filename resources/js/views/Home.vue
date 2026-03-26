@@ -23,7 +23,7 @@
           <common-grid-shape />
           <div class="flex flex-col items-center max-w-xl">
             <router-link to="/" class="block mb-4">
-              <img class="w-[100%]" :src="'/images/logo/ssu_drrrmo_logo_dark.png'" alt="Logo" />
+              <img class="w-[100%]" :src="'/images/logo/banner_white_mode.png'" alt="Logo" />
             </router-link>
          
           </div>

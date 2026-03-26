@@ -145,6 +145,19 @@ export const useMachineStore = defineStore('machines', {
       })
     },
 
+    async downloadUsers(payload) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/machine/download-users', payload).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
     async clearAttendance(payload) {
       const auth = useAuthStore()
 
@@ -201,6 +214,32 @@ export const useMachineStore = defineStore('machines', {
       const auth = useAuthStore()
 
       return await axios.post('/api/machine/enroll-fingerprint', payload).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async enrollFace(payload) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/machine/enroll-face', payload).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async enrollmentFaceStatus(payload) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/machine/enrollment-face-status', payload).then(function (resp) {
         return { success: true, data: resp.data }
       }).catch(function (resp) {
         if (resp.response?.data?.message == 'Unauthenticated.') {

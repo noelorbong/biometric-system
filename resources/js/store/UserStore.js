@@ -89,7 +89,7 @@ export const useUserStore = defineStore('users',{
         }
         return { success: true, data: resp.data };
       }).catch(function (resp) {
-        //console.log(resp.response);
+        console.log(resp.response);
         if (resp.response) {
           if (resp.response.data.message == 'Unauthenticated.') {
             auth.clearAccount()
