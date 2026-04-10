@@ -45,6 +45,10 @@ const updating = ref(false)
 const updateResults = ref([])
 const deactivating = ref(false)
 const replacing = ref(false)
+const daemonStatus = ref(null)
+const daemonLoading = ref(false)
+const daemonInstalling = ref(false)
+const daemonInstallResults = ref([])
 
 const formatDate = (iso) => {
   if (!iso) return null
@@ -252,8 +256,55 @@ const runSystemUpdate = async () => {
   toastResult('System update completed with issues', 'warning')
 }
 
+const loadAttendanceDaemonStatus = async () => {
+  daemonLoading.value = true
+  const resp = await appSettingStore.loadAttendanceDaemonStatus()
+  daemonLoading.value = false
+
+  if (!resp.success) {
+    toastResult(resp?.data?.response?.data?.message || 'Unable to load attendance daemon status', 'error')
+    return
+  }
+
+  daemonStatus.value = resp.data || null
+}
+
+const installAttendanceDaemon = async () => {
+  const confirmation = await Swal.fire({
+    title: 'Install attendance daemon service?',
+    text: 'This creates/updates supervisor config and starts attendance-auto-sync service on Linux.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Install Service',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#0284c7',
+  })
+
+  if (!confirmation.isConfirmed) {
+    return
+  }
+
+  daemonInstalling.value = true
+  daemonInstallResults.value = []
+
+  const resp = await appSettingStore.installAttendanceDaemon({ sleep: 1 })
+  daemonInstalling.value = false
+
+  if (!resp.success) {
+    daemonInstallResults.value = Array.isArray(resp?.data?.response?.data?.commands) ? resp.data.response.data.commands : []
+    toastResult(resp?.data?.response?.data?.message || 'Unable to install daemon service', 'error')
+    await loadAttendanceDaemonStatus()
+    return
+  }
+
+  daemonInstallResults.value = Array.isArray(resp?.data?.commands) ? resp.data.commands : []
+  toastResult(resp?.data?.message || 'Daemon service installed')
+  await loadAttendanceDaemonStatus()
+}
+
 onMounted(async () => {
   await loadSettings()
+  await loadAttendanceDaemonStatus()
 })
 </script>
 
@@ -504,6 +555,12 @@ onMounted(async () => {
         :patch-results="patchResults"
         :updating="updating"
         :update-results="updateResults"
+        :daemon-status="daemonStatus"
+        :daemon-loading="daemonLoading"
+        :daemon-installing="daemonInstalling"
+        :daemon-install-results="daemonInstallResults"
+        :on-refresh-daemon-status="loadAttendanceDaemonStatus"
+        :on-install-daemon="installAttendanceDaemon"
         :on-run-maintenance-patch="runMaintenancePatch"
         :on-run-system-update="runSystemUpdate"
       />

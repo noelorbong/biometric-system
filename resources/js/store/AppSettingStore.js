@@ -117,6 +117,32 @@ export const useAppSettingStore = defineStore('appSettings', {
       })
     },
 
+    async loadAttendanceDaemonStatus() {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/attendance-daemon/status').then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async installAttendanceDaemon(payload = {}) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/attendance-daemon/install', payload).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
     async backupDatabase(passphrase) {
       const auth = useAuthStore()
 

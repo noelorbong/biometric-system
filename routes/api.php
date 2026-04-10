@@ -74,6 +74,8 @@ Route::post('/settings', [AppSettingController::class, 'index'])->middleware('au
 Route::post('/settings/update', [AppSettingController::class, 'update'])->middleware('auth:sanctum');
 Route::post('/settings/maintenance-patch', [AppSettingController::class, 'runMaintenancePatch'])->middleware('auth:sanctum');
 Route::post('/settings/system-update', [AppSettingController::class, 'runSystemUpdate'])->middleware('auth:sanctum');
+Route::post('/settings/attendance-daemon/status', [AppSettingController::class, 'attendanceDaemonStatus'])->middleware('auth:sanctum');
+Route::post('/settings/attendance-daemon/install', [AppSettingController::class, 'installAttendanceDaemon'])->middleware('auth:sanctum');
 Route::post('/settings/database/backup', [AppSettingController::class, 'backupDatabase'])->middleware('auth:sanctum');
 Route::post('/settings/database/export', [AppSettingController::class, 'exportDatabase'])->middleware('auth:sanctum');
 Route::post('/settings/database/import', [AppSettingController::class, 'importDatabase'])->middleware('auth:sanctum');

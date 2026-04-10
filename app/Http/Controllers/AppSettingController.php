@@ -300,6 +300,174 @@ class AppSettingController extends Controller
         ], $allSuccessful ? 200 : 207);
     }
 
+    private function runShellCommand(string $command, ?string $workingDirectory = null, int $timeoutSeconds = 120): array
+    {
+        $process = Process::fromShellCommandline($command, $workingDirectory ?? base_path());
+        $process->setTimeout($timeoutSeconds);
+        $process->run();
+
+        return [
+            'success' => $process->isSuccessful(),
+            'exit_code' => $process->getExitCode(),
+            'output' => trim($process->getOutput() . PHP_EOL . $process->getErrorOutput()),
+        ];
+    }
+
+    public function attendanceDaemonStatus(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $isLinux = DIRECTORY_SEPARATOR === '/';
+        $configPath = '/etc/supervisor/conf.d/attendance-auto-sync.conf';
+
+        if (!$isLinux) {
+            return response()->json([
+                'available' => false,
+                'message' => 'Supervisor status is only available on Linux servers.',
+            ]);
+        }
+
+        $supervisorctl = $this->runShellCommand('command -v supervisorctl >/dev/null 2>&1 && echo OK || echo MISSING');
+        $supervisorInstalled = str_contains($supervisorctl['output'] ?? '', 'OK');
+
+        $statusOutput = '';
+        $running = false;
+
+        if ($supervisorInstalled) {
+            $status = $this->runShellCommand('supervisorctl status attendance-auto-sync');
+            $statusOutput = $status['output'] ?? '';
+            $running = str_contains($statusOutput, 'RUNNING');
+        }
+
+        return response()->json([
+            'available' => true,
+            'os' => php_uname('s'),
+            'config_path' => $configPath,
+            'config_exists' => is_file($configPath),
+            'supervisor_installed' => $supervisorInstalled,
+            'service_running' => $running,
+            'status_output' => $statusOutput,
+            'config_writable' => is_writable(dirname($configPath)),
+            'php_binary' => PHP_BINARY,
+            'app_path' => base_path(),
+        ]);
+    }
+
+    public function installAttendanceDaemon(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $isLinux = DIRECTORY_SEPARATOR === '/';
+        if (!$isLinux) {
+            return response()->json([
+                'message' => 'Installation is only supported on Linux servers.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'sleep' => ['nullable', 'integer', 'min:1', 'max:60'],
+        ]);
+
+        $sleep = (int) ($validated['sleep'] ?? 1);
+        $configPath = '/etc/supervisor/conf.d/attendance-auto-sync.conf';
+
+        $daemonUser = 'www-data';
+        if (function_exists('posix_getpwuid')) {
+            $ownerInfo = @posix_getpwuid(@fileowner(base_path()));
+            if (is_array($ownerInfo) && filled($ownerInfo['name'] ?? null)) {
+                $daemonUser = (string) $ownerInfo['name'];
+            }
+        }
+
+        $config = implode(PHP_EOL, [
+            '[program:attendance-auto-sync]',
+            'command=' . PHP_BINARY . ' ' . base_path('artisan') . ' attendance:auto-sync:daemon --sleep=' . $sleep,
+            'directory=' . base_path(),
+            'autostart=true',
+            'autorestart=true',
+            'startsecs=3',
+            'stopasgroup=true',
+            'killasgroup=true',
+            'user=' . $daemonUser,
+            'stdout_logfile=' . storage_path('logs/attendance-auto-sync.log'),
+            'stderr_logfile=' . storage_path('logs/attendance-auto-sync-error.log'),
+            '',
+        ]);
+
+        $tmpPath = storage_path('app/private/attendance-auto-sync.conf.tmp');
+        @mkdir(dirname($tmpPath), 0755, true);
+        file_put_contents($tmpPath, $config);
+
+        $steps = [];
+        $copyCommand = 'cp ' . escapeshellarg($tmpPath) . ' ' . escapeshellarg($configPath);
+
+        if (is_writable(dirname($configPath))) {
+            $copy = $this->runShellCommand($copyCommand);
+        } else {
+            $copy = $this->runShellCommand('sudo -n ' . $copyCommand);
+            if (!$copy['success']) {
+                return response()->json([
+                    'message' => 'Unable to write supervisor config. Grant permission or allow sudo without password for web user.',
+                    'step' => 'write_config',
+                    'output' => $copy['output'] ?? '',
+                ], 422);
+            }
+        }
+
+        $steps[] = array_merge(['command' => 'install config'], $copy);
+
+        $commands = [
+            'supervisorctl reread',
+            'supervisorctl update',
+            'supervisorctl restart attendance-auto-sync || supervisorctl start attendance-auto-sync',
+            'supervisorctl status attendance-auto-sync',
+        ];
+
+        foreach ($commands as $command) {
+            $result = $this->runShellCommand($command);
+            if (!$result['success']) {
+                $sudoResult = $this->runShellCommand('sudo -n ' . $command);
+                $steps[] = array_merge(['command' => $command], $sudoResult);
+
+                if (!$sudoResult['success']) {
+                    return response()->json([
+                        'message' => 'Supervisor command failed. Check supervisor installation and sudo permissions.',
+                        'step' => $command,
+                        'commands' => $steps,
+                    ], 422);
+                }
+
+                continue;
+            }
+
+            $steps[] = array_merge(['command' => $command], $result);
+        }
+
+        ActivityLog::create([
+            'user_id' => $request->user()?->id,
+            'action' => 'Installed Attendance Auto Sync Daemon',
+            'model_name' => AppSetting::class,
+            'model_id' => 0,
+            'before' => null,
+            'after' => [
+                'config_path' => $configPath,
+                'sleep' => $sleep,
+                'user' => $daemonUser,
+            ],
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'message' => 'Attendance auto-sync daemon installed and started.',
+            'config_path' => $configPath,
+            'commands' => $steps,
+        ]);
+    }
+
     public function backupDatabase(Request $request, DatabaseBackupService $backupService)
     {
         if (!$this->isSuperAdmin($request)) {
