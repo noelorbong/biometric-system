@@ -141,9 +141,7 @@ router.beforeEach(async (to, from, next) => {
 
   // ── License gate — always re-fetch so server-side changes (deactivation) are picked up ──
   if (!to.meta.skipLicenseCheck) {
-    if (!licenseStore.license_loaded) {
-      await licenseStore.loadStatus()
-    }
+    await licenseStore.loadStatus()
 
     if (licenseStore.isExpired) {
       next({ name: 'License' })

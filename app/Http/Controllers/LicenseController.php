@@ -37,6 +37,15 @@ class LicenseController extends Controller
             if ($licenseExpiry) {
                 $diff = (int) ceil(now()->diffInSeconds($licenseExpiry, false) / 86400);
                 $licenseDaysLeft = max(0, $diff);
+
+                if (now()->greaterThanOrEqualTo($licenseExpiry)) {
+                    return response()->json([
+                        'status'            => 'expired',
+                        'license_key'       => $license->license_key,
+                        'license_expiry'    => $licenseExpiry->toISOString(),
+                        'license_days_left' => 0,
+                    ]);
+                }
             }
 
             return response()->json([
