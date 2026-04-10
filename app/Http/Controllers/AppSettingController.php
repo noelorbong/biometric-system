@@ -334,11 +334,17 @@ class AppSettingController extends Controller
 
         $statusOutput = '';
         $running = false;
+        $statusExitCode = null;
 
         if ($supervisorInstalled) {
             $status = $this->runShellCommand('supervisorctl status attendance-auto-sync');
-            $statusOutput = $status['output'] ?? '';
-            $running = str_contains($statusOutput, 'RUNNING');
+            if (!($status['success'] ?? false)) {
+                $status = $this->runShellCommand('sudo -n supervisorctl status attendance-auto-sync');
+            }
+
+            $statusOutput = (string) ($status['output'] ?? '');
+            $statusExitCode = $status['exit_code'] ?? null;
+            $running = preg_match('/\bRUNNING\b/i', $statusOutput) === 1;
         }
 
         return response()->json([
@@ -349,6 +355,7 @@ class AppSettingController extends Controller
             'supervisor_installed' => $supervisorInstalled,
             'service_running' => $running,
             'status_output' => $statusOutput,
+            'status_exit_code' => $statusExitCode,
             'config_writable' => is_writable(dirname($configPath)),
             'php_binary' => PHP_BINARY,
             'app_path' => base_path(),
