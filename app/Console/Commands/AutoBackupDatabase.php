@@ -17,11 +17,15 @@ class AutoBackupDatabase extends Command
 
     public function handle(DatabaseBackupService $backupService): int
     {
+        $this->line('[db:auto-backup] Starting...');
+
+        // ── 1. Check migrations ────────────────────────────────────────────
         if (!Schema::hasTable('app_settings')) {
-            $this->line('Auto backup skipped because app_settings table is not available.');
+            $this->warn('[db:auto-backup] Skipped: app_settings table does not exist yet. Run migrations first.');
             return self::SUCCESS;
         }
 
+        // ── 2. Load settings ───────────────────────────────────────────────
         $settings = AppSetting::query()
             ->whereIn('setting_key', [
                 'backup_auto_enabled',
@@ -31,47 +35,69 @@ class AutoBackupDatabase extends Command
             ->pluck('setting_value', 'setting_key');
 
         if (!filter_var($settings['backup_auto_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-            $this->line('Auto backup is disabled in app settings.');
+            $this->line('[db:auto-backup] Skipped: auto backup is disabled in app settings.');
             return self::SUCCESS;
         }
 
+        // ── 3. Decrypt passphrase ──────────────────────────────────────────
         $encryptedPassphrase = (string) ($settings['backup_auto_passphrase_encrypted'] ?? '');
         $passphrase = '';
 
-        if ($encryptedPassphrase !== '') {
-            try {
-                $passphrase = Crypt::decryptString($encryptedPassphrase);
-            } catch (\Throwable) {
-                $passphrase = '';
-            }
-        }
-
-        if (strlen(trim($passphrase)) < 8) {
-            $this->error('Auto backup passphrase is missing or invalid in app settings. Backup aborted.');
+        if ($encryptedPassphrase === '') {
+            $this->error('[db:auto-backup] No passphrase stored in app settings. Set one from Database Settings.');
             return self::FAILURE;
         }
 
         try {
-            $this->line('Building database snapshot...');
-            $snapshot = $backupService->buildSnapshot();
+            $passphrase = Crypt::decryptString($encryptedPassphrase);
+        } catch (\Throwable $e) {
+            $this->error('[db:auto-backup] Passphrase decryption failed. APP_KEY on this server may differ from where the passphrase was stored. Error: ' . $e->getMessage());
+            return self::FAILURE;
+        }
 
-            $this->line('Encrypting snapshot...');
+        if (strlen(trim($passphrase)) < 8) {
+            $this->error('[db:auto-backup] Decrypted passphrase is too short (< 8 chars). Re-save the passphrase from Database Settings.');
+            return self::FAILURE;
+        }
+
+        // ── 4. Ensure backups directory exists ─────────────────────────────
+        $backupDir = Storage::disk('local')->path('backups');
+        if (!is_dir($backupDir) && !mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+            $this->error("[db:auto-backup] Cannot create backups directory: {$backupDir}");
+            return self::FAILURE;
+        }
+
+        if (!is_writable($backupDir)) {
+            $this->error("[db:auto-backup] Backups directory is not writable: {$backupDir}");
+            $this->line('Run: chmod -R 775 ' . Storage::disk('local')->path(''));
+            return self::FAILURE;
+        }
+
+        // ── 5. Build + encrypt + store ─────────────────────────────────────
+        try {
+            $this->line('[db:auto-backup] Building database snapshot...');
+            $snapshot = $backupService->buildSnapshot();
+            $tableCount = count($snapshot['tables'] ?? []);
+            $this->line("[db:auto-backup] Snapshot built ({$tableCount} tables).");
+
+            $this->line('[db:auto-backup] Encrypting snapshot...');
             $encrypted = $backupService->encryptSnapshot($snapshot, $passphrase);
 
             $timestamp = now()->utc()->format('Ymd_His');
-            $filename = "db-auto-{$timestamp}.bkp";
-            $path = "backups/{$filename}";
+            $filename  = "db-auto-{$timestamp}.bkp";
+            $storagePath = "backups/{$filename}";
 
-            Storage::disk('local')->put($path, $encrypted);
+            Storage::disk('local')->put($storagePath, $encrypted);
 
-            $sizeKb = round(strlen($encrypted) / 1024, 1);
-            $this->info("Backup stored: {$path} ({$sizeKb} KB)");
+            $fullPath = Storage::disk('local')->path($storagePath);
+            $sizeKb   = round(strlen($encrypted) / 1024, 1);
+            $this->info("[db:auto-backup] Backup stored: {$fullPath} ({$sizeKb} KB)");
 
             $this->pruneOldBackups((int) ($settings['backup_auto_retain_days'] ?? 7));
 
             return self::SUCCESS;
         } catch (\Throwable $exception) {
-            $this->error('Backup failed: ' . $exception->getMessage());
+            $this->error('[db:auto-backup] Backup failed: ' . $exception->getMessage());
             return self::FAILURE;
         }
     }

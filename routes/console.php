@@ -26,18 +26,24 @@ try {
 
         if (filter_var($settings['backup_auto_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             $backupSchedule = (string) ($settings['backup_auto_schedule'] ?? 'daily');
-            $backupTime = (string) ($settings['backup_auto_time'] ?? '02:00');
+            $backupTime     = (string) ($settings['backup_auto_time'] ?? '02:00');
 
-            $event = Schedule::command('db:auto-backup')->withoutOverlapping();
+            // Validate time format before passing to scheduler
+            if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $backupTime)) {
+                $backupTime = '02:00';
+            }
+
+            $event = Schedule::command('db:auto-backup')->withoutOverlapping()->runInBackground();
 
             match ($backupSchedule) {
-                'hourly' => $event->hourly(),
-                'everyTwelveHours' => $event->everyTwelveHours(),
-                'weekly' => $event->weekly()->at($backupTime),
-                default => $event->daily()->at($backupTime),
+                'hourly'            => $event->hourly(),
+                'everyTwelveHours'  => $event->everyTwelveHours(),
+                'weekly'            => $event->weekly()->at($backupTime),
+                default             => $event->daily()->at($backupTime),
             };
         }
     }
-} catch (\Throwable) {
-    // keep scheduler boot resilient during early setup or migration states
+} catch (\Throwable $e) {
+    // Log so it is visible in laravel.log; do not crash the scheduler boot
+    \Illuminate\Support\Facades\Log::warning('[console.php] Auto backup schedule registration failed: ' . $e->getMessage());
 }

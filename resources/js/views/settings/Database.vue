@@ -32,6 +32,8 @@ const autoBackupForm = ref({
   passphrase_confirm: '',
 })
 
+const activePanel = ref('auto')
+
 const Toast = Swal.mixin({
   toast: true,
   position: 'top-end',
@@ -393,7 +395,36 @@ onMounted(async () => {
         <p v-if="autoRunResult.output" class="mt-1 whitespace-pre-line break-words">{{ autoRunResult.output }}</p>
       </div>
 
-      <div class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+      <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-900/40">
+        <div class="grid gap-2 sm:grid-cols-3">
+          <button
+            type="button"
+            @click="activePanel = 'auto'"
+            class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-center text-xs font-semibold transition"
+            :class="activePanel === 'auto' ? 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+          >
+            Auto Backup Config
+          </button>
+          <button
+            type="button"
+            @click="activePanel = 'manual'"
+            class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-center text-xs font-semibold transition"
+            :class="activePanel === 'manual' ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+          >
+            Manual Encrypted Tools
+          </button>
+          <button
+            type="button"
+            @click="activePanel = 'files'"
+            class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-center text-xs font-semibold transition"
+            :class="activePanel === 'files' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+          >
+            Server Backup Files
+          </button>
+        </div>
+      </div>
+
+      <div v-show="activePanel === 'auto'" class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
         <div class="flex items-center justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">Auto Backup Config</p>
@@ -441,7 +472,7 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+      <div v-show="activePanel === 'manual'" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
         <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Manual Encrypted Tools</h3>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
           <input v-model="backupPassphrase" type="password" placeholder="Passphrase" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white/90" />
@@ -462,7 +493,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+      <div v-show="activePanel === 'files'" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
         <div class="flex items-center justify-between gap-3">
           <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Server Backup Files</h3>
           <button type="button" @click="loadAutoBackupStatus" :disabled="loadingAutoBackup" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ loadingAutoBackup ? 'Refreshing...' : 'Refresh' }}</button>
