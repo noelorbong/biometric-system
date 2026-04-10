@@ -375,6 +375,23 @@ class AppSettingController extends Controller
         $sleep = (int) ($validated['sleep'] ?? 1);
         $configPath = '/etc/supervisor/conf.d/attendance-auto-sync.conf';
 
+        // Prefer CLI php binary instead of PHP_BINARY from web/FPM context.
+        $resolvedPhpBinary = '/usr/bin/php';
+        $phpLookup = $this->runShellCommand('command -v php');
+        if (($phpLookup['success'] ?? false) && filled($phpLookup['output'] ?? null)) {
+            $candidate = trim(explode(PHP_EOL, (string) $phpLookup['output'])[0]);
+            if ($candidate !== '' && is_executable($candidate)) {
+                $resolvedPhpBinary = $candidate;
+            }
+        }
+
+        if (!is_executable($resolvedPhpBinary)) {
+            return response()->json([
+                'message' => 'Unable to resolve a valid CLI php binary for supervisor command.',
+                'php_binary' => $resolvedPhpBinary,
+            ], 422);
+        }
+
         $daemonUser = 'www-data';
         if (function_exists('posix_getpwuid')) {
             $ownerInfo = @posix_getpwuid(@fileowner(base_path()));
@@ -385,7 +402,7 @@ class AppSettingController extends Controller
 
         $config = implode(PHP_EOL, [
             '[program:attendance-auto-sync]',
-            'command=' . PHP_BINARY . ' ' . base_path('artisan') . ' attendance:auto-sync:daemon --sleep=' . $sleep,
+            'command=' . $resolvedPhpBinary . ' ' . base_path('artisan') . ' attendance:auto-sync:daemon --sleep=' . $sleep,
             'directory=' . base_path(),
             'autostart=true',
             'autorestart=true',
@@ -475,6 +492,7 @@ class AppSettingController extends Controller
                 'config_path' => $configPath,
                 'sleep' => $sleep,
                 'user' => $daemonUser,
+                'php_binary' => $resolvedPhpBinary,
             ],
             'ip_address' => $request->ip(),
         ]);
@@ -482,6 +500,7 @@ class AppSettingController extends Controller
         return response()->json([
             'message' => 'Attendance auto-sync daemon installed and started.',
             'config_path' => $configPath,
+            'php_binary' => $resolvedPhpBinary,
             'commands' => $steps,
         ]);
     }
