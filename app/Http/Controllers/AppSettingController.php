@@ -420,31 +420,49 @@ class AppSettingController extends Controller
 
         $steps[] = array_merge(['command' => 'install config'], $copy);
 
-        $commands = [
-            'supervisorctl reread',
-            'supervisorctl update',
-            'supervisorctl restart attendance-auto-sync || supervisorctl start attendance-auto-sync',
-            'supervisorctl status attendance-auto-sync',
-        ];
-
-        foreach ($commands as $command) {
+        $runWithSudoFallback = function (string $command) use (&$steps) {
             $result = $this->runShellCommand($command);
-            if (!$result['success']) {
-                $sudoResult = $this->runShellCommand('sudo -n ' . $command);
-                $steps[] = array_merge(['command' => $command], $sudoResult);
-
-                if (!$sudoResult['success']) {
-                    return response()->json([
-                        'message' => 'Supervisor command failed. Check supervisor installation and sudo permissions.',
-                        'step' => $command,
-                        'commands' => $steps,
-                    ], 422);
-                }
-
-                continue;
+            if ($result['success']) {
+                $steps[] = array_merge(['command' => $command], $result);
+                return $result;
             }
 
-            $steps[] = array_merge(['command' => $command], $result);
+            $sudoResult = $this->runShellCommand('sudo -n ' . $command);
+            $steps[] = array_merge(['command' => $command], $sudoResult);
+            return $sudoResult;
+        };
+
+        foreach (['supervisorctl reread', 'supervisorctl update'] as $command) {
+            $result = $runWithSudoFallback($command);
+            if (!$result['success']) {
+                return response()->json([
+                    'message' => 'Supervisor command failed. Check supervisor installation and sudo permissions.',
+                    'step' => $command,
+                    'commands' => $steps,
+                ], 422);
+            }
+        }
+
+        // Try restart first; if service is new/not running yet, fall back to start.
+        $restart = $runWithSudoFallback('supervisorctl restart attendance-auto-sync');
+        if (!$restart['success']) {
+            $start = $runWithSudoFallback('supervisorctl start attendance-auto-sync');
+            if (!$start['success']) {
+                return response()->json([
+                    'message' => 'Supervisor command failed. Check supervisor installation and sudo permissions.',
+                    'step' => 'supervisorctl start attendance-auto-sync',
+                    'commands' => $steps,
+                ], 422);
+            }
+        }
+
+        $status = $runWithSudoFallback('supervisorctl status attendance-auto-sync');
+        if (!$status['success']) {
+            return response()->json([
+                'message' => 'Supervisor command failed. Check supervisor installation and sudo permissions.',
+                'step' => 'supervisorctl status attendance-auto-sync',
+                'commands' => $steps,
+            ], 422);
         }
 
         ActivityLog::create([
