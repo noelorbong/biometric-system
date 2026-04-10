@@ -74,6 +74,15 @@ Route::post('/settings', [AppSettingController::class, 'index'])->middleware('au
 Route::post('/settings/update', [AppSettingController::class, 'update'])->middleware('auth:sanctum');
 Route::post('/settings/maintenance-patch', [AppSettingController::class, 'runMaintenancePatch'])->middleware('auth:sanctum');
 Route::post('/settings/system-update', [AppSettingController::class, 'runSystemUpdate'])->middleware('auth:sanctum');
+Route::post('/settings/database/backup', [AppSettingController::class, 'backupDatabase'])->middleware('auth:sanctum');
+Route::post('/settings/database/export', [AppSettingController::class, 'exportDatabase'])->middleware('auth:sanctum');
+Route::post('/settings/database/import', [AppSettingController::class, 'importDatabase'])->middleware('auth:sanctum');
+Route::post('/settings/database/auto-status', [AppSettingController::class, 'backupAutoStatus'])->middleware('auth:sanctum');
+Route::post('/settings/database/auto-update', [AppSettingController::class, 'updateAutoBackup'])->middleware('auth:sanctum');
+Route::post('/settings/database/auto-run', [AppSettingController::class, 'runAutoBackupNow'])->middleware('auth:sanctum');
+Route::post('/settings/database/download', [AppSettingController::class, 'downloadBackupFile'])->middleware('auth:sanctum');
+Route::post('/settings/database/delete', [AppSettingController::class, 'deleteBackupFile'])->middleware('auth:sanctum');
+Route::post('/settings/database/restore', [AppSettingController::class, 'restoreBackupFile'])->middleware('auth:sanctum');
 Route::post('/user/update', [UserController::class, 'update'])->middleware('auth:sanctum');
 Route::post('/user/store', [UserController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/user/delete', [UserController::class, 'delete'])->middleware('auth:sanctum');

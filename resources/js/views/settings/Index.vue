@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import Swal from 'sweetalert2'
 import 'sweetalert2/src/sweetalert2.scss'
 import Button from '@/components/ui/Button.vue'
+import SettingsNav from '@/views/settings/SettingsNav.vue'
+import SettingsSidebar from '@/views/settings/SettingsSidebar.vue'
 import { useAppSettingStore } from '@/store/AppSettingStore'
 import { useLicenseStore } from '@/store/LicenseStore'
 
@@ -257,6 +259,8 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
+    <SettingsNav />
+
     <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
       <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
         <div class="max-w-3xl">
@@ -292,14 +296,12 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- ── License Info ── -->
     <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 class="text-base font-semibold text-slate-800 dark:text-white">License</h2>
           <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Current activation status for this installation.</p>
         </div>
-        <!-- Plan badge -->
         <span
           class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
           :class="{
@@ -320,7 +322,6 @@ onMounted(async () => {
       </div>
 
       <div class="grid gap-4 px-5 py-5 sm:grid-cols-3">
-        <!-- Type -->
         <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
           <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Plan Type</p>
           <p class="mt-1.5 text-sm font-semibold text-slate-800 dark:text-white">
@@ -328,7 +329,6 @@ onMounted(async () => {
           </p>
         </div>
 
-        <!-- Expiry / Trial expiry -->
         <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
           <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Expires</p>
           <p class="mt-1.5 text-sm font-semibold text-slate-800 dark:text-white">
@@ -342,7 +342,6 @@ onMounted(async () => {
           </p>
         </div>
 
-        <!-- Days left -->
         <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
           <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Days Remaining</p>
           <p class="mt-1.5 text-sm font-semibold"
@@ -364,7 +363,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Licensed: show key + replace + deactivate -->
       <div v-if="licenseStatus === 'licensed'" class="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p class="text-xs text-slate-400 dark:text-slate-500">License Key</p>
@@ -388,7 +386,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Trial/Expired: prompt to activate -->
       <div v-else class="border-t border-slate-100 px-5 py-4 dark:border-slate-800">
         <p class="text-xs text-slate-500 dark:text-slate-400">
           <template v-if="licenseStatus === 'trial'">Upgrade to a paid license to continue after your trial ends.</template>
@@ -398,7 +395,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white">General</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Display name appears in generated printable reports.</p>
@@ -502,83 +499,14 @@ onMounted(async () => {
         </div>
       </div>
 
-      <aside class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Quick Notes</h3>
-        <ul class="mt-3 space-y-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-          <li>Timer values are clamped between 250ms and 300000ms on save.</li>
-          <li>Disabling a timer prevents that machine-page background task from running.</li>
-          <li>Changes apply globally and are used by machine monitoring screens.</li>
-        </ul>
-
-        <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Required Patch Commands</h3>
-          <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            Super Admin can run required maintenance commands directly from this panel.
-          </p>
-
-          <ul class="mt-3 space-y-1.5 text-xs font-mono text-slate-600 dark:text-slate-300">
-            <li>php artisan storage:link</li>
-            <li>php artisan config:clear</li>
-            <li>php artisan cache:clear</li>
-            <li>php artisan route:clear</li>
-            <li>php artisan view:clear</li>
-            <li>php artisan migrate --force</li>
-          </ul>
-
-          <button
-            type="button"
-            @click="runMaintenancePatch"
-            :disabled="patching"
-            class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30"
-          >
-            {{ patching ? 'Running Patch...' : 'Run Required Patch' }}
-          </button>
-
-          <div v-if="patchResults.length" class="mt-4 space-y-2">
-            <div
-              v-for="result in patchResults"
-              :key="result.command"
-              class="rounded-lg border px-3 py-2 text-xs"
-              :class="result.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'"
-            >
-              <p class="font-semibold">{{ result.command }} <span class="ml-1">({{ result.exit_code }})</span></p>
-              <p v-if="result.output" class="mt-1 whitespace-pre-line break-words text-[11px] opacity-90">{{ result.output }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">System Update</h3>
-          <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-            Pull latest code from main branch.
-          </p>
-
-          <ul class="mt-3 space-y-1.5 text-xs font-mono text-slate-600 dark:text-slate-300">
-            <li>git pull origin main</li>
-          </ul>
-
-          <button
-            type="button"
-            @click="runSystemUpdate"
-            :disabled="updating"
-            class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
-          >
-            {{ updating ? 'Running Update...' : 'Run System Update' }}
-          </button>
-
-          <div v-if="updateResults.length" class="mt-4 space-y-2">
-            <div
-              v-for="result in updateResults"
-              :key="result.command"
-              class="rounded-lg border px-3 py-2 text-xs"
-              :class="result.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-300'"
-            >
-              <p class="font-semibold">{{ result.command }} <span class="ml-1">({{ result.exit_code }})</span></p>
-              <p v-if="result.output" class="mt-1 whitespace-pre-line break-words text-[11px] opacity-90">{{ result.output }}</p>
-            </div>
-          </div>
-        </div>
-      </aside>
+      <SettingsSidebar
+        :patching="patching"
+        :patch-results="patchResults"
+        :updating="updating"
+        :update-results="updateResults"
+        :on-run-maintenance-patch="runMaintenancePatch"
+        :on-run-system-update="runSystemUpdate"
+      />
     </section>
   </div>
 </template>

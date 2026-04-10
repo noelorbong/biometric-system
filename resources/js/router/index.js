@@ -103,6 +103,12 @@ const routes = [
         meta: { title: `Settings`, roles: [1] }
       },
       {
+        name: "DatabaseSettings",
+        path: "settings/database",
+        component: () => import('../views/settings/Database.vue'),
+        meta: { title: `Database Settings`, roles: [1] }
+      },
+      {
         name: "UserView",
         path: "users/:id",
         component: () => import('../views/user/View.vue'),

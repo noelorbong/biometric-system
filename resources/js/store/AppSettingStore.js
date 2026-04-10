@@ -116,5 +116,147 @@ export const useAppSettingStore = defineStore('appSettings', {
         return { success: false, data: resp }
       })
     },
+
+    async backupDatabase(passphrase) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/backup', { passphrase }).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async exportDatabase(passphrase) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/export', { passphrase }, {
+        responseType: 'blob',
+      }).then(function (resp) {
+        const headerName = resp?.headers?.['content-disposition'] || ''
+        const match = headerName.match(/filename="?([^\"]+)"?/i)
+        const filename = match?.[1] || 'db-export.bkp'
+        return { success: true, data: { blob: resp.data, filename } }
+      }).catch(function (resp) {
+        if (resp.response?.data instanceof Blob) {
+          return { success: false, data: resp, isBlobError: true }
+        }
+
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async importDatabase(file, passphrase) {
+      const auth = useAuthStore()
+      const formData = new FormData()
+      formData.append('backup_file', file)
+      formData.append('passphrase', passphrase)
+
+      return await axios.post('/api/settings/database/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async loadBackupAutoStatus() {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/auto-status').then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async updateAutoBackupConfig(payload) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/auto-update', payload).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async runAutoBackupNow() {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/auto-run').then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async downloadBackupFile(filename) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/download', { filename }, {
+        responseType: 'blob',
+      }).then(function (resp) {
+        const headerName = resp?.headers?.['content-disposition'] || ''
+        const match = headerName.match(/filename="?([^\"]+)"?/i)
+        const resolvedFilename = match?.[1] || filename || 'backup.bkp'
+        return { success: true, data: { blob: resp.data, filename: resolvedFilename } }
+      }).catch(function (resp) {
+        if (resp.response?.data instanceof Blob) {
+          return { success: false, data: resp, isBlobError: true }
+        }
+
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async deleteBackupFile(filename) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/delete', { filename }).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
+    async restoreBackupFile(filename, passphrase) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/settings/database/restore', { filename, passphrase }).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
   },
 })
