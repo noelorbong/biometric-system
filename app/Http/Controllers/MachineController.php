@@ -123,10 +123,12 @@ class MachineController extends Controller
             $info = $zk->getDeviceInfo();
             $zk->disconnect();
 
+            $deviceName = $info['DeviceName'] ?? $info['Platform'] ?? null;
+
             $updates = array_filter([
                 'sn'              => $info['SerialNumber'] ?? null,
                 'FirmwareVersion' => $info['FirmVer']      ?? null,
-                'ProductType'     => $info['DeviceName']   ?? ($info['Platform'] ?? null),
+                'ProductType'     => $deviceName,
                 'ProduceKind'     => $info['ProduceKind']  ?? ($info['Platform'] ?? null),
                 'pushver'         => $info['Platform']     ?? null,
                 'Purpose'         => $info['WorkCode']     ?? null,
@@ -142,6 +144,7 @@ class MachineController extends Controller
 
             return response()->json([
                 'message' => 'Connected successfully',
+                'device_name' => $deviceName,
                 'info'    => $info,
                 'machine' => $machine->fresh(),
             ]);
@@ -404,18 +407,11 @@ class MachineController extends Controller
         } else {
             try {
                 $zk->connect();
-                $deviceInfo = [];
-
-                try {
-                    $deviceInfo = $zk->getDeviceInfo();
-                } catch (\Throwable) {
-                    $deviceInfo = [];
-                }
-
+                // Use cached machine metadata to avoid extra device-info calls per download.
                 $zk->configureUserDecodeProfile(
-                    $deviceInfo['FirmVer'] ?? $machine?->FirmwareVersion,
-                    $deviceInfo['DeviceName'] ?? $machine?->ProductType,
-                    $deviceInfo['ProduceKind'] ?? $machine?->ProduceKind
+                    $machine?->FirmwareVersion,
+                    $machine?->ProductType,
+                    $machine?->ProduceKind
                 );
 
                 $deviceUsers = $zk->getUsers();

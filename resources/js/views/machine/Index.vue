@@ -621,8 +621,9 @@ const connectMachine = async (machine) => {
   }
 
   const info = resp.data?.info || {}
+  const deviceName = resp.data?.device_name || info.DeviceName || machine.ProductType || null
   const lines = [
-    info.DeviceName   ? `Device: ${info.DeviceName}`     : null,
+    deviceName        ? `Device: ${deviceName}`          : null,
     info.SerialNumber ? `S/N: ${info.SerialNumber}`       : null,
     info.FirmVer      ? `Firmware: ${info.FirmVer}`       : null,
     info.Manufacturer ? `Manufacturer: ${info.Manufacturer}` : null,
@@ -646,16 +647,16 @@ const syncAttendance = async (machine) => {
         <div>
           <label for="download-scope" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Download Scope</label>
           <select id="download-scope" class="swal2-input !m-0 !w-full">
-            <option value="today" selected>Today</option>
+            <option value="today" >Today</option>
             <option value="date">Specific Date</option>
-            <option value="all">All Logs</option>
+            <option value="all" selected>All Logs</option>
           </select>
         </div>
         <div>
           <label for="user-filter" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">User Filter</label>
           <select id="user-filter" class="swal2-input !m-0 !w-full">
-            <option value="existing" selected>Only Existing Local Users</option>
-            <option value="all">All Logs (Include Unknown Users)</option>
+            <option value="existing" >Only Existing Local Users</option>
+            <option value="all" selected>All Logs (Include Unknown Users)</option>
           </select>
         </div>
         <div id="download-date-wrapper" class="hidden">

@@ -51,6 +51,7 @@ class ZKTecoService
     private int $sessionId = 0;
     private int $replyId   = 0;
     private string $userDecodeProfile = 'auto';
+    private string $userReadStrategy = 'balanced';
 
     public function __construct(
         private readonly string $ip,
@@ -148,6 +149,15 @@ class ZKTecoService
     public function configureUserDecodeProfile(?string $firmVer, ?string $deviceName = null, ?string $produceKind = null): void
     {
         $signature = strtolower(trim(($firmVer ?? '') . ' ' . ($deviceName ?? '') . ' ' . ($produceKind ?? '')));
+        $this->userReadStrategy = 'balanced';
+
+        if (
+            str_contains($signature, 'fa1-pro')
+            || str_contains($signature, 'fa1 pro')
+            || str_contains($signature, 'fa1')
+        ) {
+            $this->userReadStrategy = 'fa_fast';
+        }
 
         if ($signature === '') {
             $this->setUserDecodeProfile('auto');
@@ -198,24 +208,30 @@ class ZKTecoService
     public function getDeviceInfo(): array
     {
         $fields = [
-            '~SerialNumber' => 'SerialNumber',
-            'DeviceName' => 'DeviceName',
-            '~Platform' => 'Platform',
-            'WorkCode' => 'WorkCode',
-            '~OEMVendor' => 'Manufacturer',
-            'UserCount' => 'UserCount',
-            'FPCount' => 'FPCount',
-            'FaceCount' => 'FaceCount',
-            'ManagerCount' => 'ManagerCount',
+            ['option' => '~SerialNumber', 'key' => 'SerialNumber'],
+            // Some firmware variants expose device name under different option keys.
+            ['option' => 'DeviceName', 'key' => 'DeviceName'],
+            ['option' => '~DeviceName', 'key' => 'DeviceName'],
+            ['option' => 'Device', 'key' => 'DeviceName'],
+            ['option' => '~Platform', 'key' => 'Platform'],
+            ['option' => 'WorkCode', 'key' => 'WorkCode'],
+            ['option' => '~OEMVendor', 'key' => 'Manufacturer'],
+            ['option' => 'UserCount', 'key' => 'UserCount'],
+            ['option' => 'FPCount', 'key' => 'FPCount'],
+            ['option' => 'FaceCount', 'key' => 'FaceCount'],
+            ['option' => 'ManagerCount', 'key' => 'ManagerCount'],
         ];
         $info   = [];
 
-        foreach ($fields as $field => $key) {
+        foreach ($fields as $field) {
             try {
-                $reply = $this->sendCommand(self::CMD_OPTIONS_RRQ, $field . "\x00");
+                $reply = $this->sendCommand(self::CMD_OPTIONS_RRQ, $field['option'] . "\x00");
 
                 if ($reply['cmd'] === self::CMD_ACK_OK && isset($reply['data'])) {
-                    $info[$key] = $this->parseOptionValue($reply['data']);
+                    $value = $this->parseOptionValue($reply['data']);
+                    if ($value !== '' && (!isset($info[$field['key']]) || $info[$field['key']] === '')) {
+                        $info[$field['key']] = $value;
+                    }
                 }
             } catch (\Throwable) {
                 // field not supported by this device — skip
@@ -348,6 +364,22 @@ class ZKTecoService
                             'record_count' => $parsedCount,
                             'quality_score' => $qualityScore,
                             'rank' => $rank,
+                        ]);
+                        return $parsed;
+                    }
+
+                    // FA1-PRO direct reads are usually correct and much faster than trying all fallbacks.
+                    if (
+                        $this->userReadStrategy === 'fa_fast'
+                        && $parsedCount >= 1
+                        && $qualityScore >= 3
+                        && !$likelyTruncated
+                    ) {
+                        Log::debug('ZKTeco FA fast mode returning first valid user payload', [
+                            'ip' => $this->ip,
+                            'label' => $label,
+                            'record_count' => $parsedCount,
+                            'quality_score' => $qualityScore,
                         ]);
                         return $parsed;
                     }
