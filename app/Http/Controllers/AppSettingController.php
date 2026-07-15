@@ -16,6 +16,8 @@ class AppSettingController extends Controller
 {
     private const DEFAULT_SETTINGS = [
         'company_school_name' => 'Biometric System',
+        'company_school_logo' => '',
+        'company_school_logo_print_enabled' => false,
         'machine_auto_sync_status_timer_enabled' => true,
         'machine_auto_sync_status_timer_ms' => 5000,
         'machine_refresh_timer_enabled' => true,
@@ -88,6 +90,11 @@ class AppSettingController extends Controller
     {
         return [
             'company_school_name' => $settings['company_school_name'] ?? self::DEFAULT_SETTINGS['company_school_name'],
+            'company_school_logo' => $settings['company_school_logo'] ?? self::DEFAULT_SETTINGS['company_school_logo'],
+            'company_school_logo_print_enabled' => filter_var(
+                $settings['company_school_logo_print_enabled'] ?? self::DEFAULT_SETTINGS['company_school_logo_print_enabled'],
+                FILTER_VALIDATE_BOOLEAN
+            ),
             'machine_auto_sync_status_timer_enabled' => filter_var(
                 $settings['machine_auto_sync_status_timer_enabled'] ?? self::DEFAULT_SETTINGS['machine_auto_sync_status_timer_enabled'],
                 FILTER_VALIDATE_BOOLEAN
@@ -187,6 +194,8 @@ class AppSettingController extends Controller
 
         $validated = $request->validate([
             'company_school_name' => ['required', 'string', 'max:255'],
+            'company_school_logo' => ['nullable', 'string', 'max:255'],
+            'company_school_logo_print_enabled' => ['required', 'boolean'],
             'machine_auto_sync_status_timer_enabled' => ['required', 'boolean'],
             'machine_auto_sync_status_timer_ms' => ['nullable', 'integer', 'min:250', 'max:300000'],
             'machine_refresh_timer_enabled' => ['required', 'boolean'],
@@ -197,6 +206,8 @@ class AppSettingController extends Controller
 
         $pairs = [
             'company_school_name' => $validated['company_school_name'],
+            'company_school_logo' => (string) ($validated['company_school_logo'] ?? ''),
+            'company_school_logo_print_enabled' => $validated['company_school_logo_print_enabled'] ? '1' : '0',
             'machine_auto_sync_status_timer_enabled' => $validated['machine_auto_sync_status_timer_enabled'] ? '1' : '0',
             'machine_auto_sync_status_timer_ms' => (string) ($validated['machine_auto_sync_status_timer_ms'] ?? self::DEFAULT_SETTINGS['machine_auto_sync_status_timer_ms']),
             'machine_refresh_timer_enabled' => $validated['machine_refresh_timer_enabled'] ? '1' : '0',

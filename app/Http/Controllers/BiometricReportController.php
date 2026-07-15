@@ -33,6 +33,7 @@ class BiometricReportController extends Controller
             ->with([
                 'profile:id,user_id,first_name,middle_name,last_name,name_extension',
                 'officeShift:id,name,schedule',
+                'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'departmentRef:id,department_name',
                 'collegeRef:id,college_short,college_long',
             ])
@@ -89,7 +90,73 @@ class BiometricReportController extends Controller
             return date('h:i A', strtotime((string) $value));
         };
 
-        $buildDayRecord = function (array $punches) use ($toTimeLabel) {
+        $parseClockMinutes = function ($value) {
+            if (!$value) {
+                return null;
+            }
+
+            $parts = explode(':', (string) $value);
+            if (count($parts) < 2) {
+                return null;
+            }
+
+            $hours = (int) $parts[0];
+            $minutes = (int) $parts[1];
+
+            if ($hours < 0 || $hours > 23 || $minutes < 0 || $minutes > 59) {
+                return null;
+            }
+
+            return ($hours * 60) + $minutes;
+        };
+
+        $getScheduledMinutes = function ($officeShift) use ($parseClockMinutes) {
+            $schedules = $officeShift?->schedules;
+            if (!$schedules || $schedules->isEmpty()) {
+                return null;
+            }
+
+            $sorted = $schedules->sortBy('sequence')->values();
+            $total = 0;
+
+            foreach ($sorted as $slot) {
+                $start = $parseClockMinutes($slot->time_in);
+                $end = $parseClockMinutes($slot->time_out);
+
+                if ($start === null || $end === null) {
+                    continue;
+                }
+
+                $isNextDay = (bool) ($slot->is_next_day ?? false);
+                if ($isNextDay || $end <= $start) {
+                    $end += 1440;
+                }
+
+                $duration = $end - $start;
+                if ($duration > 0) {
+                    $total += $duration;
+                }
+            }
+
+            return $total > 0 ? $total : null;
+        };
+
+        $minutesBetween = function ($start, $end) {
+            if (!$start || !$end) {
+                return 0;
+            }
+
+            $startTs = strtotime((string) $start);
+            $endTs = strtotime((string) $end);
+
+            if ($startTs === false || $endTs === false || $endTs <= $startTs) {
+                return 0;
+            }
+
+            return (int) floor(($endTs - $startTs) / 60);
+        };
+
+        $buildDayRecord = function (array $punches, $scheduledMinutes) use ($toTimeLabel, $minutesBetween) {
             usort($punches, fn ($a, $b) => strtotime((string) $a['checktime']) <=> strtotime((string) $b['checktime']));
 
             $normalized = [];
@@ -147,23 +214,40 @@ class BiometricReportController extends Controller
             $am = $sessions[0] ?? ['check_in' => null, 'check_out' => null];
             $pm = $sessions[1] ?? ['check_in' => null, 'check_out' => null];
 
+            $workedMinutes =
+                $minutesBetween($am['check_in'] ?? null, $am['check_out'] ?? null) +
+                $minutesBetween($pm['check_in'] ?? null, $pm['check_out'] ?? null);
+
+            $undertimeMinutes = null;
+            if ($scheduledMinutes !== null && $workedMinutes > 0) {
+                $undertimeMinutes = max(0, $scheduledMinutes - $workedMinutes);
+            }
+
+            $undertimeHrs = '';
+            $undertimeMin = '';
+            if ($undertimeMinutes !== null && $undertimeMinutes > 0) {
+                $undertimeHrs = (string) floor($undertimeMinutes / 60);
+                $undertimeMin = str_pad((string) ($undertimeMinutes % 60), 2, '0', STR_PAD_LEFT);
+            }
+
             return [
                 'am_in' => $toTimeLabel($am['check_in'] ?? null),
                 'am_out' => $toTimeLabel($am['check_out'] ?? null),
                 'pm_in' => $toTimeLabel($pm['check_in'] ?? null),
                 'pm_out' => $toTimeLabel($pm['check_out'] ?? null),
-                'undertimeHrs' => '',
-                'undertimeMin' => '',
+                'undertimeHrs' => $undertimeHrs,
+                'undertimeMin' => $undertimeMin,
             ];
         };
 
-        $reportUsers = $users->map(function ($user) use ($year, $month, $daysInMonth, $recordsByUserDate, $buildDayRecord) {
+        $reportUsers = $users->map(function ($user) use ($year, $month, $daysInMonth, $recordsByUserDate, $buildDayRecord, $getScheduledMinutes) {
             $attendanceRecords = [];
+            $scheduledMinutes = $getScheduledMinutes($user->officeShift);
 
             for ($day = 1; $day <= $daysInMonth; $day += 1) {
                 $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
                 $punches = $recordsByUserDate[$user->id][$date] ?? [];
-                $dayRecord = $buildDayRecord($punches);
+                $dayRecord = $buildDayRecord($punches, $scheduledMinutes);
                 $attendanceRecords[] = array_merge(['date' => $date], $dayRecord);
             }
 

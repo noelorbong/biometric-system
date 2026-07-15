@@ -17,7 +17,7 @@ const appSettingStore = useAppSettingStore()
 const authStore = useAuthStore()
 const { users } = storeToRefs(userStore)
 const { user: authUser } = storeToRefs(authStore)
-const { companySchoolName } = storeToRefs(appSettingStore)
+const { companySchoolName, companySchoolLogo, companySchoolLogoPrintEnabled } = storeToRefs(appSettingStore)
 
 const activeTab = ref('userinfo')
 const currentDate = new Date()
@@ -173,6 +173,70 @@ const toMinutesFromDateTime = (value) => {
   }
 
   return (date.getHours() * 60) + date.getMinutes()
+}
+
+const toMinutesFromTimeString = (value) => {
+  if (!value) {
+    return null
+  }
+
+  const parts = String(value).split(':')
+  if (parts.length < 2) {
+    return null
+  }
+
+  const hours = Number(parts[0])
+  const minutes = Number(parts[1])
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null
+  }
+
+  return (hours * 60) + minutes
+}
+
+const formatUndertimeParts = (minutesValue) => {
+  const total = Math.max(0, Number(minutesValue) || 0)
+  return {
+    hrs: Math.floor(total / 60),
+    min: total % 60,
+  }
+}
+
+const getScheduledMinutes = () => {
+  const slots = scheduleSlots.value
+  if (!Array.isArray(slots) || !slots.length) {
+    return null
+  }
+
+  const firstSlot = slots[0]
+  const lastSlot = slots.at(-1)
+  const startMinute = toMinutesFromScheduleTime(firstSlot?.time_in)
+  const endMinute = toMinutesFromScheduleTime(lastSlot?.time_out)
+
+  if (startMinute === null || endMinute === null) {
+    return null
+  }
+
+  return Math.max(0, endMinute - startMinute)
+}
+
+const getActualWorkedMinutes = (row) => {
+  const amIn = toMinutesFromTimeString(row?.slots?.[0]?.check_in ? formatTimeOnly(row.slots[0].check_in) : '')
+  const amOut = toMinutesFromTimeString(row?.slots?.[0]?.check_out ? formatTimeOnly(row.slots[0].check_out) : '')
+  const pmIn = toMinutesFromTimeString(row?.slots?.[1]?.check_in ? formatTimeOnly(row.slots[1].check_in) : '')
+  const pmOut = toMinutesFromTimeString(row?.slots?.[1]?.check_out ? formatTimeOnly(row.slots[1].check_out) : '')
+
+  let total = 0
+
+  if (amIn !== null && amOut !== null && amOut > amIn) {
+    total += amOut - amIn
+  }
+
+  if (pmIn !== null && pmOut !== null && pmOut > pmIn) {
+    total += pmOut - pmIn
+  }
+
+  return total > 0 ? total : null
 }
 
 const resolveCheckInSlotIndex = (minutes, slotMeta) => {
@@ -803,6 +867,8 @@ const deleteOverrideLog = async (log) => {
 }
 
 const buildPrintableAttendanceRecords = () => {
+  const scheduledMinutes = getScheduledMinutes()
+
   return attendanceRows.value.map((row) => {
     const [year, month, day] = String(row.date).split('-').map(Number)
     const dateObj = new Date(year, month - 1, day)
@@ -811,6 +877,11 @@ const buildPrintableAttendanceRecords = () => {
     const amOut = row.slots[0]?.check_out ? formatTimeOnly(row.slots[0].check_out) : ''
     const pmIn = row.slots[1]?.check_in ? formatTimeOnly(row.slots[1].check_in) : ''
     const pmOut = row.slots[1]?.check_out ? formatTimeOnly(row.slots[1].check_out) : ''
+    const actualWorkedMinutes = getActualWorkedMinutes(row)
+    const undertimeMinutes = scheduledMinutes !== null && actualWorkedMinutes !== null
+      ? Math.max(0, scheduledMinutes - actualWorkedMinutes)
+      : 0
+    const undertime = formatUndertimeParts(undertimeMinutes)
 
     return {
       date: row.date,
@@ -819,8 +890,8 @@ const buildPrintableAttendanceRecords = () => {
       am_out: amOut,
       pm_in: pmIn,
       pm_out: pmOut,
-      undertimeHrs: '',
-      undertimeMin: '',
+      undertimeHrs: undertime.hrs,
+      undertimeMin: String(undertime.min).padStart(2, '0'),
     }
   })
 }
@@ -1274,6 +1345,8 @@ const buildPrintableAttendanceRecords = () => {
           :selected-month="selectedMonth"
           :attendance-records="buildPrintableAttendanceRecords()"
           :company-name="companySchoolName"
+          :company-logo="companySchoolLogo"
+          :show-logo="companySchoolLogoPrintEnabled"
         />
       </div>
     </template>

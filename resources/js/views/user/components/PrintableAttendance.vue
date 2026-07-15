@@ -8,6 +8,10 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400">Print official attendance record for payroll</p>
             </div>
             <div class="flex items-center gap-3">
+                <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    <input v-model="useCalculatedUndertime" type="checkbox" class="h-4 w-4" />
+                    Calculate Undertime
+                </label>
                 <div class="flex items-center gap-2">
                     <label
                         class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Copies:</label>
@@ -27,7 +31,13 @@
         <div ref="printContainer"
             style="background: white; padding: 0px; border: 1px solid #d1d5db; border-radius: 8px; color: #111827;">
             <!-- Header Section -->
-            <div style=" margin-top: 10px; border-bottom: 2px solid #111827;">
+              <div style="margin-top: 10px; border-bottom: 2px solid #111827; position: relative;">
+                <div
+                    v-if="showLogo && companyLogo"
+                    style="position: absolute; top: 0; right: 0; display: flex; padding-right: 10px; justify-content: center; align-items: center; margin-bottom: 4px;"
+                >
+                    <img :src="companyLogo" alt="Company logo" style=" max-height: 50px; object-fit: contain;" />
+                </div>
                 <p style="font-size: 8px; font-weight: 600; color: #374151; margin-bottom: 4px; padding-left: 10px;">CSC
                     Form No. 48</p>
                 <h1 style="text-align: center; font-size: 8pt; font-weight: 700; color: #111827; margin:0; padding:0;">
@@ -35,7 +45,7 @@
                 <p style="text-align: center; font-size: 6pt; color: #4b5563; margin:0; padding:0;">{{ companyName || 'Company / School Name' }}</p>
            
                 <p style="text-align: center; font-size: 6pt; color: #4b5563;  margin-top: 8pt; ">
-                    {{ user?.department || user?.department_ref?.department_name || 'Department' }}
+                    {{ user?.department || user?.department_ref?.department_name || '' }}
                 </p>
                 <h1 style="text-align: center; font-size: 12pt; font-weight: 700; color: #111827; margin-top:5px; ">{{ user?.name }}
                 </h1>
@@ -133,10 +143,10 @@
                                 {{ getRecordValue(day, 'pm_out') }}
                             </td>
                             <td style="border: 1px solid #111827; font-size: 6pt; text-align: center;">
-                                {{ getRecordValue(day, 'undertime_hrs') }}
+                                {{ getUndertimeValue(day, 'hrs') }}
                             </td>
                             <td style="border: 1px solid #111827;  font-size: 6pt; text-align: center;">
-                                {{ getRecordValue(day, 'undertime_min') }}
+                                {{ getUndertimeValue(day, 'min') }}
                             </td>
                         </tr>
                         <!-- TOTAL Row -->
@@ -185,6 +195,7 @@ import { computed, ref } from 'vue'
 
 const printContainer = ref(null)
 const copies = ref(4)
+const useCalculatedUndertime = ref(true)
 
 const props = defineProps({
     user: Object,
@@ -195,15 +206,35 @@ const props = defineProps({
         type: String,
         default: 'Biometric System'
     },
+    companyLogo: {
+        type: String,
+        default: '',
+    },
+    showLogo: {
+        type: Boolean,
+        default: false,
+    },
     showControls: {
         type: Boolean,
         default: true,
     }
     ,
+    calculateUndertime: {
+        type: Boolean,
+        default: undefined,
+    },
     overrides: {
         type: Array,
         default: () => [],
     },
+})
+
+const shouldUseCalculatedUndertime = computed(() => {
+    if (typeof props.calculateUndertime === 'boolean') {
+        return props.calculateUndertime
+    }
+
+    return useCalculatedUndertime.value
 })
 
 // Computed Properties
@@ -223,6 +254,114 @@ const totalDaysInMonth = computed(() => {
     const days = new Date(props.selectedYear, props.selectedMonth, 0).getDate()
     return Array.from({ length: days }, (_, i) => i + 1)
 })
+
+const parseTimeToMinutes = (value) => {
+    if (!value) return null
+
+    if (value instanceof Date) {
+        const time = value.getTime()
+        if (Number.isNaN(time)) return null
+        return (value.getHours() * 60) + value.getMinutes()
+    }
+
+    const raw = String(value).trim()
+    if (!raw) return null
+
+    const timeMatch = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/)
+    if (timeMatch) {
+        let hours = Number(timeMatch[1])
+        const minutes = Number(timeMatch[2])
+        const meridiem = (timeMatch[3] || '').toUpperCase()
+
+        if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+            return null
+        }
+
+        if (meridiem === 'AM') {
+            if (hours === 12) hours = 0
+        } else if (meridiem === 'PM') {
+            if (hours < 12) hours += 12
+        }
+
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+            return null
+        }
+
+        return (hours * 60) + minutes
+    }
+
+    const parts = raw.split(':')
+    if (parts.length < 2) return null
+
+    const hours = Number(parts[0])
+    const minutes = Number(parts[1])
+
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+        return null
+    }
+
+    return (hours * 60) + minutes
+}
+
+const formatMinutes = (totalMinutes) => {
+    if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+        return ''
+    }
+
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
+
+    return { hours, minutes }
+}
+
+const getUserScheduledMinutes = () => {
+    const officeShift = props.user?.office_shift || props.user?.officeShift
+    const schedules = Array.isArray(officeShift?.schedules) ? [...officeShift.schedules] : []
+
+    const sorted = schedules.sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+    if (!sorted.length) {
+        return null
+    }
+
+    const totalScheduledMinutes = sorted.reduce((acc, slot) => {
+        const startMinute = parseTimeToMinutes(slot?.time_in)
+        const endMinute = parseTimeToMinutes(slot?.time_out)
+
+        if (startMinute === null || endMinute === null || endMinute <= startMinute) {
+            return acc
+        }
+
+        return acc + (endMinute - startMinute)
+    }, 0)
+
+    return totalScheduledMinutes > 0 ? totalScheduledMinutes : null
+}
+
+const getActualWorkedMinutes = (record) => {
+    const amIn = parseTimeToMinutes(record?.am_in)
+    const amOut = parseTimeToMinutes(record?.am_out)
+    const pmIn = parseTimeToMinutes(record?.pm_in)
+    const pmOut = parseTimeToMinutes(record?.pm_out)
+
+    let total = 0
+
+    if (amIn !== null && amOut !== null && amOut > amIn) {
+        total += amOut - amIn
+    }
+
+    if (pmIn !== null && pmOut !== null && pmOut > pmIn) {
+        total += pmOut - pmIn
+    }
+
+    return total > 0 ? total : null
+}
+
+const getPrintableRecordForDay = (day) => {
+    const dayStr = String(day).padStart(2, '0')
+    const monthStr = String(props.selectedMonth).padStart(2, '0')
+    const dateStr = `${props.selectedYear}-${monthStr}-${dayStr}`
+    return props.attendanceRecords?.find?.((r) => r.date === dateStr) || null
+}
 
 // Methods
 const formatOverrideTime = (dateTimeValue) => {
@@ -294,6 +433,25 @@ const getOverrideValue = (day, field) => {
     return formatOverrideTime(matched[0].new_checktime)
 }
 
+const getEffectiveRecordForDay = (day) => {
+    const baseRecord = getPrintableRecordForDay(day)
+    if (!baseRecord) {
+        return null
+    }
+
+    const fields = ['am_in', 'am_out', 'pm_in', 'pm_out']
+    const effectiveRecord = { ...baseRecord }
+
+    fields.forEach((field) => {
+        const overrideValue = getOverrideValue(day, field)
+        if (overrideValue) {
+            effectiveRecord[field] = overrideValue
+        }
+    })
+
+    return effectiveRecord
+}
+
 const getRecordValue = (day, field) => {
     if (!props.attendanceRecords || !Array.isArray(props.attendanceRecords)) return ''
 
@@ -329,6 +487,62 @@ const getRecordValue = (day, field) => {
         default:
             return ''
     }
+}
+
+const getUndertimeValue = (day, field) => {
+    const getStoredUndertimeDisplay = () => {
+        const hrsRaw = getRecordValue(day, 'undertime_hrs')
+        const minRaw = getRecordValue(day, 'undertime_min')
+
+        const hrsText = String(hrsRaw || '').trim()
+        const minText = String(minRaw || '').trim()
+
+        const hrsNum = Number(hrsText)
+        const minNum = Number(minText)
+        const hasHrs = hrsText !== '' && !Number.isNaN(hrsNum) && hrsNum > 0
+        const hasMin = minText !== '' && !Number.isNaN(minNum) && minNum > 0
+
+        // When stored values are blank/zero, render both cells as empty.
+        if (!hasHrs && !hasMin) {
+            return ''
+        }
+
+        if (field === 'hrs') {
+            return hasHrs ? String(hrsNum) : ''
+        }
+
+        return minText
+    }
+
+    if (!shouldUseCalculatedUndertime.value) {
+        return getStoredUndertimeDisplay()
+    }
+
+    const record = getEffectiveRecordForDay(day)
+
+    if (!record) {
+        return ''
+    }
+
+    const scheduledMinutes = getUserScheduledMinutes()
+    const actualWorkedMinutes = getActualWorkedMinutes(record)
+
+    if (scheduledMinutes === null || actualWorkedMinutes === null) {
+        return getStoredUndertimeDisplay()
+    }
+
+    const undertimeMinutes = Math.max(0, scheduledMinutes - actualWorkedMinutes)
+    if (undertimeMinutes <= 0) {
+        return ''
+    }
+
+    const parts = formatMinutes(undertimeMinutes)
+
+    if (!parts) {
+        return ''
+    }
+
+    return field === 'hrs' ? String(parts.hours) : String(parts.minutes).padStart(2, '0')
 }
 
 const getPrintContent = () => {
@@ -474,9 +688,36 @@ const handlePrint = () => {
     </html>
   `)
     win.document.close()
-    win.focus()
-    win.print()
-    win.close()
+
+    const printWhenReady = () => {
+        win.focus()
+        win.print()
+        win.close()
+    }
+
+    const images = Array.from(win.document.images || [])
+    if (!images.length) {
+        printWhenReady()
+        return
+    }
+
+    let remaining = images.length
+    const finish = () => {
+        remaining -= 1
+        if (remaining <= 0) {
+            printWhenReady()
+        }
+    }
+
+    images.forEach((img) => {
+        if (img.complete) {
+            finish()
+            return
+        }
+
+        img.addEventListener('load', finish, { once: true })
+        img.addEventListener('error', finish, { once: true })
+    })
 }
 
 defineExpose({ getPrintPayload, getPrintContent })

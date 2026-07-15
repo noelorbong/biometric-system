@@ -12,7 +12,7 @@ import PrintableAttendance from '@/views/user/components/PrintableAttendance.vue
 const userStore = useUserStore()
 const appSettingStore = useAppSettingStore()
 const { officeShifts, departments, colleges } = storeToRefs(userStore)
-const { companySchoolName } = storeToRefs(appSettingStore)
+const { companySchoolName, companySchoolLogo, companySchoolLogoPrintEnabled } = storeToRefs(appSettingStore)
 
 const now = new Date()
 const filters = ref({
@@ -26,6 +26,7 @@ const filters = ref({
 const reportUsers = ref([])
 const loading = ref(false)
 const copiesPerUser = ref(1)
+const calculateUndertime = ref(false)
 const printableRefs = ref([])
 const selectedUserIds = ref([])
 const biometricModalOpen = ref(false)
@@ -107,7 +108,7 @@ const generateReport = async () => {
     if (!reportUsers.value.length) {
       toastResult('No users found for selected filters', 'info')
     }
-        await fetchOverridesForUsers(reportUsers.value)
+    await fetchOverridesForUsers(reportUsers.value)
   } catch (error) {
     reportUsers.value = []
     toastResult(error?.response?.data?.message || 'Unable to generate report', 'error')
@@ -115,20 +116,20 @@ const generateReport = async () => {
     loading.value = false
   }
 }
-    const fetchOverridesForUsers = async (users) => {
-      for (const user of users) {
-        try {
-          const resp = await axios.post('/api/user/checkinout', {
-            user_id: user.id,
-            year: Number(filters.value.year),
-            month: Number(filters.value.month),
-          })
-          user._overrides = resp?.data?.overrides || []
-        } catch (err) {
-          user._overrides = []
-        }
-      }
+const fetchOverridesForUsers = async (users) => {
+  for (const user of users) {
+    try {
+      const resp = await axios.post('/api/user/checkinout', {
+        user_id: user.id,
+        year: Number(filters.value.year),
+        month: Number(filters.value.month),
+      })
+      user._overrides = resp?.data?.overrides || []
+    } catch (err) {
+      user._overrides = []
     }
+  }
+}
 
 const printReport = async () => {
   if (!reportUsers.value.length) {
@@ -193,9 +194,36 @@ const printReport = async () => {
     </html>
   `)
   win.document.close()
-  win.focus()
-  win.print()
-  win.close()
+
+  const printWhenReady = () => {
+    win.focus()
+    win.print()
+    win.close()
+  }
+
+  const images = Array.from(win.document.images || [])
+  if (!images.length) {
+    printWhenReady()
+    return
+  }
+
+  let remaining = images.length
+  const finish = () => {
+    remaining -= 1
+    if (remaining <= 0) {
+      printWhenReady()
+    }
+  }
+
+  images.forEach((img) => {
+    if (img.complete) {
+      finish()
+      return
+    }
+
+    img.addEventListener('load', finish, { once: true })
+    img.addEventListener('error', finish, { once: true })
+  })
 }
 
 onMounted(async () => {
@@ -296,122 +324,174 @@ const closeBiometricLogs = () => {
   biometricLogOverrides.value = []
   biometricLogUser.value = null
 }
+
+const getPrintableRecords = (user) => {
+  const records = Array.isArray(user?.attendance_records) ? user.attendance_records : []
+
+  if (calculateUndertime.value) {
+    return records
+  }
+
+  return records.map((record) => ({
+    ...record,
+    undertimeHrs: '',
+    undertimeMin: '',
+  }))
+}
 </script>
 
 <template>
   <div class="space-y-6">
-    <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
-      <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-        <div class="max-w-3xl">
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Reporting Deck</p>
-          <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Bulk Report</h1>
-          <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200/90">
-            Generate and print attendance forms for multiple users by month, office shift, department, and college.
-          </p>
-          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <span class="inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
-              Period: {{ monthYearLabel }}
-            </span>
-            <span class="inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
-              :class="loading ? 'bg-amber-400/15 text-amber-100 ring-amber-300/30' : 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'">
-              {{ loading ? 'Generating Report...' : 'Ready to Generate' }}
-            </span>
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section
+        class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
+        <div class="flex flex-col gap-1 xl:flex-row xl:items-end xl:justify-between">
+          <div class="max-w-xl">
+            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Reporting Deck</p>
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Bulk Report</h1>
+            
+            <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
+              <span
+                class="inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
+                Period: {{ monthYearLabel }}
+              </span>
+              <span class="inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
+                :class="loading ? 'bg-amber-400/15 text-amber-100 ring-amber-300/30' : 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'">
+                {{ loading ? 'Generating Report...' : 'Ready to Generate' }}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:min-w-[600px]">
+            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Users</p>
+              <p class="mt-2 text-3xl font-semibold text-white">{{ reportUsers.length }}</p>
+              <p class="mt-1 text-xs text-slate-300">Matched records</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Selected</p>
+              <p class="mt-2 text-3xl font-semibold text-white">{{ selectedCount }}</p>
+              <p class="mt-1 text-xs text-slate-300">Ready to print</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Unselected</p>
+              <p class="mt-2 text-3xl font-semibold text-white">{{ unselectedCount }}</p>
+              <p class="mt-1 text-xs text-slate-300">Excluded from print</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Copies/User</p>
+              <p class="mt-2 text-3xl font-semibold text-white">{{ copiesPerUser }}</p>
+              <p class="mt-1 text-xs text-slate-300">Print multiplier</p>
+            </div>
           </div>
         </div>
-
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[460px]">
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Users</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ reportUsers.length }}</p>
-            <p class="mt-1 text-xs text-slate-300">Matched records</p>
+        <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200/90 hidden md:block">
+              Generate and print attendance forms for multiple users by month, office shift, department, and college.
+            </p>
+      </section>
+      <aside
+        class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Print Options</h3>
+        <div class="mt-3 space-y-3">
+          <label
+            class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm dark:border-slate-700">
+            <span class="font-medium text-slate-700 dark:text-slate-200">Calculate Undertime</span>
+            <input v-model="calculateUndertime" type="checkbox" class="h-4 w-4" />
+          </label>
+          <div class="flex">
+          <div class="w-full">
+            <label
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Copies
+              Per User</label>
+            <select v-model.number="copiesPerUser"
+              class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option v-for="n in 10" :key="`copies-${n}`" :value="n">{{ n }}</option>
+            </select>
           </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Selected</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ selectedCount }}</p>
-            <p class="mt-1 text-xs text-slate-300">Ready to print</p>
+          <button @click="printReport" type="button"
+            class="mt-auto inline-flex h-11 w-full items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30">
+            Print Selected
+          </button>
           </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Unselected</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ unselectedCount }}</p>
-            <p class="mt-1 text-xs text-slate-300">Excluded from print</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Copies/User</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ copiesPerUser }}</p>
-            <p class="mt-1 text-xs text-slate-300">Print multiplier</p>
-          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Only selected users will be included in printing.</p>
         </div>
-      </div>
-    </section>
-
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
+      </aside>
+    </div>
+    <section class="grid gap-4 ">
+      <div
+        class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Report Filters</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Set criteria to generate the attendance population.</p>
+            <!-- <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Set criteria to generate the attendance
+              population.</p> -->
           </div>
-          <Button @click="generateReport" size="sm" variant="primary" :className="'h-11 bg-sky-500 hover:bg-sky-600 text-white'">Generate</Button>
+          
         </div>
 
-        <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+        <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-6">
           <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
-            <select v-model.number="filters.year" class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+            <label
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
+            <select v-model.number="filters.year"
+              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
               <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
-            <select v-model.number="filters.month" class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
+            <label
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
+            <select v-model.number="filters.month"
+              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}
+              </option>
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
-            <select v-model="filters.office_shift_id" class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+            <label
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office
+              Shift</label>
+            <select v-model="filters.office_shift_id"
+              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
               <option value="">All</option>
-              <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{ shift.name }}</option>
+              <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{
+                shift.name }}</option>
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
-            <select v-model="filters.department_id" class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+            <label
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
+            <select v-model="filters.department_id"
+              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
               <option value="">All</option>
-              <option v-for="department in departments" :key="`report-department-${department.id}`" :value="String(department.id)">{{ department.department_name }}</option>
+              <option v-for="department in departments" :key="`report-department-${department.id}`"
+                :value="String(department.id)">{{ department.department_name }}</option>
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
-            <select v-model="filters.college_id" class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+            <label
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
+            <select v-model="filters.college_id"
+              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
               <option value="">All</option>
-              <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{ college.college_long || college.college_short || `College #${college.id}` }}</option>
+              <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{
+                college.college_long || college.college_short || `College #${college.id}` }}</option>
             </select>
           </div>
+          <Button @click="generateReport" size="sm" variant="primary"
+            :className="'mt-auto h-11 bg-sky-500 hover:bg-sky-600 text-white'">Generate</Button>
         </div>
       </div>
 
-      <aside class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Print Options</h3>
-        <div class="mt-3 space-y-3">
-          <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Copies Per User</label>
-            <select v-model.number="copiesPerUser" class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option v-for="n in 10" :key="`copies-${n}`" :value="n">{{ n }}</option>
-            </select>
-          </div>
-          <button @click="printReport" type="button" class="inline-flex h-11 w-full items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30">
-            Print Selected
-          </button>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Only selected users will be included in printing.</p>
-        </div>
-      </aside>
+
     </section>
 
-    <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section
+      class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <div class="text-sm text-slate-600 dark:text-slate-300">
-          <span class="font-semibold text-slate-900 dark:text-white">{{ loading ? 'Generating...' : reportUsers.length }}</span> user(s) matched for {{ monthYearLabel }}
+          <span class="font-semibold text-slate-900 dark:text-white">{{ loading ? 'Generating...' : reportUsers.length
+            }}</span> user(s) matched for {{ monthYearLabel }}
           <span v-if="!loading" class="ml-2">({{ selectedCount }} selected)</span>
         </div>
       </div>
@@ -420,46 +500,38 @@ const closeBiometricLogs = () => {
           <thead class="bg-slate-50 dark:bg-slate-900/60">
             <tr>
               <th class="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <input
-                  type="checkbox"
-                  :checked="allSelected"
-                  @change="toggleSelectAll"
-                  class="h-4 w-4"
-                />
+                <input type="checkbox" :checked="allSelected" @change="toggleSelectAll" class="h-4 w-4" />
               </th>
               <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Office Shift</th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Department</th>
+              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Office Shift
+              </th>
+              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Department
+              </th>
               <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">College</th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Biometrics</th>
+              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Biometrics
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-            <tr v-for="user in reportUsers" :key="`report-user-${user.id}`" class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <tr v-for="user in reportUsers" :key="`report-user-${user.id}`"
+              class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
               <td class="px-4 py-2 text-center text-sm">
-                <input
-                  v-model="selectedUserIds"
-                  type="checkbox"
-                  :value="user.id"
-                  class="h-4 w-4"
-                />
+                <input v-model="selectedUserIds" type="checkbox" :value="user.id" class="h-4 w-4" />
               </td>
               <td class="px-4 py-2 text-sm font-medium text-slate-800 dark:text-slate-100">{{ user.name }}</td>
               <td class="px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{{ user.office_shift?.name || '-' }}</td>
               <td class="px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{{ user.department || '-' }}</td>
               <td class="px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{{ user.college || '-' }}</td>
               <td class="px-4 py-2 text-sm">
-                <button
-                  @click="openBiometricLogs(user)"
-                  type="button"
-                  class="rounded-md border border-sky-200 px-2.5 py-1 text-xs font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"
-                >
+                <button @click="openBiometricLogs(user)" type="button"
+                  class="rounded-md border border-sky-200 px-2.5 py-1 text-xs font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20">
                   View All Logs
                 </button>
               </td>
             </tr>
             <tr v-if="!reportUsers.length && !loading">
-              <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">No report data yet. Apply filters and click Generate.</td>
+              <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">No report data yet. Apply filters and
+                click Generate.</td>
             </tr>
           </tbody>
         </table>
@@ -468,8 +540,10 @@ const closeBiometricLogs = () => {
 
     <Modal v-if="biometricModalOpen" @close="closeBiometricLogs">
       <template #body>
-        <div class="relative m-2 w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950 lg:p-6">
-          <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800">
+        <div
+          class="relative m-2 w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950 lg:p-6">
+          <section
+            class="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800">
             <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div class="max-w-3xl">
                 <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Audit</p>
@@ -477,7 +551,8 @@ const closeBiometricLogs = () => {
                 <p class="mt-2 text-sm text-slate-200/90">
                   {{ biometricLogUser?.name || '-' }} - {{ monthYearLabel }}
                 </p>
-                <p class="mt-2 text-xs text-slate-300/90">All entries are shown as-is, including duplicate IN/OUT punches.</p>
+                <p class="mt-2 text-xs text-slate-300/90">All entries are shown as-is, including duplicate IN/OUT
+                  punches.</p>
               </div>
 
               <div class="grid grid-cols-3 gap-3 sm:min-w-[340px]">
@@ -487,23 +562,23 @@ const closeBiometricLogs = () => {
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
                   <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Check In</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{ mergedBiometricLogs.filter(log => normalizeCheckType(log?.CHECKTYPE) === 'I').length }}</p>
+                  <p class="mt-1 text-2xl font-semibold text-white">{{mergedBiometricLogs.filter(log =>
+                    normalizeCheckType(log?.CHECKTYPE) === 'I').length }}</p>
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
                   <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Check Out</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{ mergedBiometricLogs.filter(log => normalizeCheckType(log?.CHECKTYPE) === 'O').length }}</p>
+                  <p class="mt-1 text-2xl font-semibold text-white">{{mergedBiometricLogs.filter(log =>
+                    normalizeCheckType(log?.CHECKTYPE) === 'O').length }}</p>
                 </div>
               </div>
             </div>
           </section>
 
           <div class="mt-4 flex items-center justify-between gap-2">
-            <p class="text-xs uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Chronological Event Stream</p>
-            <button
-              @click="closeBiometricLogs"
-              type="button"
-              class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
+            <p class="text-xs uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Chronological Event Stream
+            </p>
+            <button @click="closeBiometricLogs" type="button"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
               Close
             </button>
           </div>
@@ -513,31 +588,44 @@ const closeBiometricLogs = () => {
               <table class="min-w-full">
                 <thead class="bg-slate-50 dark:bg-slate-900/70">
                   <tr>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">#</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date/Time</th>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      #</th>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Type</th>
+                    <th
+                      class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Date/Time</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                   <tr v-if="biometricModalLoading">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">Loading biometric logs...</td>
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">Loading
+                      biometric logs...</td>
                   </tr>
                   <tr v-else-if="!mergedBiometricLogs.length">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No biometric logs for selected user and period.</td>
+                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No
+                      biometric logs for selected user and period.</td>
                   </tr>
-                  <tr v-else v-for="(log, index) in mergedBiometricLogs" :key="`log-${index}-${log.CHECKTIME}`" class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr v-else v-for="(log, index) in mergedBiometricLogs" :key="`log-${index}-${log.CHECKTIME}`"
+                    class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td class="px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200">{{ index + 1 }}</td>
                     <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
                       <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em]" :class="checkTypeBadgeClass(log.CHECKTYPE)">
+                        <span
+                          class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
+                          :class="checkTypeBadgeClass(log.CHECKTYPE)">
                           {{ formatCheckTypeLabel(log.CHECKTYPE) }}
                         </span>
-                        <span v-if="log._override_action" class="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                        <span v-if="log._override_action"
+                          class="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                           {{ log._override_action === 'add' ? 'added' : log._override_action }}
                         </span>
                       </div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME) }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME)
+                      }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -548,18 +636,11 @@ const closeBiometricLogs = () => {
     </Modal>
 
     <div class="hidden">
-      <PrintableAttendance
-        v-for="user in reportUsers"
-        :key="`report-printable-${user.id}`"
-        ref="printableRefs"
-        :user="user"
-        :selected-year="filters.year"
-        :selected-month="filters.month"
-        :attendance-records="user.attendance_records || []"
-        :company-name="companySchoolName"
-        :show-controls="false"
-        :overrides="user._overrides || []"
-      />
+      <PrintableAttendance v-for="user in reportUsers" :key="`report-printable-${user.id}`" ref="printableRefs"
+        :user="user" :selected-year="filters.year" :selected-month="filters.month"
+        :attendance-records="getPrintableRecords(user)" :company-name="companySchoolName"
+        :company-logo="companySchoolLogo" :show-logo="companySchoolLogoPrintEnabled" :show-controls="false"
+        :calculate-undertime="calculateUndertime" :overrides="user._overrides || []" />
     </div>
   </div>
 </template>

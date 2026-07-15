@@ -20,6 +20,8 @@ const trialDaysLeft     = computed(() => licenseStore.trialDaysLeft)
 const trialExpiresAt    = computed(() => licenseStore.trialExpiresAt)
 const {
   companySchoolName,
+  companySchoolLogo,
+  companySchoolLogoPrintEnabled,
   machineAutoSyncStatusTimerEnabled,
   machineAutoSyncStatusTimerMs,
   machineRefreshTimerEnabled,
@@ -30,6 +32,8 @@ const {
 
 const form = ref({
   company_school_name: '',
+  company_school_logo: '',
+  company_school_logo_print_enabled: false,
   machine_auto_sync_status_timer_enabled: true,
   machine_auto_sync_status_timer_ms: 5000,
   machine_refresh_timer_enabled: true,
@@ -129,6 +133,31 @@ const toastResult = (message, icon = 'success') => {
   Toast.fire({ icon, title: message })
 }
 
+const uploadLogo = async (event) => {
+  const files = event?.target?.files
+  if (!files || files.length <= 0) {
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('file', files[0])
+
+  try {
+    const response = await axios.post('/api/media/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    form.value.company_school_logo = response?.data?.path || ''
+    toastResult('Logo uploaded')
+  } catch (error) {
+    toastResult(error?.response?.data?.message || 'Unable to upload logo', 'error')
+  } finally {
+    event.target.value = ''
+  }
+}
+
 const loadSettings = async () => {
   const resp = await appSettingStore.loadSettings()
   if (!resp.success) {
@@ -137,6 +166,8 @@ const loadSettings = async () => {
   }
 
   form.value.company_school_name = companySchoolName.value || 'Biometric System'
+  form.value.company_school_logo = companySchoolLogo.value || ''
+  form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
   form.value.machine_auto_sync_status_timer_enabled = Boolean(machineAutoSyncStatusTimerEnabled.value)
   form.value.machine_auto_sync_status_timer_ms = Number(machineAutoSyncStatusTimerMs.value || 5000)
   form.value.machine_refresh_timer_enabled = Boolean(machineRefreshTimerEnabled.value)
@@ -157,6 +188,8 @@ const saveSettings = async () => {
   saving.value = true
   const resp = await appSettingStore.updateSettings({
     company_school_name: form.value.company_school_name,
+    company_school_logo: form.value.company_school_logo,
+    company_school_logo_print_enabled: Boolean(form.value.company_school_logo_print_enabled),
     machine_auto_sync_status_timer_enabled: Boolean(form.value.machine_auto_sync_status_timer_enabled),
     machine_auto_sync_status_timer_ms: clampMs(form.value.machine_auto_sync_status_timer_ms, 5000),
     machine_refresh_timer_enabled: Boolean(form.value.machine_refresh_timer_enabled),
@@ -172,6 +205,8 @@ const saveSettings = async () => {
   }
 
   form.value.company_school_name = companySchoolName.value || form.value.company_school_name
+  form.value.company_school_logo = companySchoolLogo.value || form.value.company_school_logo
+  form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
   form.value.machine_auto_sync_status_timer_enabled = Boolean(machineAutoSyncStatusTimerEnabled.value)
   form.value.machine_auto_sync_status_timer_ms = Number(machineAutoSyncStatusTimerMs.value || 5000)
   form.value.machine_refresh_timer_enabled = Boolean(machineRefreshTimerEnabled.value)
@@ -459,6 +494,33 @@ onMounted(async () => {
             placeholder="Enter company or school name"
             class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
           />
+        </div>
+
+        <div class="mt-4">
+          <label class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Company / School Logo</label>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            @change="uploadLogo"
+            class="block w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-sky-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-sky-700 hover:file:bg-sky-200 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
+          />
+          <div v-if="form.company_school_logo" class="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+            <img :src="form.company_school_logo" alt="Company logo" class="h-14 w-14 rounded-lg bg-white object-contain p-1" />
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-slate-800 dark:text-white">Logo ready</p>
+              <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.company_school_logo }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <label class="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <input v-model="form.company_school_logo_print_enabled" type="checkbox" class="h-4 w-4" />
+            Show logo in printed reports
+          </label>
+          <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            When enabled, the uploaded logo will appear in printable attendance forms.
+          </p>
         </div>
 
         <div class="mt-6">

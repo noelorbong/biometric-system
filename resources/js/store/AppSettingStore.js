@@ -21,6 +21,8 @@ export const useAppSettingStore = defineStore('appSettings', {
   },
   state: () => ({
     companySchoolName: 'Biometric System',
+    companySchoolLogo: '',
+    companySchoolLogoPrintEnabled: false,
     machineAutoSyncStatusTimerEnabled: true,
     machineAutoSyncStatusTimerMs: 5000,
     machineRefreshTimerEnabled: true,
@@ -40,6 +42,8 @@ export const useAppSettingStore = defineStore('appSettings', {
           data: {
             settings: {
               company_school_name: app.companySchoolName,
+              company_school_logo: app.companySchoolLogo,
+              company_school_logo_print_enabled: app.companySchoolLogoPrintEnabled,
               machine_auto_sync_status_timer_enabled: app.machineAutoSyncStatusTimerEnabled,
               machine_auto_sync_status_timer_ms: app.machineAutoSyncStatusTimerMs,
               machine_refresh_timer_enabled: app.machineRefreshTimerEnabled,
@@ -53,6 +57,8 @@ export const useAppSettingStore = defineStore('appSettings', {
 
       return await axios.post('/api/settings').then(function (resp) {
         app.companySchoolName = resp?.data?.settings?.company_school_name || 'Biometric System'
+        app.companySchoolLogo = resp?.data?.settings?.company_school_logo || ''
+        app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? false)
         app.machineAutoSyncStatusTimerEnabled = Boolean(resp?.data?.settings?.machine_auto_sync_status_timer_enabled ?? true)
         app.machineAutoSyncStatusTimerMs = Number(resp?.data?.settings?.machine_auto_sync_status_timer_ms || 5000)
         app.machineRefreshTimerEnabled = Boolean(resp?.data?.settings?.machine_refresh_timer_enabled ?? true)
@@ -75,6 +81,8 @@ export const useAppSettingStore = defineStore('appSettings', {
 
       return await axios.post('/api/settings/update', payload).then(function (resp) {
         app.companySchoolName = resp?.data?.settings?.company_school_name || app.companySchoolName
+        app.companySchoolLogo = resp?.data?.settings?.company_school_logo || app.companySchoolLogo
+        app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? app.companySchoolLogoPrintEnabled)
         app.machineAutoSyncStatusTimerEnabled = Boolean(resp?.data?.settings?.machine_auto_sync_status_timer_enabled ?? app.machineAutoSyncStatusTimerEnabled)
         app.machineAutoSyncStatusTimerMs = Number(resp?.data?.settings?.machine_auto_sync_status_timer_ms || app.machineAutoSyncStatusTimerMs)
         app.machineRefreshTimerEnabled = Boolean(resp?.data?.settings?.machine_refresh_timer_enabled ?? app.machineRefreshTimerEnabled)
