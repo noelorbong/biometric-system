@@ -64,9 +64,8 @@ const detectPlatform = () => {
   isIOS.value = /iphone|ipad|ipod/.test(userAgent)
 }
 
-const onBeforeInstallPrompt = (event) => {
-  event.preventDefault()
-  deferredPrompt.value = event
+const syncDeferredPrompt = () => {
+  deferredPrompt.value = window.__deferredInstallPrompt || null
 }
 
 const onAppInstalled = () => {
@@ -128,13 +127,14 @@ onMounted(() => {
   isDismissed.value = localStorage.getItem(DISMISS_KEY) === '1'
   detectPlatform()
   checkStandalone()
+  syncDeferredPrompt()
 
-  window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-  window.addEventListener('appinstalled', onAppInstalled)
+  window.addEventListener('pwa-install-available', syncDeferredPrompt)
+  window.addEventListener('pwa-installed', onAppInstalled)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
-  window.removeEventListener('appinstalled', onAppInstalled)
+  window.removeEventListener('pwa-install-available', syncDeferredPrompt)
+  window.removeEventListener('pwa-installed', onAppInstalled)
 })
 </script>

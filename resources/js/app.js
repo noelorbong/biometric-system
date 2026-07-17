@@ -28,6 +28,21 @@ import { API_BASE_URL } from './config/api'
 import { markRaw, createApp } from 'vue'
 import { createPinia } from 'pinia'
 
+if (typeof window !== 'undefined') {
+	window.__deferredInstallPrompt = window.__deferredInstallPrompt || null
+
+	window.addEventListener('beforeinstallprompt', (event) => {
+		event.preventDefault()
+		window.__deferredInstallPrompt = event
+		window.dispatchEvent(new Event('pwa-install-available'))
+	})
+
+	window.addEventListener('appinstalled', () => {
+		window.__deferredInstallPrompt = null
+		window.dispatchEvent(new Event('pwa-installed'))
+	})
+}
+
 
 /**
  * Next, we will create a fresh Vue application instance. You may then begin

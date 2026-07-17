@@ -6,6 +6,17 @@
         <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
           Use these steps to install the app on Android, desktop, and iOS.
         </p>
+        <button
+          v-if="canInstallNow"
+          type="button"
+          class="mt-4 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black dark:bg-white dark:text-black dark:hover:bg-slate-200"
+          @click="installApp"
+        >
+          Install App Now
+        </button>
+        <p v-else class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          If the install button is not available yet, refresh once and open this site in Chrome, Edge, or Safari (iOS).
+        </p>
       </div>
 
       <div class="grid gap-4 md:grid-cols-3">
@@ -43,3 +54,36 @@
     </div>
   </section>
 </template>
+
+<script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+
+const deferredPrompt = ref(null)
+
+const syncDeferredPrompt = () => {
+  deferredPrompt.value = window.__deferredInstallPrompt || null
+}
+
+const canInstallNow = computed(() => !!deferredPrompt.value)
+
+const installApp = async () => {
+  if (!deferredPrompt.value) {
+    return
+  }
+
+  deferredPrompt.value.prompt()
+  await deferredPrompt.value.userChoice
+  deferredPrompt.value = null
+}
+
+onMounted(() => {
+  syncDeferredPrompt()
+  window.addEventListener('pwa-install-available', syncDeferredPrompt)
+  window.addEventListener('pwa-installed', syncDeferredPrompt)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('pwa-install-available', syncDeferredPrompt)
+  window.removeEventListener('pwa-installed', syncDeferredPrompt)
+})
+</script>
