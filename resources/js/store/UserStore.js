@@ -175,6 +175,40 @@ export const useUserStore = defineStore('users',{
         }
         return { success: false, data: resp };
       })
+    },
+    async previewUserDatImport(file) {
+      const auth = useAuthStore();
+      const formData = new FormData();
+      formData.append('file', file);
+
+      return await axios.post('/api/user/import-dat/preview', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }).then(function (resp) {
+        return { success: true, data: resp.data };
+      }).catch(function (resp) {
+        if (resp.response) {
+          if (resp.response.data.message == 'Unauthenticated.') {
+            auth.clearAccount()
+          }
+        }
+        return { success: false, data: resp };
+      })
+    },
+    async importUserDat(payload) {
+      const auth = useAuthStore();
+
+      return await axios.post('/api/user/import-dat', payload).then(function (resp) {
+        return { success: true, data: resp.data };
+      }).catch(function (resp) {
+        if (resp.response) {
+          if (resp.response.data.message == 'Unauthenticated.') {
+            auth.clearAccount()
+          }
+        }
+        return { success: false, data: resp };
+      })
     }
   }
 })

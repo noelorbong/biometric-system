@@ -222,27 +222,7 @@ class MachineController extends Controller
         $validUserIds = User::pluck('id')->flip()->all();
 
         foreach ($logs as $log) {
-            $pin = trim((string) ($log['pin'] ?? ''));
-
-            $biometric = UserBiometricInfo::query()
-                ->when($pin !== '', fn ($query) => $query->where('Badgenumber', $pin))
-                ->when($pin !== '' && ctype_digit($pin), function ($query) use ($pin) {
-                    $query->orWhere('USERID', (int) $pin);
-                })
-                ->when($pin === '' && isset($log['uid']), function ($query) use ($log) {
-                    $query->where('USERID', $log['uid']);
-                })
-                ->first();
-
-            $resolvedUserId = $biometric?->USERID;
-
-            if ($resolvedUserId === null && $pin !== '' && ctype_digit($pin)) {
-                $resolvedUserId = (int) $pin;
-            }
-
-            if ($resolvedUserId === null && isset($log['uid']) && is_numeric($log['uid'])) {
-                $resolvedUserId = (int) $log['uid'];
-            }
+            [$resolvedUserId, $biometric, $pin] = $this->resolveAttendanceUser($log);
 
             if ($resolvedUserId === null || $resolvedUserId <= 0) {
                 $skipped++;
@@ -285,6 +265,371 @@ class MachineController extends Controller
             'download_date' => $downloadDate,
             'user_filter' => $userFilter,
         ]);
+    }
+
+    public function previewAttendanceDatImport(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => ['nullable', 'file', 'required_without:text_content'],
+            'text_content' => ['nullable', 'string', 'required_without:file'],
+        ]);
+
+        $rows = $this->buildAttendanceImportRows(
+            uploadedFile: $validated['file'] ?? null,
+            textContent: $validated['text_content'] ?? null,
+        );
+
+        if ($rows === []) {
+            return response()->json([
+                'message' => $this->attendanceImportDecodeFailureMessage(
+                    uploadedFile: $validated['file'] ?? null,
+                    textContent: $validated['text_content'] ?? null,
+                ),
+            ], 422);
+        }
+
+        $preview = [];
+        $importable = 0;
+        $unmapped = 0;
+
+        foreach ($rows as $row) {
+            if (($row['USERID'] ?? null) !== null && (int) $row['USERID'] > 0) {
+                $importable++;
+            } else {
+                $unmapped++;
+            }
+
+            $preview[] = $row + [
+                'resolved' => ($row['USERID'] ?? null) !== null && (int) $row['USERID'] > 0,
+            ];
+        }
+
+        return response()->json([
+            'message' => 'Attendance DAT preview generated successfully.',
+            'total' => count($rows),
+            'importable' => $importable,
+            'unmapped' => $unmapped,
+            'rows' => $preview,
+        ]);
+    }
+
+    public function importAttendanceDat(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => ['nullable', 'file', 'required_without:text_content'],
+            'text_content' => ['nullable', 'string', 'required_without:file'],
+            'user_filter' => ['nullable', 'string', Rule::in(['existing', 'all'])],
+        ]);
+
+        $rows = $this->buildAttendanceImportRows(
+            uploadedFile: $validated['file'] ?? null,
+            textContent: $validated['text_content'] ?? null,
+        );
+
+        if ($rows === []) {
+            return response()->json([
+                'message' => $this->attendanceImportDecodeFailureMessage(
+                    uploadedFile: $validated['file'] ?? null,
+                    textContent: $validated['text_content'] ?? null,
+                ),
+            ], 422);
+        }
+
+        $userFilter = $validated['user_filter'] ?? 'all';
+        $validUserIds = User::pluck('id')->flip()->all();
+
+        $imported = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $resolvedUserId = isset($row['USERID']) && is_numeric($row['USERID'])
+                ? (int) $row['USERID']
+                : null;
+
+            if ($resolvedUserId === null || $resolvedUserId <= 0) {
+                $skipped++;
+                continue;
+            }
+
+            if ($userFilter === 'existing' && !isset($validUserIds[$resolvedUserId])) {
+                $skipped++;
+                continue;
+            }
+
+            $checkTime = $row['CHECKTIME'] ?? null;
+
+            if (!$checkTime) {
+                $skipped++;
+                continue;
+            }
+
+            $exists = Checkinout::query()
+                ->where('USERID', $resolvedUserId)
+                ->where('CHECKTIME', $checkTime)
+                ->exists();
+
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+
+            Checkinout::create([
+                'USERID' => $resolvedUserId,
+                'CHECKTIME' => $checkTime,
+                'CHECKTYPE' => $row['CHECKTYPE'] ?? 'I',
+                'VERIFYCODE' => $row['VERIFYCODE'] ?? 0,
+                'SENSORID' => $row['SENSORID'] ?? null,
+                'Memoinfo' => $row['Memoinfo'] ?? null,
+                'WorkCode' => $row['WorkCode'] ?? null,
+                'sn' => $row['sn'] ?? null,
+                'UserExtFmt' => $row['UserExtFmt'] ?? null,
+            ]);
+
+            $imported++;
+        }
+
+        return response()->json([
+            'message' => 'Attendance DAT imported successfully.',
+            'total' => count($rows),
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'user_filter' => $userFilter,
+        ]);
+    }
+
+    private function buildAttendanceImportRows(mixed $uploadedFile = null, ?string $textContent = null): array
+    {
+        $textContent = trim((string) ($textContent ?? ''));
+
+        if ($textContent !== '') {
+            return $this->parseAttendanceTableText($textContent);
+        }
+
+        if ($uploadedFile === null) {
+            return [];
+        }
+
+        $raw = file_get_contents($uploadedFile->getRealPath());
+
+        if ($raw === false || $raw === '') {
+            return [];
+        }
+
+        $textCandidate = trim($raw);
+
+        if ($textCandidate !== '' && preg_match('/^USERID\s+(CHECKTIME|Time)\s+/im', $textCandidate)) {
+            return $this->parseAttendanceTableText($textCandidate);
+        }
+
+        $zk = new ZKTecoService(ip: '127.0.0.1');
+        $logs = $zk->parseEncryptedAttendanceDat($raw);
+        $validationMessage = $this->validateAttendanceDatPreview($logs);
+
+        if ($validationMessage !== null) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach ($logs as $log) {
+            [$resolvedUserId, $biometric, $pin] = $this->resolveAttendanceUser($log);
+
+            $rows[] = [
+                'USERID' => $resolvedUserId,
+                'CHECKTIME' => $log['check_time'] ?? null,
+                'CHECKTYPE' => $this->normalizeAttendanceCheckType($log['check_type'] ?? 'I'),
+                'VERIFYCODE' => (int) ($log['verify_code'] ?? 0),
+                'SENSORID' => null,
+                'Memoinfo' => $biometric ? null : trim('UNMAPPED PIN:' . $pin . ' UID:' . ($log['uid'] ?? '')),
+                'WorkCode' => null,
+                'sn' => null,
+                'UserExtFmt' => 0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function parseAttendanceTableText(string $textContent): array
+    {
+        $lines = preg_split('/\r\n|\n|\r/', trim($textContent)) ?: [];
+
+        if ($lines === []) {
+            return [];
+        }
+
+        $rows = [];
+        $header = null;
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $columns = str_contains($line, "\t")
+                ? array_map('trim', str_getcsv($line, "\t"))
+                : (preg_split('/\s{2,}/', $line) ?: []);
+
+            if ($columns === []) {
+                continue;
+            }
+
+            if ($header === null) {
+                $upperColumns = array_map(static fn ($value) => strtoupper(trim((string) $value)), $columns);
+
+                if (!in_array('USERID', $upperColumns, true) || !in_array('CHECKTIME', $upperColumns, true)) {
+                    continue;
+                }
+
+                $header = $upperColumns;
+                continue;
+            }
+
+            $mapped = [];
+
+            foreach ($header as $index => $columnName) {
+                $mapped[$columnName] = $columns[$index] ?? null;
+            }
+
+            $checkTime = $this->normalizeAttendanceCheckTime($mapped['CHECKTIME'] ?? null);
+
+            if ($checkTime === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'USERID' => isset($mapped['USERID']) && is_numeric((string) $mapped['USERID']) ? (int) $mapped['USERID'] : null,
+                'CHECKTIME' => $checkTime,
+                'CHECKTYPE' => $this->normalizeAttendanceCheckType($mapped['CHECKTYPE'] ?? 'I'),
+                'VERIFYCODE' => isset($mapped['VERIFYCODE']) && is_numeric((string) $mapped['VERIFYCODE']) ? (int) $mapped['VERIFYCODE'] : 0,
+                'SENSORID' => $this->nullableAttendanceField($mapped['SENSORID'] ?? null),
+                'Memoinfo' => $this->nullableAttendanceField($mapped['MEMOINFO'] ?? null),
+                'WorkCode' => $this->nullableAttendanceField($mapped['WORKCODE'] ?? null),
+                'sn' => $this->nullableAttendanceField($mapped['SN'] ?? null),
+                'UserExtFmt' => isset($mapped['USEREXTFMT']) && is_numeric((string) $mapped['USEREXTFMT']) ? (int) $mapped['USEREXTFMT'] : 0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function normalizeAttendanceCheckTime(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function normalizeAttendanceCheckType(mixed $value): string
+    {
+        $value = strtoupper(trim((string) ($value ?? 'I')));
+
+        return $value === 'O' ? 'O' : 'I';
+    }
+
+    private function nullableAttendanceField(mixed $value): ?string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function attendanceImportDecodeFailureMessage(mixed $uploadedFile = null, ?string $textContent = null): string
+    {
+        if (trim((string) ($textContent ?? '')) !== '') {
+            return 'The pasted attendance table could not be parsed. Make sure it includes the USERID, CHECKTIME, CHECKTYPE, and VERIFYCODE columns.';
+        }
+
+        $originalName = $uploadedFile?->getClientOriginalName();
+
+        if (is_string($originalName) && str_ends_with(strtolower($originalName), '.dat')) {
+            return 'This AttEncryptLog.dat file appears to require ZKTeco Self Service Reader or a similar vendor tool to decode first. Export the decoded attendance table, or paste the attendance rows with USERID, CHECKTIME, CHECKTYPE, and VERIFYCODE so they can be imported correctly.';
+        }
+
+        return 'The attendance source could not be decoded into importable rows.';
+    }
+
+    private function resolveAttendanceUser(array $log): array
+    {
+        $pin = trim((string) ($log['pin'] ?? ''));
+
+        $biometric = UserBiometricInfo::query()
+            ->when($pin !== '', fn ($query) => $query->where('Badgenumber', $pin))
+            ->when($pin !== '' && ctype_digit($pin), function ($query) use ($pin) {
+                $query->orWhere('USERID', (int) $pin);
+            })
+            ->when($pin === '' && isset($log['uid']), function ($query) use ($log) {
+                $query->where('USERID', $log['uid']);
+            })
+            ->first();
+
+        $resolvedUserId = $biometric?->USERID;
+
+        if ($resolvedUserId === null && $pin !== '' && ctype_digit($pin)) {
+            $resolvedUserId = (int) $pin;
+        }
+
+        if ($resolvedUserId === null && isset($log['uid']) && is_numeric($log['uid'])) {
+            $resolvedUserId = (int) $log['uid'];
+        }
+
+        return [$resolvedUserId, $biometric, $pin];
+    }
+
+    private function validateAttendanceDatPreview(array $logs): ?string
+    {
+        if ($logs === []) {
+            return 'The attendance DAT file could not be decoded.';
+        }
+
+        $minimumYear = now()->year - 20;
+        $maximumYear = now()->year + 2;
+        $checked = 0;
+        $reasonableDates = 0;
+
+        foreach ($logs as $log) {
+            $checkTime = $log['check_time'] ?? null;
+
+            if (!$checkTime) {
+                continue;
+            }
+
+            try {
+                $year = Carbon::parse($checkTime)->year;
+            } catch (\Throwable) {
+                continue;
+            }
+
+            $checked++;
+
+            if ($year >= $minimumYear && $year <= $maximumYear) {
+                $reasonableDates++;
+            }
+        }
+
+        if ($checked === 0) {
+            return 'The attendance DAT file could not be decoded into valid timestamps.';
+        }
+
+        if (($reasonableDates / $checked) < 0.8) {
+            return 'This attendance DAT file does not match the current decoder yet. The preview was blocked to avoid importing incorrect USERID, PIN, or CHECKTIME values.';
+        }
+
+        return null;
     }
 
     /**

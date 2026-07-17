@@ -18,6 +18,17 @@ const isModalOpen = ref(false)
 const isDeleteModal = ref(false)
 const isEdit = ref(false)
 const selectedMachine = ref(null)
+const isAttendanceDatModalOpen = ref(false)
+const attendanceDatFile = ref(null)
+const attendanceDatFileName = ref('')
+const attendanceDatText = ref('')
+const attendanceDatUserFilter = ref('existing')
+const attendanceDatLoading = ref(false)
+const attendanceDatImporting = ref(false)
+const attendanceDatError = ref('')
+const attendanceDatPreview = ref(null)
+const attendanceDatPage = ref(1)
+const attendanceDatPageSize = 20
 
 const connectingIds = ref(new Set())
 const syncingIds = ref(new Set())
@@ -38,6 +49,147 @@ let webAutoFallbackTimer = null
 let webAutoFallbackRunning = false
 const webLastRunAt = new Map()
 const WEB_AUTO_FALLBACK_STORAGE_KEY = 'machine-web-auto-fallback-enabled'
+
+const escapeHtml = (value) => String(value ?? '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+
+const attendanceDatRows = computed(() => attendanceDatPreview.value?.rows || [])
+const attendanceDatTotalPages = computed(() => Math.max(1, Math.ceil(attendanceDatRows.value.length / attendanceDatPageSize)))
+const attendanceDatPageRows = computed(() => {
+  const start = (attendanceDatPage.value - 1) * attendanceDatPageSize
+  return attendanceDatRows.value.slice(start, start + attendanceDatPageSize)
+})
+const attendanceDatHasInput = computed(() => {
+  return !!attendanceDatFile.value || attendanceDatText.value.trim() !== ''
+})
+
+const resetAttendanceDatImportState = () => {
+  attendanceDatFile.value = null
+  attendanceDatFileName.value = ''
+  attendanceDatText.value = ''
+  attendanceDatUserFilter.value = 'existing'
+  attendanceDatLoading.value = false
+  attendanceDatImporting.value = false
+  attendanceDatError.value = ''
+  attendanceDatPreview.value = null
+  attendanceDatPage.value = 1
+}
+
+const openAttendanceDatImport = () => {
+  resetAttendanceDatImportState()
+  isAttendanceDatModalOpen.value = true
+}
+
+const closeAttendanceDatImport = () => {
+  isAttendanceDatModalOpen.value = false
+}
+
+const onAttendanceDatFileChange = (event) => {
+  const file = event?.target?.files?.[0] || null
+  attendanceDatFile.value = file
+  attendanceDatFileName.value = file?.name || ''
+  attendanceDatPreview.value = null
+  attendanceDatPage.value = 1
+  attendanceDatError.value = ''
+}
+
+const onAttendanceDatTextInput = () => {
+  attendanceDatPreview.value = null
+  attendanceDatPage.value = 1
+  attendanceDatError.value = ''
+}
+
+const loadAttendanceDatPreview = async () => {
+  if (!attendanceDatHasInput.value) {
+    attendanceDatError.value = 'Please choose an attendance file or paste attendance text.'
+    return false
+  }
+
+  attendanceDatLoading.value = true
+  attendanceDatError.value = ''
+
+  const formData = new FormData()
+  if (attendanceDatFile.value) {
+    formData.append('file', attendanceDatFile.value)
+  }
+  if (attendanceDatText.value.trim() !== '') {
+    formData.append('text_content', attendanceDatText.value)
+  }
+  formData.append('user_filter', attendanceDatUserFilter.value)
+
+  const resp = await machineStore.previewAttendanceDat(formData)
+
+  attendanceDatLoading.value = false
+
+  if (!resp.success) {
+    attendanceDatError.value = resp?.data?.response?.data?.message || 'Preview failed.'
+    return false
+  }
+
+  attendanceDatPreview.value = resp.data || null
+  attendanceDatPage.value = 1
+  return true
+}
+
+const importAttendanceDat = async () => {
+  if (!attendanceDatHasInput.value) {
+    attendanceDatError.value = 'Please choose an attendance file or paste attendance text.'
+    return
+  }
+
+  if (!attendanceDatPreview.value) {
+    const previewOk = await loadAttendanceDatPreview()
+    if (!previewOk) {
+      return
+    }
+  }
+
+  attendanceDatImporting.value = true
+
+  const formData = new FormData()
+  if (attendanceDatFile.value) {
+    formData.append('file', attendanceDatFile.value)
+  }
+  if (attendanceDatText.value.trim() !== '') {
+    formData.append('text_content', attendanceDatText.value)
+  }
+  formData.append('user_filter', attendanceDatUserFilter.value)
+
+  const resp = await machineStore.importAttendanceDat(formData)
+
+  attendanceDatImporting.value = false
+
+  if (!resp.success) {
+    attendanceDatError.value = resp?.data?.response?.data?.message || 'Import failed.'
+    return
+  }
+
+  const { total, imported, skipped, user_filter } = resp.data
+  const userFilterLabel = user_filter === 'all'
+    ? 'All Logs (Include Unknown Users)'
+    : 'Only Existing Local Users'
+
+  isAttendanceDatModalOpen.value = false
+  resetAttendanceDatImportState()
+
+  await Swal.fire({
+    icon: 'success',
+    title: 'Attendance DAT Imported',
+    html: `<p class="text-sm text-gray-600">User filter: <strong>${userFilterLabel}</strong></p>
+           <p class="text-sm text-gray-600">Total decoded records: <strong>${total}</strong></p>
+           <p class="text-sm text-gray-600">Imported: <strong class="text-green-600">${imported}</strong></p>
+           <p class="text-sm text-gray-600">Skipped (duplicates / unmatched): <strong>${skipped}</strong></p>`,
+    confirmButtonText: 'OK',
+  })
+}
+
+const gotoAttendanceDatPage = (page) => {
+  attendanceDatPage.value = Math.min(Math.max(1, page), attendanceDatTotalPages.value)
+}
 
 const ensureIntervalMs = (value, fallback) => {
   const parsed = Number(value)
@@ -779,13 +931,6 @@ const clearAttendanceLogs = async (machine) => {
   toastResult(resp?.data?.message || 'Device logs cleared')
 }
 
-const escapeHtml = (value) => String(value ?? '')
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;')
-  .replace(/'/g, '&#39;')
-
 const isDefaultSelectedPlan = (plan) => ['create', 'update', 'restore'].includes(plan)
 
 const matchedPlans = ['create', 'update', 'restore']
@@ -1438,6 +1583,15 @@ onUnmounted(() => {
 
         <div class="mt-4 grid gap-3">
           <button
+            @click="openAttendanceDatImport"
+            type="button"
+            class="flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-medium transition bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+          >
+            <RefreshIcon class="h-4 w-4" />
+            <span>Import Attendance DAT</span>
+          </button>
+
+          <button
             @click="pushUsersToAllMachines"
             type="button"
             :disabled="pushingUsers"
@@ -1690,6 +1844,145 @@ onUnmounted(() => {
         </div>
       </div>
     </section>
+
+    <Modal v-if="isAttendanceDatModalOpen" @close="closeAttendanceDatImport">
+      <template #body>
+        <div class="no-scrollbar relative m-2 w-full max-w-[1100px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-7">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h4 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Import Attendance Export</h4>
+              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">If you have a raw <strong>AttEncryptLog.dat</strong>, decode/export it first with <strong>Self Service Reader</strong>, then upload the exported table or paste rows using the real <strong>USERID / CHECKTIME / CHECKTYPE / VERIFYCODE</strong> columns.</p>
+            </div>
+            <button type="button" @click="closeAttendanceDatImport" class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
+          </div>
+
+          <div class="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div class="space-y-4">
+              <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                <div>
+                  <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Attendance Export File</label>
+                  <input type="file" accept=".dat,.bin,.txt" @change="onAttendanceDatFileChange" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ attendanceDatFileName || 'No file selected' }}</p>
+                </div>
+                <div>
+                  <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">User Filter</label>
+                  <select v-model="attendanceDatUserFilter" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
+                    <option value="existing">Only Existing Local Users</option>
+                    <option value="all">All Logs (Include Unknown Users)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Paste Attendance Text</label>
+                <textarea
+                  v-model="attendanceDatText"
+                  @input="onAttendanceDatTextInput"
+                  rows="10"
+                  placeholder="Paste tabular attendance rows here, including the USERID CHECKTIME CHECKTYPE VERIFYCODE header."
+                  class="w-full rounded-2xl border border-gray-300 bg-transparent px-4 py-3 text-sm"
+                ></textarea>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">If text is pasted, it will be used as the source of truth for preview and import. This is the preferred path for Self Service Reader output.</p>
+              </div>
+
+              <div class="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  @click="loadAttendanceDatPreview"
+                  :disabled="attendanceDatLoading || !attendanceDatHasInput"
+                  class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-medium transition"
+                  :class="attendanceDatLoading || !attendanceDatHasInput
+                    ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
+                    : 'bg-sky-600 text-white hover:bg-sky-500'"
+                >
+                  <span v-if="attendanceDatLoading" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  <RefreshIcon v-else class="h-4 w-4" />
+                  <span>{{ attendanceDatLoading ? 'Loading Preview…' : 'Load Preview' }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  @click="importAttendanceDat"
+                  :disabled="attendanceDatImporting || attendanceDatLoading || !attendanceDatHasInput"
+                  class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-medium transition"
+                  :class="attendanceDatImporting || attendanceDatLoading || !attendanceDatHasInput
+                    ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-500'"
+                >
+                  <span v-if="attendanceDatImporting" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  <RefreshIcon v-else class="h-4 w-4" />
+                  <span>{{ attendanceDatImporting ? 'Importing…' : 'Import DAT' }}</span>
+                </button>
+              </div>
+
+              <p v-if="attendanceDatError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
+                {{ attendanceDatError }}
+              </p>
+
+              <div v-if="attendanceDatPreview" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Decoded</p>
+                  <p class="mt-1 text-lg font-semibold text-slate-800 dark:text-white">{{ attendanceDatPreview.total || 0 }}</p>
+                </div>
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Importable</p>
+                  <p class="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-300">{{ attendanceDatPreview.importable || 0 }}</p>
+                </div>
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-900/10">
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Unmapped</p>
+                  <p class="mt-1 text-lg font-semibold text-amber-700 dark:text-amber-300">{{ attendanceDatPreview.unmapped || 0 }}</p>
+                </div>
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-900/40 dark:bg-sky-900/10">
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Pages</p>
+                  <p class="mt-1 text-lg font-semibold text-sky-700 dark:text-sky-300">{{ attendanceDatTotalPages }}</p>
+                </div>
+              </div>
+
+              <div v-if="attendanceDatPreview" class="rounded-[24px] border border-slate-200 dark:border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div class="text-sm text-slate-600 dark:text-slate-300">
+                    Showing <strong>{{ ((attendanceDatPage - 1) * attendanceDatPageSize) + 1 }}</strong>-<strong>{{ Math.min(attendanceDatPage * attendanceDatPageSize, attendanceDatRows.length) }}</strong>
+                    of <strong>{{ attendanceDatRows.length }}</strong>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage - 1)" :disabled="attendanceDatPage <= 1" class="rounded-xl px-3 py-2 text-sm font-medium" :class="attendanceDatPage <= 1 ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800' : 'bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'">Prev</button>
+                    <span class="min-w-20 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">{{ attendanceDatPage }} / {{ attendanceDatTotalPages }}</span>
+                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage + 1)" :disabled="attendanceDatPage >= attendanceDatTotalPages" class="rounded-xl px-3 py-2 text-sm font-medium" :class="attendanceDatPage >= attendanceDatTotalPages ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800' : 'bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'">Next</button>
+                  </div>
+                </div>
+
+                <div class="max-h-[48vh] overflow-auto">
+                  <table class="min-w-full divide-y divide-slate-200 text-left text-xs dark:divide-slate-800">
+                    <thead class="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-900/90">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">USERID</th>
+                        <th class="px-3 py-2 font-semibold">CHECKTIME</th>
+                        <th class="px-3 py-2 font-semibold">CHECKTYPE</th>
+                        <th class="px-3 py-2 font-semibold">VERIFYCODE</th>
+                        <th class="px-3 py-2 font-semibold">SENSORID</th>
+                        <th class="px-3 py-2 font-semibold">WORKCODE</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
+                      <tr v-for="(row, index) in attendanceDatPageRows" :key="`${attendanceDatPage}-${index}-${row.CHECKTIME || ''}`">
+                        <td class="px-3 py-2 font-medium text-slate-700 dark:text-slate-200">{{ row.USERID ?? '' }}</td>
+                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.CHECKTIME ?? '' }}</td>
+                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.CHECKTYPE ?? '' }}</td>
+                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.VERIFYCODE ?? '' }}</td>
+                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.SENSORID ?? '' }}</td>
+                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.WorkCode ?? '' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <p v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT file to preview the decoded rows.</p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </Modal>
 
     <Modal v-if="isModalOpen" @close="isModalOpen = false">
       <template #body>

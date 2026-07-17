@@ -20,6 +20,386 @@ use Illuminate\Validation\Rule;
 class UserController extends Controller
 {
 
+    private function decodeUserDatTextField(string $bytes): string
+    {
+        return trim(rtrim($bytes, "\x00 \r\n\t"));
+    }
+
+    private function parseUserDatRecords(string $raw): array
+    {
+        $recordSize = 72;
+
+        if ($raw === '') {
+            return [];
+        }
+
+        if (strlen($raw) % $recordSize !== 0) {
+            throw new \RuntimeException('Invalid user.dat structure. Expected 72-byte records.');
+        }
+
+        $rows = [];
+        $total = strlen($raw);
+
+        for ($offset = 0, $row = 1; $offset + $recordSize <= $total; $offset += $recordSize, $row++) {
+            $record = substr($raw, $offset, $recordSize);
+
+            $uid = unpack('v', substr($record, 0, 2))[1] ?? 0;
+            $privilege = ord(substr($record, 2, 1) ?: "\x00");
+            $password = $this->decodeUserDatTextField(substr($record, 3, 8));
+            $name = $this->decodeUserDatTextField(substr($record, 11, 24));
+            $card = unpack('V', substr($record, 35, 4))[1] ?? 0;
+            $pin = $this->decodeUserDatTextField(substr($record, 48, 24));
+
+            $resolvedUserId = ctype_digit($pin) ? (int) $pin : null;
+
+            $rows[] = [
+                'row' => $row,
+                'uid' => (int) $uid,
+                'pin' => (string) $pin,
+                'name' => (string) $name,
+                'password' => (string) $password,
+                'privilege' => (int) $privilege,
+                'card' => (int) $card,
+                'resolved_user_id' => $resolvedUserId,
+                'valid_for_import' => $resolvedUserId !== null && $resolvedUserId > 0,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function enrichUserDatRowsWithExistingFlags(array $rows): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map(
+            static fn (array $row) => (int) ($row['resolved_user_id'] ?? 0),
+            $rows
+        ), static fn (int $id) => $id > 0)));
+
+        if ($ids === []) {
+            return $rows;
+        }
+
+        $existingUsers = User::withTrashed()->whereIn('id', $ids)->get()->keyBy('id');
+        $existingUserInfos = UserBiometricInfo::withTrashed()->whereIn('USERID', $ids)->get()->keyBy('USERID');
+        $existingProfiles = UserProfile::withTrashed()->whereIn('user_id', $ids)->get()->keyBy('user_id');
+
+        return array_map(function (array $row) use ($existingUsers, $existingUserInfos, $existingProfiles): array {
+            $resolved = (int) ($row['resolved_user_id'] ?? 0);
+
+            if ($resolved <= 0) {
+                $row['has_existing_id'] = false;
+                $row['existing'] = [
+                    'user' => false,
+                    'userinfo' => false,
+                    'profile' => false,
+                ];
+                return $row;
+            }
+
+            $hasUser = $existingUsers->has($resolved);
+            $hasUserInfo = $existingUserInfos->has($resolved);
+            $hasProfile = $existingProfiles->has($resolved);
+
+            $row['has_existing_id'] = $hasUser || $hasUserInfo || $hasProfile;
+            $row['existing'] = [
+                'user' => $hasUser,
+                'userinfo' => $hasUserInfo,
+                'profile' => $hasProfile,
+            ];
+
+            return $row;
+        }, $rows);
+    }
+
+    private function buildImportedUserEmail(int $resolvedUserId, string $pin): string
+    {
+        $seed = ctype_digit($pin) ? $pin : (string) $resolvedUserId;
+        $base = 'import' . $seed;
+        $candidate = $base . '@biometric.local';
+        $suffix = 1;
+
+        while (User::withTrashed()->where('email', $candidate)->exists()) {
+            $candidate = $base . '+' . $suffix . '@biometric.local';
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function parseDeviceName(string $name): array
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return ['first_name' => '', 'last_name' => '', 'middle_name' => ''];
+        }
+
+        $toTitle = static function (string $segment): string {
+            return implode(' ', array_map(
+                static fn (string $word) => mb_strtoupper(mb_substr($word, 0, 1)) . mb_strtolower(mb_substr($word, 1)),
+                array_filter(explode(' ', $segment))
+            ));
+        };
+
+        if (str_contains($name, ',')) {
+            [$rawLast, $rawRest] = explode(',', $name, 2);
+            $last = $toTitle(trim($rawLast));
+            $parts = array_values(array_filter(explode(' ', trim($rawRest))));
+
+            $first = isset($parts[0]) ? $toTitle($parts[0]) : '';
+            $middle = '';
+
+            if (count($parts) > 1) {
+                $middle = implode(' ', array_map(static function (string $part) use ($toTitle): string {
+                    $part = rtrim($part, '.');
+                    return $part !== '' ? $toTitle($part) : '';
+                }, array_slice($parts, 1)));
+                $middle = trim($middle);
+            }
+
+            return ['first_name' => $first, 'last_name' => $last, 'middle_name' => $middle];
+        }
+
+        $parts = array_values(array_filter(explode(' ', $name)));
+
+        if (count($parts) === 1) {
+            return ['first_name' => $toTitle($parts[0]), 'last_name' => '', 'middle_name' => ''];
+        }
+
+        $first = $toTitle(array_shift($parts));
+        $last = $toTitle(array_pop($parts));
+        $middle = implode(' ', array_map($toTitle, $parts));
+
+        return ['first_name' => $first, 'last_name' => $last, 'middle_name' => $middle];
+    }
+
+    public function previewUserDatImport(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+        ]);
+
+        $uploaded = $validated['file'];
+
+        if (strtolower((string) $uploaded->getClientOriginalExtension()) !== 'dat') {
+            return response()->json(['message' => 'Please upload a .dat file.'], 422);
+        }
+
+        $raw = file_get_contents($uploaded->getRealPath());
+
+        if ($raw === false) {
+            return response()->json(['message' => 'Unable to read uploaded file.'], 422);
+        }
+
+        try {
+            $rows = $this->parseUserDatRecords($raw);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $rows = $this->enrichUserDatRowsWithExistingFlags($rows);
+
+        $validRows = array_values(array_filter($rows, static fn (array $row) => (bool) ($row['valid_for_import'] ?? false)));
+        $existingCount = count(array_filter($validRows, static fn (array $row) => (bool) ($row['has_existing_id'] ?? false)));
+
+        return response()->json([
+            'message' => 'user.dat decoded successfully.',
+            'rows' => $rows,
+            'summary' => [
+                'total_rows' => count($rows),
+                'valid_rows' => count($validRows),
+                'existing_id_rows' => $existingCount,
+                'new_rows' => count($validRows) - $existingCount,
+            ],
+        ]);
+    }
+
+    public function importUserDat(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $validated = $request->validate([
+            'rows' => ['required', 'array', 'min:1'],
+            'selected_user_ids' => ['required', 'array', 'min:1'],
+            'selected_user_ids.*' => ['integer', 'min:1'],
+            'replace_existing' => ['nullable', 'boolean'],
+        ]);
+
+        $replaceExisting = (bool) ($validated['replace_existing'] ?? false);
+        $selectedLookup = array_flip(array_values(array_unique(array_map('intval', $validated['selected_user_ids'] ?? []))));
+
+        $rows = $this->enrichUserDatRowsWithExistingFlags($validated['rows']);
+        $rowsByUserId = [];
+
+        foreach ($rows as $row) {
+            $resolvedId = (int) ($row['resolved_user_id'] ?? (ctype_digit((string) ($row['pin'] ?? '')) ? (int) $row['pin'] : 0));
+
+            if ($resolvedId <= 0 || !isset($selectedLookup[$resolvedId])) {
+                continue;
+            }
+
+            $row['resolved_user_id'] = $resolvedId;
+            $rowsByUserId[$resolvedId] = $row;
+        }
+
+        if ($rowsByUserId === []) {
+            return response()->json(['message' => 'No valid selected users to import.'], 422);
+        }
+
+        $createdUsers = 0;
+        $updatedUsers = 0;
+        $createdUserInfos = 0;
+        $updatedUserInfos = 0;
+        $createdProfiles = 0;
+        $updatedProfiles = 0;
+        $skippedExisting = 0;
+        $skippedInvalid = 0;
+        $processedIds = [];
+
+        DB::transaction(function () use (
+            $rowsByUserId,
+            $replaceExisting,
+            $request,
+            &$createdUsers,
+            &$updatedUsers,
+            &$createdUserInfos,
+            &$updatedUserInfos,
+            &$createdProfiles,
+            &$updatedProfiles,
+            &$skippedExisting,
+            &$skippedInvalid,
+            &$processedIds
+        ) {
+            foreach ($rowsByUserId as $resolvedUserId => $row) {
+                $pin = (string) ($row['pin'] ?? '');
+                $name = trim((string) ($row['name'] ?? ''));
+                $plainPassword = (string) ($row['password'] ?? '');
+                $privilege = (int) ($row['privilege'] ?? 0);
+                $card = (int) ($row['card'] ?? 0);
+
+                if (!ctype_digit($pin)) {
+                    $skippedInvalid++;
+                    continue;
+                }
+
+                $user = User::withTrashed()->find($resolvedUserId);
+                $userInfo = UserBiometricInfo::withTrashed()->where('USERID', $resolvedUserId)->first();
+                $profile = UserProfile::withTrashed()->where('user_id', $resolvedUserId)->first();
+
+                $hasExisting = $user !== null || $userInfo !== null || $profile !== null;
+
+                if ($hasExisting && !$replaceExisting) {
+                    $skippedExisting++;
+                    continue;
+                }
+
+                if ($user) {
+                    if ($user->trashed()) {
+                        $user->restore();
+                    }
+
+                    $userPayload = [
+                        'name' => $name !== '' ? $name : $user->name,
+                        'user_last_modify' => $request->user()?->id,
+                    ];
+
+                    if ($plainPassword !== '') {
+                        $userPayload['password'] = $plainPassword;
+                    }
+
+                    $user->update($userPayload);
+                    $updatedUsers++;
+                } else {
+                    $newUser = new User([
+                        'name' => $name !== '' ? $name : ('Imported User ' . $resolvedUserId),
+                        'email' => $this->buildImportedUserEmail($resolvedUserId, $pin),
+                        'password' => $plainPassword !== '' ? $plainPassword : ('biometric-' . $pin),
+                        'role' => 0,
+                        'status' => true,
+                        'user_add' => $request->user()?->id,
+                        'user_last_modify' => $request->user()?->id,
+                    ]);
+
+                    $newUser->id = $resolvedUserId;
+                    $newUser->save();
+                    $createdUsers++;
+                }
+
+                $userInfoPayload = [
+                    'USERID' => $resolvedUserId,
+                    'Badgenumber' => $pin,
+                    'Name' => $name !== '' ? $name : null,
+                    'PASSWORD' => $plainPassword,
+                    'privilege' => $privilege,
+                    'IDCardNo' => $card > 0 ? (string) $card : null,
+                    'user_last_modify' => $request->user()?->id,
+                ];
+
+                if ($userInfo) {
+                    if ($userInfo->trashed()) {
+                        $userInfo->restore();
+                    }
+
+                    $userInfo->update($userInfoPayload);
+                    $updatedUserInfos++;
+                } else {
+                    $userInfoPayload['user_add'] = $request->user()?->id;
+                    UserBiometricInfo::create($userInfoPayload);
+                    $createdUserInfos++;
+                }
+
+                $nameParts = $this->parseDeviceName($name);
+                $profilePayload = [
+                    'first_name' => $nameParts['first_name'] ?: null,
+                    'last_name' => $nameParts['last_name'] ?: null,
+                    'middle_name' => $nameParts['middle_name'] ?: null,
+                    'user_last_modify' => $request->user()?->id,
+                ];
+
+                if ($profile) {
+                    if ($profile->trashed()) {
+                        $profile->restore();
+                    }
+
+                    $profile->update($profilePayload);
+                    $updatedProfiles++;
+                } else {
+                    UserProfile::create(array_merge($profilePayload, [
+                        'user_id' => $resolvedUserId,
+                        'user_add' => $request->user()?->id,
+                    ]));
+                    $createdProfiles++;
+                }
+
+                $processedIds[] = $resolvedUserId;
+            }
+        });
+
+        return response()->json([
+            'message' => 'user.dat import completed.',
+            'processed_ids' => $processedIds,
+            'summary' => [
+                'selected' => count($rowsByUserId),
+                'processed' => count($processedIds),
+                'created_users' => $createdUsers,
+                'updated_users' => $updatedUsers,
+                'created_userinfo' => $createdUserInfos,
+                'updated_userinfo' => $updatedUserInfos,
+                'created_profiles' => $createdProfiles,
+                'updated_profiles' => $updatedProfiles,
+                'skipped_existing' => $skippedExisting,
+                'skipped_invalid' => $skippedInvalid,
+                'replace_existing' => $replaceExisting,
+            ],
+        ]);
+    }
+
     private function monthRange(int $year, int $month): array
     {
         $start = Carbon::create($year, $month, 1)->startOfDay();

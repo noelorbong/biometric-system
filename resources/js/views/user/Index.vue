@@ -12,6 +12,7 @@ import Button from '@/components/ui/Button.vue'
 import { useUserStore } from '@/store/UserStore'
 import { useLoadingStore } from '@/store/LoadingStore'
 import { useMachineStore } from '@/store/MachineStore'
+import ImportUserDatModal from './components/ImportUserDatModal.vue'
 
 import FingerprintEnrollModal from './components/FingerprintEnrollModal.vue'
 import { useAuthStore } from '@/store/AuthStore'
@@ -28,6 +29,7 @@ const { machines } = storeToRefs(machineStore)
 
 
 const isUserAddModal = ref(false)
+const isImportUserDatModal = ref(false)
 const isDeleteModal = ref(false)
 const enrollModal    = ref({ open: false, user: null, machineId: null, machineName: '' })
 const enrollLoading  = ref(false)
@@ -155,6 +157,30 @@ const addUser = () => {
     college_id: null,
     password: '',
   }
+}
+
+const openImportUserDatModal = () => {
+  isImportUserDatModal.value = true
+}
+
+const handleUserDatImported = async (result) => {
+  await userStore.loadUsers()
+  isImportUserDatModal.value = false
+
+  const summary = result?.summary || {}
+  await Swal.fire({
+    icon: 'success',
+    title: 'Import Completed',
+    html: `<div class="space-y-1 text-left text-sm text-slate-600">
+      <p>Processed: <strong>${summary.processed ?? 0}</strong></p>
+      <p>Created users: <strong>${summary.created_users ?? 0}</strong></p>
+      <p>Updated users: <strong>${summary.updated_users ?? 0}</strong></p>
+      <p>Created userinfo: <strong>${summary.created_userinfo ?? 0}</strong></p>
+      <p>Updated userinfo: <strong>${summary.updated_userinfo ?? 0}</strong></p>
+      <p>Skipped existing: <strong>${summary.skipped_existing ?? 0}</strong></p>
+    </div>`,
+    confirmButtonText: 'OK',
+  })
 }
 
 const editUser = (event) => {
@@ -940,6 +966,9 @@ const closeEnrollModal = () => {
         <div class="mt-4 grid gap-3">
           <Button @click="addUser" :className="'h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary"
             :startIcon="PlusIcon">Add User</Button>
+          <Button @click="openImportUserDatModal" :className="'h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
+            Import user.dat
+          </Button>
         </div>
       </div>
     </section>
@@ -972,6 +1001,11 @@ const closeEnrollModal = () => {
       :last-completed-finger-id="enrollLastCompletedFinger"
       @close="closeEnrollModal"
       @confirm="handleEnrollConfirm"
+    />
+    <ImportUserDatModal
+      v-if="isImportUserDatModal"
+      @close="isImportUserDatModal = false"
+      @imported="handleUserDatImported"
     />
   </div>
 </template>

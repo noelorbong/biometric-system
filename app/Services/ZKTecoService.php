@@ -278,6 +278,23 @@ class ZKTecoService
     }
 
     /**
+     * Decode an encrypted attendance export file and return attendance rows.
+     *
+     * The export used in this project is XOR-0x55 obfuscated before the usual
+     * 40-byte attendance parser is applied.
+     *
+     * @return array<int, array{pin: string, check_time: string, check_type: string, verify_code: int, uid?: int}>
+     */
+    public function parseEncryptedAttendanceDat(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+
+        return $this->parseAttendanceLogs($this->xorBuffer($raw, 0x55));
+    }
+
+    /**
      * Download user records stored on the device.
      *
      * @return array<int, array{uid:int,pin:string,name:string,password:string,privilege:int,card:int}>
@@ -1035,9 +1052,34 @@ class ZKTecoService
         return $records;
     }
 
+    private function xorBuffer(string $raw, int $key): string
+    {
+        $length = strlen($raw);
+
+        if ($length === 0) {
+            return '';
+        }
+
+        $buffer = $raw;
+
+        for ($index = 0; $index < $length; $index++) {
+            $buffer[$index] = chr(ord($raw[$index]) ^ $key);
+        }
+
+        return $buffer;
+    }
+
     private function detectAttendanceRecordSize(string $payload): ?int
     {
         $length = strlen($payload);
+
+        // Some DAT exports in this project are large 16-byte record sets and are
+        // not compatible with the older 40-byte TCP layout. If the payload cleanly
+        // divides into 16-byte rows and looks like a bulk export, prefer 16-byte
+        // decoding first so the preview/import uses the right field positions.
+        if ($length % 16 === 0 && intdiv($length, 16) >= 1000) {
+            return 16;
+        }
 
         foreach ([40, 16, 8] as $candidate) {
             if ($length >= $candidate && $length % $candidate === 0) {

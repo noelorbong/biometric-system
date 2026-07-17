@@ -38,6 +38,8 @@ Route::post('/user/checkinout', [UserController::class, 'checkinout'])->middlewa
 Route::post('/user/checkinout/override/store', [UserController::class, 'storeCheckinoutOverride'])->middleware('auth:sanctum');
 Route::post('/user/checkinout/override/update', [UserController::class, 'updateCheckinoutOverride'])->middleware('auth:sanctum');
 Route::post('/user/checkinout/override/delete', [UserController::class, 'deleteCheckinoutOverride'])->middleware('auth:sanctum');
+Route::post('/user/import-dat/preview', [UserController::class, 'previewUserDatImport'])->middleware('auth:sanctum');
+Route::post('/user/import-dat', [UserController::class, 'importUserDat'])->middleware('auth:sanctum');
 Route::post('/report/biometric', [BiometricReportController::class, 'generate'])->middleware('auth:sanctum');
 Route::post('/user/office-shift/update', [UserController::class, 'updateOfficeShift'])->middleware('auth:sanctum');
 Route::post('/user/affiliation/update', [UserController::class, 'updateAffiliation'])->middleware('auth:sanctum');
@@ -60,6 +62,8 @@ Route::post('/machine/delete', [MachineController::class, 'delete'])->middleware
 Route::post('/machine/connect', [MachineController::class, 'testConnection'])->middleware('auth:sanctum');
 Route::post('/machine/auto-sync-status', [MachineController::class, 'autoSyncStatus'])->middleware('auth:sanctum');
 Route::post('/machine/sync-attendance', [MachineController::class, 'syncAttendance'])->middleware('auth:sanctum');
+Route::post('/machine/import-attendance-dat/preview', [MachineController::class, 'previewAttendanceDatImport'])->middleware('auth:sanctum');
+Route::post('/machine/import-attendance-dat', [MachineController::class, 'importAttendanceDat'])->middleware('auth:sanctum');
 Route::post('/machine/download-users', [MachineController::class, 'downloadUsers'])->middleware('auth:sanctum');
 Route::post('/machine/download-users-progress', [MachineController::class, 'downloadUsersProgress'])->middleware('auth:sanctum');
 Route::post('/machine/clear-attendance', [MachineController::class, 'clearAttendanceLogs'])->middleware('auth:sanctum');
