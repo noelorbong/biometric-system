@@ -5,6 +5,13 @@
         <!-- <meta http-equiv="Content-Security-Policy" content="worker-src 'self' http://localhost:8000"> -->
         <link rel="shortcut icon" href="/images/logo/logo.png" type="image/png">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#0f172a">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="Biometric System">
+        <link rel="manifest" href="/manifest.webmanifest">
+        <link rel="apple-touch-icon" href="/images/logo/logo.png">
         <title>Biometric System</title>
         @vite(['resources/js/app.js'])
     </head>

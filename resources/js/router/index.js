@@ -37,6 +37,12 @@ const routes = [
         path: "signin",
         component: () => import('../views/auth/Signin.vue'),
         meta: { title: `Sign In` }
+      },
+      {
+        name: "InstallGuide",
+        path: "install",
+        component: () => import('../views/pwa/InstallGuide.vue'),
+        meta: { title: `Install App`, skipLicenseCheck: true, middleware: 'guest' }
       }
     ]
   },
