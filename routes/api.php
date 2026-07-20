@@ -40,6 +40,8 @@ Route::post('/user/checkinout/override/update', [UserController::class, 'updateC
 Route::post('/user/checkinout/override/delete', [UserController::class, 'deleteCheckinoutOverride'])->middleware('auth:sanctum');
 Route::post('/user/import-dat/preview', [UserController::class, 'previewUserDatImport'])->middleware('auth:sanctum');
 Route::post('/user/import-dat', [UserController::class, 'importUserDat'])->middleware('auth:sanctum');
+Route::post('/user/import-biotemplate-dat/preview', [UserController::class, 'previewBiometricTemplateDatImport'])->middleware('auth:sanctum');
+Route::post('/user/import-biotemplate-dat', [UserController::class, 'importBiometricTemplateDat'])->middleware('auth:sanctum');
 Route::post('/report/biometric', [BiometricReportController::class, 'generate'])->middleware('auth:sanctum');
 Route::post('/user/office-shift/update', [UserController::class, 'updateOfficeShift'])->middleware('auth:sanctum');
 Route::post('/user/affiliation/update', [UserController::class, 'updateAffiliation'])->middleware('auth:sanctum');

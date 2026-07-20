@@ -25,6 +25,7 @@ const filters = ref({
 
 const reportUsers = ref([])
 const loading = ref(false)
+const preparingPrintData = ref(false)
 const copiesPerUser = ref(1)
 const calculateUndertime = ref(false)
 const printableRefs = ref([])
@@ -91,6 +92,7 @@ const loadOptions = async () => {
 
 const generateReport = async () => {
   loading.value = true
+  preparingPrintData.value = false
 
   try {
     const payload = {
@@ -108,7 +110,14 @@ const generateReport = async () => {
     if (!reportUsers.value.length) {
       toastResult('No users found for selected filters', 'info')
     }
-    await fetchOverridesForUsers(reportUsers.value)
+    loading.value = false
+
+    if (reportUsers.value.length) {
+      preparingPrintData.value = true
+      fetchOverridesForUsers(reportUsers.value).finally(() => {
+        preparingPrintData.value = false
+      })
+    }
   } catch (error) {
     reportUsers.value = []
     toastResult(error?.response?.data?.message || 'Unable to generate report', 'error')
@@ -116,24 +125,47 @@ const generateReport = async () => {
     loading.value = false
   }
 }
+
 const fetchOverridesForUsers = async (users) => {
-  for (const user of users) {
+  const concurrency = 8
+  let cursor = 0
+
+  const prepareUser = async (user) => {
     try {
       const resp = await axios.post('/api/user/checkinout', {
         user_id: user.id,
         year: Number(filters.value.year),
         month: Number(filters.value.month),
       })
+      user._effective_checkinouts = resp?.data?.checkinouts || []
       user._overrides = resp?.data?.overrides || []
+      user._printable_attendance_records = buildPrintableAttendanceRecords(user, user._effective_checkinouts)
     } catch (err) {
+      user._effective_checkinouts = []
       user._overrides = []
+      user._printable_attendance_records = []
     }
   }
+
+  const workers = Array.from({ length: Math.min(concurrency, users.length) }, async () => {
+    while (cursor < users.length) {
+      const user = users[cursor]
+      cursor += 1
+      await prepareUser(user)
+    }
+  })
+
+  await Promise.all(workers)
 }
 
 const printReport = async () => {
   if (!reportUsers.value.length) {
     toastResult('Generate report first', 'info')
+    return
+  }
+
+  if (preparingPrintData.value) {
+    toastResult('Preparing print data, please try again in a moment', 'info')
     return
   }
 
@@ -325,8 +357,390 @@ const closeBiometricLogs = () => {
   biometricLogUser.value = null
 }
 
+const toMinutesFromScheduleTime = (value) => {
+  if (!value) return null
+
+  const [h, m] = String(value).split(':')
+  const hours = Number(h)
+  const minutes = Number(m)
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null
+  }
+
+  return (hours * 60) + minutes
+}
+
+const toMinutesFromDateTime = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return (date.getHours() * 60) + date.getMinutes()
+}
+
+const toMinutesFromTimeString = (value) => {
+  if (!value) return null
+
+  const parts = String(value).split(':')
+  if (parts.length < 2) {
+    return null
+  }
+
+  const hours = Number(parts[0])
+  const minutes = Number(parts[1])
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null
+  }
+
+  return (hours * 60) + minutes
+}
+
+const formatTimeOnly = (value) => {
+  if (!value) return ''
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const formatUndertimeParts = (minutesValue) => {
+  const total = Math.max(0, Number(minutesValue) || 0)
+  return {
+    hrs: Math.floor(total / 60),
+    min: total % 60,
+  }
+}
+
+const getScheduleSlots = (user) => {
+  const schedules = user?.office_shift?.schedules || user?.officeShift?.schedules || []
+  const slots = [...schedules].sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+
+  if (!slots.length) {
+    return [{ sequence: 1, time_in: null, time_out: null, is_next_day: false }]
+  }
+
+  return slots
+}
+
+const hasOvernightShift = (user) => {
+  return getScheduleSlots(user).some((row) => {
+    if (row?.is_next_day) {
+      return true
+    }
+
+    const timeIn = String(row?.time_in || '')
+    const timeOut = String(row?.time_out || '')
+    return timeIn && timeOut && timeOut < timeIn
+  })
+}
+
+const getOvernightEndMinute = (user) => {
+  return getScheduleSlots(user)
+    .filter((row) => Boolean(row?.is_next_day))
+    .map((row) => {
+      const [h, m] = String(row?.time_out || '00:00:00').split(':')
+      return (Number(h) * 60) + Number(m)
+    })
+    .sort((a, b) => a - b)
+    .at(-1) ?? 0
+}
+
+const resolveLogicalDateKey = (user, value) => {
+  const dateTime = new Date(value)
+  if (Number.isNaN(dateTime.getTime())) {
+    return null
+  }
+
+  const logicalDate = new Date(dateTime)
+  if (hasOvernightShift(user)) {
+    const minutes = (dateTime.getHours() * 60) + dateTime.getMinutes()
+    if (minutes <= getOvernightEndMinute(user)) {
+      logicalDate.setDate(logicalDate.getDate() - 1)
+    }
+  }
+
+  return `${logicalDate.getFullYear()}-${String(logicalDate.getMonth() + 1).padStart(2, '0')}-${String(logicalDate.getDate()).padStart(2, '0')}`
+}
+
+const resolveCheckInSlotIndex = (minutes, slotMeta) => {
+  if (minutes === null || !slotMeta.length) {
+    return null
+  }
+
+  for (let index = 0; index < slotMeta.length; index += 1) {
+    const nextRow = slotMeta[index + 1]
+    const currentEnd = slotMeta[index].outMinute
+    const boundary = currentEnd ?? nextRow?.inMinute ?? null
+
+    if (boundary !== null && minutes < boundary) {
+      return index
+    }
+  }
+
+  return slotMeta.length - 1
+}
+
+const resolveCheckOutSlotIndex = (minutes, slotMeta) => {
+  if (minutes === null || !slotMeta.length) {
+    return null
+  }
+
+  for (let index = 0; index < slotMeta.length - 1; index += 1) {
+    const nextStart = slotMeta[index + 1].inMinute
+    if (nextStart !== null && minutes < nextStart) {
+      return index
+    }
+  }
+
+  return slotMeta.length - 1
+}
+
+const getShiftGraceSettings = (user) => {
+  const officeShift = user?.office_shift || user?.officeShift
+
+  return {
+    enabled: Boolean(officeShift?.grace_enabled),
+    before: Math.max(0, Number(officeShift?.grace_before_minutes || 0)),
+    after: Math.max(0, Number(officeShift?.grace_after_minutes || 0)),
+  }
+}
+
+const resolveGraceCorrectedCheckType = (user, record, slotMeta) => {
+  const rawType = String(record?.CHECKTYPE || '').toUpperCase()
+  const minutes = toMinutesFromDateTime(record?.CHECKTIME)
+  const grace = getShiftGraceSettings(user)
+
+  if (!grace.enabled || minutes === null || !slotMeta.length) {
+    return rawType
+  }
+
+  const candidates = []
+
+  slotMeta.forEach((slot) => {
+    if (slot.inMinute !== null && minutes >= slot.inMinute - grace.before && minutes <= slot.inMinute + grace.after) {
+      candidates.push({ type: 'I', distance: Math.abs(minutes - slot.inMinute) })
+    }
+
+    if (slot.outMinute !== null && minutes >= slot.outMinute - grace.before && minutes <= slot.outMinute + grace.after) {
+      candidates.push({ type: 'O', distance: Math.abs(minutes - slot.outMinute) })
+    }
+  })
+
+  if (!candidates.length) {
+    return rawType
+  }
+
+  return candidates.sort((a, b) => a.distance - b.distance)[0].type
+}
+
+const getScheduledMinutes = (user) => {
+  const slots = getScheduleSlots(user)
+  if (!Array.isArray(slots) || !slots.length) {
+    return null
+  }
+
+  const firstSlot = slots[0]
+  const lastSlot = slots.at(-1)
+  const startMinute = toMinutesFromScheduleTime(firstSlot?.time_in)
+  const endMinute = toMinutesFromScheduleTime(lastSlot?.time_out)
+
+  if (startMinute === null || endMinute === null) {
+    return null
+  }
+
+  return Math.max(0, endMinute - startMinute)
+}
+
+const getActualWorkedMinutes = (row) => {
+  const amIn = toMinutesFromTimeString(row?.slots?.[0]?.check_in ? formatTimeOnly(row.slots[0].check_in) : '')
+  const amOut = toMinutesFromTimeString(row?.slots?.[0]?.check_out ? formatTimeOnly(row.slots[0].check_out) : '')
+  const pmIn = toMinutesFromTimeString(row?.slots?.[1]?.check_in ? formatTimeOnly(row.slots[1].check_in) : '')
+  const pmOut = toMinutesFromTimeString(row?.slots?.[1]?.check_out ? formatTimeOnly(row.slots[1].check_out) : '')
+
+  let total = 0
+
+  if (amIn !== null && amOut !== null && amOut > amIn) {
+    total += amOut - amIn
+  }
+
+  if (pmIn !== null && pmOut !== null && pmOut > pmIn) {
+    total += pmOut - pmIn
+  }
+
+  return total > 0 ? total : null
+}
+
+const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
+  const grouped = new Map()
+  const records = [...checkinouts].sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
+
+  records.forEach((record) => {
+    const dateKey = resolveLogicalDateKey(user, record.CHECKTIME)
+    if (!dateKey) {
+      return
+    }
+
+    if (!grouped.has(dateKey)) {
+      grouped.set(dateKey, [])
+    }
+
+    grouped.get(dateKey).push(record)
+  })
+
+  const scheduleSlots = getScheduleSlots(user)
+  const slotMeta = scheduleSlots.map((slot) => ({
+    inMinute: toMinutesFromScheduleTime(slot?.time_in),
+    outMinute: toMinutesFromScheduleTime(slot?.time_out),
+  }))
+  const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
+
+  const buildAttendanceRow = (date, recordsInDay = []) => {
+    const sorted = recordsInDay.sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
+    const normalizedPunches = []
+
+    sorted.forEach((item) => {
+      const type = resolveGraceCorrectedCheckType(user, item, slotMeta)
+      if (type !== 'I' && type !== 'O') {
+        return
+      }
+
+      const lastPunch = normalizedPunches[normalizedPunches.length - 1]
+      if (!lastPunch || lastPunch.type !== type) {
+        normalizedPunches.push({ type, time: item.CHECKTIME })
+        return
+      }
+
+      if (type === 'I' && hasScheduleBoundaries) {
+        normalizedPunches.push({ type, time: item.CHECKTIME })
+        return
+      }
+
+      if (type === 'O') {
+        lastPunch.time = item.CHECKTIME
+      }
+    })
+
+    const sessions = []
+    let currentSession = null
+
+    normalizedPunches.forEach((punch) => {
+      if (punch.type === 'I') {
+        if (!currentSession || (currentSession.check_in && currentSession.check_out)) {
+          currentSession = { check_in: punch.time, check_out: null }
+        } else if (currentSession.check_in && !currentSession.check_out) {
+          sessions.push(currentSession)
+          currentSession = { check_in: punch.time, check_out: null }
+        } else {
+          currentSession = { check_in: punch.time, check_out: null }
+        }
+        return
+      }
+
+      if (!currentSession) {
+        currentSession = { check_in: null, check_out: punch.time }
+        return
+      }
+
+      if (currentSession.check_in && !currentSession.check_out) {
+        currentSession.check_out = punch.time
+        sessions.push(currentSession)
+        currentSession = null
+      }
+    })
+
+    if (currentSession && (currentSession.check_in || currentSession.check_out)) {
+      sessions.push(currentSession)
+    }
+
+    const slots = scheduleSlots.map(() => ({ check_in: null, check_out: null }))
+
+    if (hasScheduleBoundaries) {
+      normalizedPunches.forEach((punch) => {
+        const minutes = toMinutesFromDateTime(punch.time)
+        const slotIndex = punch.type === 'I'
+          ? resolveCheckInSlotIndex(minutes, slotMeta)
+          : resolveCheckOutSlotIndex(minutes, slotMeta)
+
+        if (slotIndex === null || !slots[slotIndex]) {
+          return
+        }
+
+        if (punch.type === 'I') {
+          if (!slots[slotIndex].check_in || new Date(punch.time) < new Date(slots[slotIndex].check_in)) {
+            slots[slotIndex].check_in = punch.time
+          }
+          return
+        }
+
+        if (!slots[slotIndex].check_out || new Date(punch.time) > new Date(slots[slotIndex].check_out)) {
+          slots[slotIndex].check_out = punch.time
+        }
+      })
+    } else {
+      sessions.slice(0, slots.length).forEach((session, index) => {
+        slots[index] = {
+          check_in: session.check_in,
+          check_out: session.check_out,
+        }
+      })
+    }
+
+    return { date, slots }
+  }
+
+  const totalDaysInMonth = new Date(Number(filters.value.year), Number(filters.value.month), 0).getDate()
+  const rows = []
+
+  for (let day = 1; day <= totalDaysInMonth; day += 1) {
+    const dateKey = `${filters.value.year}-${String(filters.value.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    rows.push(buildAttendanceRow(dateKey, grouped.get(dateKey) || []))
+  }
+
+  return rows.sort((a, b) => new Date(a.date) - new Date(b.date))
+}
+
+const buildPrintableAttendanceRecords = (user, checkinouts = []) => {
+  const scheduledMinutes = getScheduledMinutes(user)
+
+  return buildAttendanceRowsFromCheckinouts(user, checkinouts).map((row) => {
+    const [year, month, day] = String(row.date).split('-').map(Number)
+    const dateObj = new Date(year, month - 1, day)
+    const amIn = row.slots[0]?.check_in ? formatTimeOnly(row.slots[0].check_in) : ''
+    const amOut = row.slots[0]?.check_out ? formatTimeOnly(row.slots[0].check_out) : ''
+    const pmIn = row.slots[1]?.check_in ? formatTimeOnly(row.slots[1].check_in) : ''
+    const pmOut = row.slots[1]?.check_out ? formatTimeOnly(row.slots[1].check_out) : ''
+    const actualWorkedMinutes = getActualWorkedMinutes(row)
+    const undertimeMinutes = scheduledMinutes !== null && actualWorkedMinutes !== null
+      ? Math.max(0, scheduledMinutes - actualWorkedMinutes)
+      : 0
+    const undertime = formatUndertimeParts(undertimeMinutes)
+
+    return {
+      date: row.date,
+      dateDisplay: dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit' }),
+      am_in: amIn,
+      am_out: amOut,
+      pm_in: pmIn,
+      pm_out: pmOut,
+      undertimeHrs: undertime.hrs,
+      undertimeMin: String(undertime.min).padStart(2, '0'),
+    }
+  })
+}
+
 const getPrintableRecords = (user) => {
-  const records = Array.isArray(user?.attendance_records) ? user.attendance_records : []
+  const records = Array.isArray(user?._printable_attendance_records) && user._printable_attendance_records.length
+    ? user._printable_attendance_records
+    : (Array.isArray(user?.attendance_records) ? user.attendance_records : [])
 
   if (calculateUndertime.value) {
     return records
@@ -357,7 +771,7 @@ const getPrintableRecords = (user) => {
               </span>
               <span class="inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
                 :class="loading ? 'bg-amber-400/15 text-amber-100 ring-amber-300/30' : 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'">
-                {{ loading ? 'Generating Report...' : 'Ready to Generate' }}
+                {{ loading ? 'Generating Report...' : (preparingPrintData ? 'Preparing Print Data...' : 'Ready to Generate') }}
               </span>
             </div>
           </div>
@@ -410,7 +824,7 @@ const getPrintableRecords = (user) => {
           </div>
           <button @click="printReport" type="button"
             class="mt-auto inline-flex h-11 w-full items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30">
-            Print Selected
+            {{ preparingPrintData ? 'Preparing...' : 'Print Selected' }}
           </button>
           </div>
           <p class="text-xs text-slate-500 dark:text-slate-400">Only selected users will be included in printing.</p>
@@ -493,6 +907,7 @@ const getPrintableRecords = (user) => {
           <span class="font-semibold text-slate-900 dark:text-white">{{ loading ? 'Generating...' : reportUsers.length
             }}</span> user(s) matched for {{ monthYearLabel }}
           <span v-if="!loading" class="ml-2">({{ selectedCount }} selected)</span>
+          <span v-if="preparingPrintData" class="ml-2 text-xs text-amber-600 dark:text-amber-300">Preparing print data...</span>
         </div>
       </div>
       <div class="overflow-x-auto">
@@ -640,7 +1055,7 @@ const getPrintableRecords = (user) => {
         :user="user" :selected-year="filters.year" :selected-month="filters.month"
         :attendance-records="getPrintableRecords(user)" :company-name="companySchoolName"
         :company-logo="companySchoolLogo" :show-logo="companySchoolLogoPrintEnabled" :show-controls="false"
-        :calculate-undertime="calculateUndertime" :overrides="user._overrides || []" />
+        :calculate-undertime="calculateUndertime" />
     </div>
   </div>
 </template>

@@ -82,6 +82,16 @@ const shiftSchedules = computed(() => {
   return officeShift?.schedules || []
 })
 
+const shiftGraceSettings = computed(() => {
+  const officeShift = selectedUser.value?.office_shift || selectedUser.value?.officeShift
+
+  return {
+    enabled: Boolean(officeShift?.grace_enabled),
+    before: Math.max(0, Number(officeShift?.grace_before_minutes || 0)),
+    after: Math.max(0, Number(officeShift?.grace_after_minutes || 0)),
+  }
+})
+
 const scheduleSlots = computed(() => {
   const slots = [...shiftSchedules.value].sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
   if (!slots.length) {
@@ -274,6 +284,34 @@ const resolveCheckOutSlotIndex = (minutes, slotMeta) => {
   return slotMeta.length - 1
 }
 
+const resolveGraceCorrectedCheckType = (record, slotMeta) => {
+  const rawType = String(record?.CHECKTYPE || '').toUpperCase()
+  const minutes = toMinutesFromDateTime(record?.CHECKTIME)
+  const grace = shiftGraceSettings.value
+
+  if (!grace.enabled || minutes === null || !slotMeta.length) {
+    return rawType
+  }
+
+  const candidates = []
+
+  slotMeta.forEach((slot) => {
+    if (slot.inMinute !== null && minutes >= slot.inMinute - grace.before && minutes <= slot.inMinute + grace.after) {
+      candidates.push({ type: 'I', distance: Math.abs(minutes - slot.inMinute) })
+    }
+
+    if (slot.outMinute !== null && minutes >= slot.outMinute - grace.before && minutes <= slot.outMinute + grace.after) {
+      candidates.push({ type: 'O', distance: Math.abs(minutes - slot.outMinute) })
+    }
+  })
+
+  if (!candidates.length) {
+    return rawType
+  }
+
+  return candidates.sort((a, b) => a.distance - b.distance)[0].type
+}
+
 const attendanceRows = computed(() => {
   const grouped = new Map()
 
@@ -301,7 +339,7 @@ const attendanceRows = computed(() => {
       const normalizedPunches = []
 
       sorted.forEach((item) => {
-        const type = String(item.CHECKTYPE || '').toUpperCase()
+        const type = resolveGraceCorrectedCheckType(item, slotMeta)
         if (type !== 'I' && type !== 'O') {
           return
         }

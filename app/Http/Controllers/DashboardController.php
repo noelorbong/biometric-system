@@ -94,7 +94,7 @@ class DashboardController extends Controller
         $user->loadMissing([
             'departmentRef:id,department_name,dep_short',
             'collegeRef:id,college_short,college_long',
-            'officeShift:id,name,schedule,is_flexible',
+            'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
             'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
         ]);
 

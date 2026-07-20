@@ -13,6 +13,7 @@ use App\Models\OfficeShift;
 use App\Models\UserContact;
 use App\Models\UserProfile;
 use App\Models\BiometricLogOverride;
+use App\Models\BiometricTemplate;
 use App\Models\Department;
 use App\Models\College;
 use Illuminate\Validation\Rule;
@@ -111,6 +112,114 @@ class UserController extends Controller
         }, $rows);
     }
 
+    private function parseBiometricTemplateDatRecords(string $raw): array
+    {
+        $raw = trim($raw);
+
+        if ($raw === '') {
+            return [];
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        $rows = [];
+
+        foreach ($lines as $index => $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            $fields = [];
+            foreach (explode("\t", $line) as $part) {
+                [$key, $value] = array_pad(explode('=', $part, 2), 2, '');
+                $key = trim($key);
+                if ($key !== '') {
+                    $fields[$key] = $value;
+                }
+            }
+
+            $pin = trim((string) ($fields['Pin'] ?? ''));
+            $fingerId = isset($fields['Index']) && is_numeric($fields['Index']) ? (int) $fields['Index'] : null;
+            $valid = isset($fields['Valid']) && is_numeric($fields['Valid']) ? (int) $fields['Valid'] : 0;
+            $type = isset($fields['Type']) && is_numeric($fields['Type']) ? (int) $fields['Type'] : null;
+            $templateBase64 = trim((string) ($fields['Tmp'] ?? ''));
+            $templateBytes = '';
+            $templateByteLength = 0;
+
+            if ($templateBase64 !== '') {
+                $decoded = base64_decode($templateBase64, true);
+                if ($decoded !== false) {
+                    $templateBytes = $decoded;
+                    $templateByteLength = strlen($decoded);
+                }
+            }
+
+            $resolvedUserId = ctype_digit($pin) ? (int) $pin : null;
+            $validForImport = $resolvedUserId !== null
+                && $resolvedUserId > 0
+                && $fingerId !== null
+                && $fingerId >= 0
+                && $fingerId <= 9
+                && $valid === 1
+                && $templateBytes !== '';
+
+            $rows[] = [
+                'row' => $index + 1,
+                'pin' => $pin,
+                'no' => isset($fields['No']) && is_numeric($fields['No']) ? (int) $fields['No'] : 0,
+                'finger_id' => $fingerId,
+                'valid' => $valid,
+                'duress' => isset($fields['Duress']) && is_numeric($fields['Duress']) ? (int) $fields['Duress'] : 0,
+                'type' => $type,
+                'major_ver' => isset($fields['MajorVer']) && is_numeric($fields['MajorVer']) ? (int) $fields['MajorVer'] : null,
+                'minor_ver' => isset($fields['MinorVer']) && is_numeric($fields['MinorVer']) ? (int) $fields['MinorVer'] : null,
+                'format' => isset($fields['Format']) && is_numeric($fields['Format']) ? (int) $fields['Format'] : null,
+                'template' => $templateBase64,
+                'template_bytes' => $templateByteLength,
+                'resolved_user_id' => $resolvedUserId,
+                'valid_for_import' => $validForImport,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function enrichBiometricTemplateRowsWithExistingFlags(array $rows, ?string $machineMarker = null): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map(
+            static fn (array $row) => (int) ($row['resolved_user_id'] ?? 0),
+            $rows
+        ), static fn (int $id) => $id > 0)));
+
+        $users = $ids === []
+            ? collect()
+            : User::query()->whereIn('id', $ids)->get(['id', 'name'])->keyBy('id');
+
+        $templates = $ids === []
+            ? collect()
+            : BiometricTemplate::query()
+                ->whereIn('USERID', $ids)
+                ->when($machineMarker === null, fn ($query) => $query->whereNull('EMACHINENUM'))
+                ->when($machineMarker !== null, fn ($query) => $query->where('EMACHINENUM', $machineMarker))
+                ->get(['USERID', 'FINGERID', 'EMACHINENUM'])
+                ->groupBy(fn (BiometricTemplate $template) => $template->USERID . ':' . $template->FINGERID);
+
+        return array_map(function (array $row) use ($users, $templates): array {
+            $resolved = (int) ($row['resolved_user_id'] ?? 0);
+            $fingerId = (int) ($row['finger_id'] ?? -1);
+            $user = $users->get($resolved);
+            $hasUser = $user !== null;
+            $hasTemplate = $templates->has($resolved . ':' . $fingerId);
+
+            $row['user_exists'] = $hasUser;
+            $row['user_name'] = $user?->name;
+            $row['has_existing_template'] = $hasTemplate;
+            $row['valid_for_import'] = (bool) ($row['valid_for_import'] ?? false) && $hasUser;
+
+            return $row;
+        }, $rows);
+    }
+
     private function buildImportedUserEmail(int $resolvedUserId, string $pin): string
     {
         $seed = ctype_digit($pin) ? $pin : (string) $resolvedUserId;
@@ -171,6 +280,40 @@ class UserController extends Controller
         $middle = implode(' ', array_map($toTitle, $parts));
 
         return ['first_name' => $first, 'last_name' => $last, 'middle_name' => $middle];
+    }
+
+    private function normalizeImportedProfileName(array $nameParts, ?UserProfile $existingProfile = null): array
+    {
+        $first = trim((string) ($nameParts['first_name'] ?? ''));
+        $last = trim((string) ($nameParts['last_name'] ?? ''));
+        $middle = trim((string) ($nameParts['middle_name'] ?? ''));
+
+        if ($first === '' && $existingProfile?->first_name) {
+            $first = trim((string) $existingProfile->first_name);
+        }
+
+        if ($last === '' && $existingProfile?->last_name) {
+            $last = trim((string) $existingProfile->last_name);
+        }
+
+        if ($first === '' && $last !== '') {
+            $first = $last;
+        }
+
+        if ($last === '' && $first !== '') {
+            $last = $first;
+        }
+
+        if ($first === '' && $last === '') {
+            $first = 'Imported';
+            $last = 'User';
+        }
+
+        return [
+            'first_name' => $first,
+            'last_name' => $last,
+            'middle_name' => $middle !== '' ? $middle : null,
+        ];
     }
 
     public function previewUserDatImport(Request $request)
@@ -355,12 +498,19 @@ class UserController extends Controller
                 }
 
                 $nameParts = $this->parseDeviceName($name);
+                $normalizedNameParts = $this->normalizeImportedProfileName($nameParts, $profile);
+                $importedDisplayName = $name !== '' ? $name : null;
+                $existingDisplayName = $profile ? trim((string) ($profile->display_name ?? '')) : '';
                 $profilePayload = [
-                    'first_name' => $nameParts['first_name'] ?: null,
-                    'last_name' => $nameParts['last_name'] ?: null,
-                    'middle_name' => $nameParts['middle_name'] ?: null,
+                    'first_name' => $normalizedNameParts['first_name'],
+                    'last_name' => $normalizedNameParts['last_name'],
+                    'middle_name' => $normalizedNameParts['middle_name'],
                     'user_last_modify' => $request->user()?->id,
                 ];
+
+                if ($importedDisplayName !== null && $existingDisplayName === '') {
+                    $profilePayload['display_name'] = $importedDisplayName;
+                }
 
                 if ($profile) {
                     if ($profile->trashed()) {
@@ -370,6 +520,10 @@ class UserController extends Controller
                     $profile->update($profilePayload);
                     $updatedProfiles++;
                 } else {
+                    if ($importedDisplayName !== null) {
+                        $profilePayload['display_name'] = $importedDisplayName;
+                    }
+
                     UserProfile::create(array_merge($profilePayload, [
                         'user_id' => $resolvedUserId,
                         'user_add' => $request->user()?->id,
@@ -396,6 +550,186 @@ class UserController extends Controller
                 'skipped_existing' => $skippedExisting,
                 'skipped_invalid' => $skippedInvalid,
                 'replace_existing' => $replaceExisting,
+            ],
+        ]);
+    }
+
+    public function previewBiometricTemplateDatImport(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:10240'],
+            'machine_marker' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $uploaded = $validated['file'];
+
+        if (strtolower((string) $uploaded->getClientOriginalExtension()) !== 'dat') {
+            return response()->json(['message' => 'Please upload a .dat file.'], 422);
+        }
+
+        $raw = file_get_contents($uploaded->getRealPath());
+
+        if ($raw === false) {
+            return response()->json(['message' => 'Unable to read uploaded file.'], 422);
+        }
+
+        $machineMarker = trim((string) ($validated['machine_marker'] ?? ''));
+        $machineMarker = $machineMarker !== '' ? $machineMarker : null;
+
+        try {
+            $rows = $this->parseBiometricTemplateDatRecords($raw);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $rows = $this->enrichBiometricTemplateRowsWithExistingFlags($rows, $machineMarker);
+
+        $validRows = array_values(array_filter($rows, static fn (array $row) => (bool) ($row['valid_for_import'] ?? false)));
+        $existingCount = count(array_filter($validRows, static fn (array $row) => (bool) ($row['has_existing_template'] ?? false)));
+        $missingUsers = count(array_filter($rows, static fn (array $row) => !(bool) ($row['user_exists'] ?? false)));
+
+        return response()->json([
+            'message' => 'biotemplate.dat decoded successfully.',
+            'rows' => $rows,
+            'summary' => [
+                'total_rows' => count($rows),
+                'valid_rows' => count($validRows),
+                'existing_template_rows' => $existingCount,
+                'new_template_rows' => count($validRows) - $existingCount,
+                'missing_user_rows' => $missingUsers,
+            ],
+        ]);
+    }
+
+    public function importBiometricTemplateDat(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $validated = $request->validate([
+            'rows' => ['required', 'array', 'min:1'],
+            'selected_keys' => ['required', 'array', 'min:1'],
+            'selected_keys.*' => ['string'],
+            'replace_existing' => ['nullable', 'boolean'],
+            'machine_marker' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $replaceExisting = (bool) ($validated['replace_existing'] ?? false);
+        $machineMarker = trim((string) ($validated['machine_marker'] ?? ''));
+        $machineMarker = $machineMarker !== '' ? $machineMarker : null;
+        $selectedLookup = array_flip(array_values(array_unique(array_map('strval', $validated['selected_keys'] ?? []))));
+        $rows = $this->enrichBiometricTemplateRowsWithExistingFlags($validated['rows'], $machineMarker);
+
+        $rowsToImport = [];
+        foreach ($rows as $row) {
+            $key = (int) ($row['resolved_user_id'] ?? 0) . ':' . (int) ($row['finger_id'] ?? -1);
+
+            if (!isset($selectedLookup[$key])) {
+                continue;
+            }
+
+            $rowsToImport[$key] = $row;
+        }
+
+        if ($rowsToImport === []) {
+            return response()->json(['message' => 'No valid selected templates to import.'], 422);
+        }
+
+        $created = 0;
+        $updated = 0;
+        $skippedExisting = 0;
+        $skippedInvalid = 0;
+        $skippedMissingUser = 0;
+        $processedKeys = [];
+
+        DB::transaction(function () use (
+            $rowsToImport,
+            $replaceExisting,
+            $machineMarker,
+            &$created,
+            &$updated,
+            &$skippedExisting,
+            &$skippedInvalid,
+            &$skippedMissingUser,
+            &$processedKeys
+        ) {
+            foreach ($rowsToImport as $key => $row) {
+                $userId = (int) ($row['resolved_user_id'] ?? 0);
+                $fingerId = (int) ($row['finger_id'] ?? -1);
+
+                if ($userId <= 0 || $fingerId < 0 || $fingerId > 9 || empty($row['template'])) {
+                    $skippedInvalid++;
+                    continue;
+                }
+
+                if (!(bool) ($row['user_exists'] ?? false)) {
+                    $skippedMissingUser++;
+                    continue;
+                }
+
+                $templateRaw = base64_decode((string) $row['template'], true);
+                if ($templateRaw === false || $templateRaw === '') {
+                    $skippedInvalid++;
+                    continue;
+                }
+
+                $query = BiometricTemplate::query()
+                    ->where('USERID', $userId)
+                    ->where('FINGERID', $fingerId);
+
+                if ($machineMarker === null) {
+                    $query->whereNull('EMACHINENUM');
+                } else {
+                    $query->where('EMACHINENUM', $machineMarker);
+                }
+
+                $template = $query->first();
+
+                if ($template && !$replaceExisting) {
+                    $skippedExisting++;
+                    continue;
+                }
+
+                if (!$template) {
+                    $template = new BiometricTemplate([
+                        'USERID' => $userId,
+                        'FINGERID' => $fingerId,
+                        'EMACHINENUM' => $machineMarker,
+                    ]);
+                    $created++;
+                } else {
+                    $updated++;
+                }
+
+                $template->TEMPLATE = $templateRaw;
+                $template->TEMPLATE4 = $templateRaw;
+                $template->USETYPE = 0;
+                $template->Flag = (int) ($row['valid'] ?? 1);
+                $template->DivisionFP = 10;
+                $template->save();
+
+                $processedKeys[] = $key;
+            }
+        });
+
+        return response()->json([
+            'message' => 'biotemplate.dat import completed.',
+            'processed_keys' => $processedKeys,
+            'summary' => [
+                'selected' => count($rowsToImport),
+                'processed' => count($processedKeys),
+                'created_templates' => $created,
+                'updated_templates' => $updated,
+                'skipped_existing' => $skippedExisting,
+                'skipped_invalid' => $skippedInvalid,
+                'skipped_missing_user' => $skippedMissingUser,
+                'replace_existing' => $replaceExisting,
+                'machine_marker' => $machineMarker,
             ],
         ]);
     }
@@ -814,11 +1148,11 @@ class UserController extends Controller
     {
         return User::with([
             'addedBy:id,name',
-            'profile:id,user_id,first_name,middle_name,last_name,name_extension,dob,gender,image,thumbnail',
+            'profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension,dob,gender,image,thumbnail',
             'contacts:id,user_id,type,value,is_primary',
             'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
             'biometricInfo',
-            'officeShift:id,name,schedule,is_flexible',
+            'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
             'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
             'departmentRef:id,department_name,dep_short,status',
             'collegeRef:id,company_id,college_short,college_long,college_head,status',
@@ -839,7 +1173,7 @@ class UserController extends Controller
 
         $office_shifts = OfficeShift::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'schedule', 'is_flexible']);
+            ->get(['id', 'name', 'schedule', 'is_flexible', 'grace_enabled', 'grace_before_minutes', 'grace_after_minutes']);
 
         $departments = Department::query()
             ->where('status', true)
@@ -1090,6 +1424,7 @@ class UserController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
+            'display_name' => ['nullable', 'string', 'max:255'],
             'name_extension' => ['nullable', 'string', 'max:50'],
             'dob' => ['nullable', 'date'],
             'gender' => ['nullable', 'string', 'max:30'],
@@ -1160,6 +1495,7 @@ class UserController extends Controller
 
             UserProfile::create([
                 'user_id' => $user->id,
+                'display_name' => $validated['display_name'] ?? null,
                 'first_name' => $validated['first_name'],
                 'middle_name' => $validated['middle_name'] ?? null,
                 'last_name' => $validated['last_name'],
@@ -1202,6 +1538,7 @@ class UserController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
+            'display_name' => ['nullable', 'string', 'max:255'],
             'name_extension' => ['nullable', 'string', 'max:50'],
             'dob' => ['nullable', 'date'],
             'gender' => ['nullable', 'string', 'max:30'],
@@ -1307,6 +1644,7 @@ class UserController extends Controller
 
             if ($profile) {
                 $profile->update([
+                    'display_name' => $validated['display_name'] ?? null,
                     'first_name' => $validated['first_name'],
                     'middle_name' => $validated['middle_name'] ?? null,
                     'last_name' => $validated['last_name'],
@@ -1320,6 +1658,7 @@ class UserController extends Controller
             } else {
                 UserProfile::create([
                     'user_id' => $user->id,
+                    'display_name' => $validated['display_name'] ?? null,
                     'first_name' => $validated['first_name'],
                     'middle_name' => $validated['middle_name'] ?? null,
                     'last_name' => $validated['last_name'],
@@ -1393,11 +1732,11 @@ class UserController extends Controller
 
         $user = User::where('users.id',$request->user()->id)
             ->with([
-                'profile:id,user_id,first_name,middle_name,last_name,name_extension,dob,gender,image,thumbnail',
+                'profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension,dob,gender,image,thumbnail',
                 'contacts:id,user_id,type,value,is_primary',
                 'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
                 'biometricInfo',
-                'officeShift:id,name,schedule,is_flexible',
+                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
             ])
             ->select('users.*')

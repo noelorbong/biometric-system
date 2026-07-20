@@ -55,7 +55,7 @@ class OfficeShiftController extends Controller
             ->with(['schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day'])
             ->withCount('users')
             ->orderBy('name')
-            ->get(['id', 'name', 'schedule', 'is_flexible'])
+            ->get(['id', 'name', 'schedule', 'is_flexible', 'grace_enabled', 'grace_before_minutes', 'grace_after_minutes'])
             ->map(function ($shift) {
                 if ($shift->schedules->isNotEmpty()) {
                     $shift->schedule = $shift->schedules
@@ -76,6 +76,9 @@ class OfficeShiftController extends Controller
             'name' => ['required', 'string', 'max:100', 'unique:office_shifts,name'],
             'schedule' => ['nullable', 'string', 'max:255'],
             'is_flexible' => ['nullable', 'boolean'],
+            'grace_enabled' => ['nullable', 'boolean'],
+            'grace_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'grace_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'schedules' => ['nullable', 'array'],
             'schedules.*.time_in' => ['required_with:schedules', 'date_format:H:i'],
             'schedules.*.time_out' => ['required_with:schedules', 'date_format:H:i'],
@@ -92,10 +95,15 @@ class OfficeShiftController extends Controller
         }
 
         $office_shift = DB::transaction(function () use ($validated, $isFlexible, $schedules) {
+            $graceEnabled = !$isFlexible && (bool) ($validated['grace_enabled'] ?? false);
+
             $officeShift = OfficeShift::create([
                 'name' => $validated['name'],
                 'schedule' => $this->buildScheduleSummary($schedules, $isFlexible) ?? ($validated['schedule'] ?? null),
                 'is_flexible' => $isFlexible,
+                'grace_enabled' => $graceEnabled,
+                'grace_before_minutes' => $graceEnabled ? (int) ($validated['grace_before_minutes'] ?? 0) : 0,
+                'grace_after_minutes' => $graceEnabled ? (int) ($validated['grace_after_minutes'] ?? 0) : 0,
             ]);
 
             if (!$isFlexible && !empty($schedules)) {
@@ -120,6 +128,9 @@ class OfficeShiftController extends Controller
             'name' => ['required', 'string', 'max:100', Rule::unique('office_shifts', 'name')->ignore($request->id)],
             'schedule' => ['nullable', 'string', 'max:255'],
             'is_flexible' => ['nullable', 'boolean'],
+            'grace_enabled' => ['nullable', 'boolean'],
+            'grace_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'grace_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'schedules' => ['nullable', 'array'],
             'schedules.*.time_in' => ['required_with:schedules', 'date_format:H:i'],
             'schedules.*.time_out' => ['required_with:schedules', 'date_format:H:i'],
@@ -137,10 +148,15 @@ class OfficeShiftController extends Controller
 
         $office_shift = DB::transaction(function () use ($validated, $isFlexible, $schedules) {
             $officeShift = OfficeShift::findOrFail($validated['id']);
+            $graceEnabled = !$isFlexible && (bool) ($validated['grace_enabled'] ?? false);
+
             $officeShift->update([
                 'name' => $validated['name'],
                 'schedule' => $this->buildScheduleSummary($schedules, $isFlexible) ?? ($validated['schedule'] ?? null),
                 'is_flexible' => $isFlexible,
+                'grace_enabled' => $graceEnabled,
+                'grace_before_minutes' => $graceEnabled ? (int) ($validated['grace_before_minutes'] ?? 0) : 0,
+                'grace_after_minutes' => $graceEnabled ? (int) ($validated['grace_after_minutes'] ?? 0) : 0,
             ]);
 
             if ($isFlexible) {

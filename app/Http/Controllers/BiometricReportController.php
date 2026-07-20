@@ -32,7 +32,7 @@ class BiometricReportController extends Controller
         $usersQuery = User::query()
             ->with([
                 'profile:id,user_id,first_name,middle_name,last_name,name_extension',
-                'officeShift:id,name,schedule',
+                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'departmentRef:id,department_name',
                 'collegeRef:id,college_short,college_long',
@@ -156,13 +156,52 @@ class BiometricReportController extends Controller
             return (int) floor(($endTs - $startTs) / 60);
         };
 
-        $buildDayRecord = function (array $punches, $scheduledMinutes) use ($toTimeLabel, $minutesBetween) {
+        $resolveGraceCorrectedType = function ($officeShift, array $item) use ($parseClockMinutes) {
+            $rawType = strtoupper((string) ($item['checktype'] ?? ''));
+
+            if (!$officeShift || !(bool) ($officeShift->grace_enabled ?? false)) {
+                return $rawType;
+            }
+
+            $timestamp = strtotime((string) ($item['checktime'] ?? ''));
+            if ($timestamp === false) {
+                return $rawType;
+            }
+
+            $punchMinutes = ((int) date('G', $timestamp) * 60) + (int) date('i', $timestamp);
+            $before = max(0, (int) ($officeShift->grace_before_minutes ?? 0));
+            $after = max(0, (int) ($officeShift->grace_after_minutes ?? 0));
+            $candidates = [];
+
+            foreach (($officeShift->schedules ?? collect())->sortBy('sequence') as $slot) {
+                $inMinute = $parseClockMinutes($slot->time_in);
+                $outMinute = $parseClockMinutes($slot->time_out);
+
+                if ($inMinute !== null && $punchMinutes >= ($inMinute - $before) && $punchMinutes <= ($inMinute + $after)) {
+                    $candidates[] = ['type' => 'I', 'distance' => abs($punchMinutes - $inMinute)];
+                }
+
+                if ($outMinute !== null && $punchMinutes >= ($outMinute - $before) && $punchMinutes <= ($outMinute + $after)) {
+                    $candidates[] = ['type' => 'O', 'distance' => abs($punchMinutes - $outMinute)];
+                }
+            }
+
+            if (empty($candidates)) {
+                return $rawType;
+            }
+
+            usort($candidates, fn ($a, $b) => $a['distance'] <=> $b['distance']);
+
+            return $candidates[0]['type'];
+        };
+
+        $buildDayRecord = function (array $punches, $scheduledMinutes, $officeShift) use ($toTimeLabel, $minutesBetween, $resolveGraceCorrectedType) {
             usort($punches, fn ($a, $b) => strtotime((string) $a['checktime']) <=> strtotime((string) $b['checktime']));
 
             $normalized = [];
 
             foreach ($punches as $item) {
-                $type = $item['checktype'] ?? '';
+                $type = $resolveGraceCorrectedType($officeShift, $item);
                 if (!in_array($type, ['I', 'O'], true)) {
                     continue;
                 }
@@ -247,7 +286,7 @@ class BiometricReportController extends Controller
             for ($day = 1; $day <= $daysInMonth; $day += 1) {
                 $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
                 $punches = $recordsByUserDate[$user->id][$date] ?? [];
-                $dayRecord = $buildDayRecord($punches, $scheduledMinutes);
+                $dayRecord = $buildDayRecord($punches, $scheduledMinutes, $user->officeShift);
                 $attendanceRecords[] = array_merge(['date' => $date], $dayRecord);
             }
 

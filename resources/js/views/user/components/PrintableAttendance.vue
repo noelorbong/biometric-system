@@ -195,7 +195,7 @@ import { computed, ref } from 'vue'
 
 const printContainer = ref(null)
 const copies = ref(4)
-const useCalculatedUndertime = ref(true)
+const useCalculatedUndertime = ref(false)
 
 const props = defineProps({
     user: Object,

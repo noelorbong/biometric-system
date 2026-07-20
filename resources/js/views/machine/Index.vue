@@ -22,7 +22,7 @@ const isAttendanceDatModalOpen = ref(false)
 const attendanceDatFile = ref(null)
 const attendanceDatFileName = ref('')
 const attendanceDatText = ref('')
-const attendanceDatUserFilter = ref('existing')
+const attendanceDatUserFilter = ref('all')
 const attendanceDatLoading = ref(false)
 const attendanceDatImporting = ref(false)
 const attendanceDatError = ref('')
@@ -105,7 +105,7 @@ const onAttendanceDatTextInput = () => {
 
 const loadAttendanceDatPreview = async () => {
   if (!attendanceDatHasInput.value) {
-    attendanceDatError.value = 'Please choose an attendance file or paste attendance text.'
+    attendanceDatError.value = 'Please choose an attendance DAT/TXT file or paste attendance text.'
     return false
   }
 
@@ -137,7 +137,7 @@ const loadAttendanceDatPreview = async () => {
 
 const importAttendanceDat = async () => {
   if (!attendanceDatHasInput.value) {
-    attendanceDatError.value = 'Please choose an attendance file or paste attendance text.'
+    attendanceDatError.value = 'Please choose an attendance DAT/TXT file or paste attendance text.'
     return
   }
 
@@ -178,7 +178,7 @@ const importAttendanceDat = async () => {
 
   await Swal.fire({
     icon: 'success',
-    title: 'Attendance DAT Imported',
+    title: 'Attendance Imported',
     html: `<p class="text-sm text-gray-600">User filter: <strong>${userFilterLabel}</strong></p>
            <p class="text-sm text-gray-600">Total decoded records: <strong>${total}</strong></p>
            <p class="text-sm text-gray-600">Imported: <strong class="text-green-600">${imported}</strong></p>
@@ -189,6 +189,25 @@ const importAttendanceDat = async () => {
 
 const gotoAttendanceDatPage = (page) => {
   attendanceDatPage.value = Math.min(Math.max(1, page), attendanceDatTotalPages.value)
+}
+
+const exportAttendanceDatCsv = () => {
+  if (!attendanceDatRows.value.length) return
+
+  const columns = ['USERID', 'CHECKTIME', 'CHECKTYPE', 'VERIFYCODE', 'SENSORID', 'WorkCode', 'UserExtFmt']
+  const escapeCsv = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
+  const csv = [
+    columns.join(','),
+    ...attendanceDatRows.value.map((row) => columns.map((column) => escapeCsv(row[column])).join(',')),
+  ].join('\r\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const baseName = (attendanceDatFileName.value || 'attendance').replace(/\.[^.]+$/, '')
+  link.href = url
+  link.download = `${baseName}_decoded.csv`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 const ensureIntervalMs = (value, fallback) => {
@@ -1555,7 +1574,7 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_640px]">
       <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -1581,14 +1600,14 @@ onUnmounted(() => {
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick Actions</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Run global actions without leaving the page.</p>
 
-        <div class="mt-4 grid gap-3">
+        <div class="mt-4 grid grid-cols-3 gap-3">
           <button
             @click="openAttendanceDatImport"
             type="button"
             class="flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-medium transition bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
           >
             <RefreshIcon class="h-4 w-4" />
-            <span>Import Attendance DAT</span>
+            <span>Decode / Import Attendance DAT</span>
           </button>
 
           <button
@@ -1624,7 +1643,11 @@ onUnmounted(() => {
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <h3 class="truncate text-xl font-semibold text-slate-900 dark:text-white">{{ machine.MachineAlias || 'Unnamed Machine' }}</h3>
-                  <span
+                  
+                </div>
+
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ machine.IP || 'No IP configured' }}<span v-if="machine.Port"> :{{ machine.Port }}</span>
+                <span
                     class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                     :class="machine.Enabled
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
@@ -1632,9 +1655,7 @@ onUnmounted(() => {
                   >
                     {{ machine.Enabled ? 'Enabled' : 'Disabled' }}
                   </span>
-                </div>
-
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ machine.IP || 'No IP configured' }}<span v-if="machine.Port"> :{{ machine.Port }}</span></p>
+                </p>
 
                 <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
                   <span class="rounded-full bg-white/80 px-2.5 py-1 font-medium text-slate-700 ring-1 ring-inset ring-slate-200 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-slate-700">
@@ -1696,13 +1717,13 @@ onUnmounted(() => {
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.pushver || '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60 hidden">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Purpose</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.Purpose || '-' }}</p>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+            <div class="hidden grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
               <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Users</p>
                 <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.usercount ?? 0 }}</p>
@@ -1850,21 +1871,21 @@ onUnmounted(() => {
         <div class="no-scrollbar relative m-2 w-full max-w-[1100px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-7">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h4 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Import Attendance Export</h4>
-              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">If you have a raw <strong>AttEncryptLog.dat</strong>, decode/export it first with <strong>Self Service Reader</strong>, then upload the exported table or paste rows using the real <strong>USERID / CHECKTIME / CHECKTYPE / VERIFYCODE</strong> columns.</p>
+              <h4 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Attendance Import</h4>
+              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload the original <strong>AttEncryptLog.dat</strong> or an exported <strong>inout.txt</strong>. The app decodes/maps the rows, shows every record, and lets you export or import the result.</p>
             </div>
             <button type="button" @click="closeAttendanceDatImport" class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
           </div>
 
-          <div class="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <div class="mt-6 grid gap-4 ">
             <div class="space-y-4">
               <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
                 <div>
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Attendance Export File</label>
-                  <input type="file" accept=".dat,.bin,.txt" @change="onAttendanceDatFileChange" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+                  <input type="file" accept=".dat,.bin,.txt,.csv,.tsv" @change="onAttendanceDatFileChange" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ attendanceDatFileName || 'No file selected' }}</p>
                 </div>
-                <div>
+                <div class="hidden">
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">User Filter</label>
                   <select v-model="attendanceDatUserFilter" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
                     <option value="existing">Only Existing Local Users</option>
@@ -1873,16 +1894,16 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div>
+              <div class="hidden">
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Paste Attendance Text</label>
                 <textarea
                   v-model="attendanceDatText"
                   @input="onAttendanceDatTextInput"
                   rows="10"
-                  placeholder="Paste tabular attendance rows here, including the USERID CHECKTIME CHECKTYPE VERIFYCODE header."
+                  placeholder="Paste tabular attendance rows here, including headers like USERID, CHECKTIME, CHECKTYPE, VERIFYCODE."
                   class="w-full rounded-2xl border border-gray-300 bg-transparent px-4 py-3 text-sm"
                 ></textarea>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">If text is pasted, it will be used as the source of truth for preview and import. This is the preferred path for Self Service Reader output.</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Optional: paste an already-decoded table. Header names are auto-mapped, even when exported columns are interchanged.</p>
               </div>
 
               <div class="flex flex-wrap gap-3">
@@ -1911,7 +1932,16 @@ onUnmounted(() => {
                 >
                   <span v-if="attendanceDatImporting" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   <RefreshIcon v-else class="h-4 w-4" />
-                  <span>{{ attendanceDatImporting ? 'Importing…' : 'Import DAT' }}</span>
+                  <span>{{ attendanceDatImporting ? 'Importing…' : 'Import Attendance' }}</span>
+                </button>
+
+                <button
+                  v-if="attendanceDatPreview"
+                  type="button"
+                  @click="exportAttendanceDatCsv"
+                  class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-700 px-4 text-sm font-medium text-white transition hover:bg-slate-600"
+                >
+                  Export Decoded CSV
                 </button>
               </div>
 
@@ -1977,7 +2007,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <p v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT file to preview the decoded rows.</p>
+              <p v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT/TXT attendance file to preview the decoded rows.</p>
             </div>
           </div>
         </div>

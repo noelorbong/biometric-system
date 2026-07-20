@@ -209,6 +209,41 @@ export const useUserStore = defineStore('users',{
         }
         return { success: false, data: resp };
       })
+    },
+    async previewBiometricTemplateDatImport(file, machineMarker = '') {
+      const auth = useAuthStore();
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('machine_marker', machineMarker || '');
+
+      return await axios.post('/api/user/import-biotemplate-dat/preview', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }).then(function (resp) {
+        return { success: true, data: resp.data };
+      }).catch(function (resp) {
+        if (resp.response) {
+          if (resp.response.data.message == 'Unauthenticated.') {
+            auth.clearAccount()
+          }
+        }
+        return { success: false, data: resp };
+      })
+    },
+    async importBiometricTemplateDat(payload) {
+      const auth = useAuthStore();
+
+      return await axios.post('/api/user/import-biotemplate-dat', payload).then(function (resp) {
+        return { success: true, data: resp.data };
+      }).catch(function (resp) {
+        if (resp.response) {
+          if (resp.response.data.message == 'Unauthenticated.') {
+            auth.clearAccount()
+          }
+        }
+        return { success: false, data: resp };
+      })
     }
   }
 })

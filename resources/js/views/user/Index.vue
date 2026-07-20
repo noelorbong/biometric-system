@@ -13,6 +13,7 @@ import { useUserStore } from '@/store/UserStore'
 import { useLoadingStore } from '@/store/LoadingStore'
 import { useMachineStore } from '@/store/MachineStore'
 import ImportUserDatModal from './components/ImportUserDatModal.vue'
+import ImportBiometricTemplateDatModal from './components/ImportBiometricTemplateDatModal.vue'
 
 import FingerprintEnrollModal from './components/FingerprintEnrollModal.vue'
 import { useAuthStore } from '@/store/AuthStore'
@@ -30,6 +31,7 @@ const { machines } = storeToRefs(machineStore)
 
 const isUserAddModal = ref(false)
 const isImportUserDatModal = ref(false)
+const isImportBiometricTemplateDatModal = ref(false)
 const isDeleteModal = ref(false)
 const enrollModal    = ref({ open: false, user: null, machineId: null, machineName: '' })
 const enrollLoading  = ref(false)
@@ -65,6 +67,8 @@ const managedUsers = computed(() => users.value.filter((item) => item.id !== aut
 var filteredUsers = computed(() => sortedUsers.value.filter((item) => {
   return (
     (
+      (item.profile?.display_name || '')
+      +" "+
       ((item.profile?.first_name || '') + ' ' + (item.profile?.last_name || '')).trim()
       +" "+
       item.email
@@ -130,6 +134,7 @@ const addUser = () => {
   isEditUser.value = false;
   user.value = {
     name: '',
+    display_name: '',
     first_name: '',
     middle_name: '',
     last_name: '',
@@ -163,6 +168,10 @@ const openImportUserDatModal = () => {
   isImportUserDatModal.value = true
 }
 
+const openImportBiometricTemplateDatModal = () => {
+  isImportBiometricTemplateDatModal.value = true
+}
+
 const handleUserDatImported = async (result) => {
   await userStore.loadUsers()
   isImportUserDatModal.value = false
@@ -183,6 +192,24 @@ const handleUserDatImported = async (result) => {
   })
 }
 
+const handleBiometricTemplateDatImported = async (result) => {
+  isImportBiometricTemplateDatModal.value = false
+
+  const summary = result?.summary || {}
+  await Swal.fire({
+    icon: 'success',
+    title: 'Template Import Completed',
+    html: `<div class="space-y-1 text-left text-sm text-slate-600">
+      <p>Processed: <strong>${summary.processed ?? 0}</strong></p>
+      <p>Created templates: <strong>${summary.created_templates ?? 0}</strong></p>
+      <p>Updated templates: <strong>${summary.updated_templates ?? 0}</strong></p>
+      <p>Skipped existing: <strong>${summary.skipped_existing ?? 0}</strong></p>
+      <p>Skipped missing user: <strong>${summary.skipped_missing_user ?? 0}</strong></p>
+    </div>`,
+    confirmButtonText: 'OK',
+  })
+}
+
 const editUser = (event) => {
 
   isUserAddModal.value = true;
@@ -197,6 +224,7 @@ const editUser = (event) => {
     department_id: event.department_id ?? null,
     college_id: event.college_id ?? null,
     password: '',
+    display_name: event.profile?.display_name || '',
     first_name: event.profile?.first_name || '',
     middle_name: event.profile?.middle_name || '',
     last_name: event.profile?.last_name || '',
@@ -896,45 +924,31 @@ const closeEnrollModal = () => {
         <div class="max-w-3xl">
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200/80">People Directory</p>
           <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Users</h1>
-          <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200/90">
-            Manage user records, update affiliations, and send profiles to biometric devices from one workspace.
-          </p>
-          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <span class="inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
-              Managed Users: {{ userStats.total }}
-            </span>
-            <span class="inline-flex rounded-full bg-emerald-400/15 px-3 py-1 font-medium text-emerald-100 ring-1 ring-inset ring-emerald-300/30">
-              Active: {{ userStats.active }}
-            </span>
-          </div>
+
         </div>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[460px]">
+        <div class="grid grid-cols-3 gap-3 sm:grid-cols-4 ml-auto xl:min-w-[460px]">
           <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
             <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Total</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ userStats.total }}</p>
-            <p class="mt-1 text-xs text-slate-300">Managed accounts</p>
+            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.total }}</p>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
             <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Active</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ userStats.active }}</p>
-            <p class="mt-1 text-xs text-slate-300">Currently enabled</p>
+            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.active }}</p>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
             <p class="text-xs uppercase tracking-[0.25em] text-slate-300">With Shift</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ userStats.withShift }}</p>
-            <p class="mt-1 text-xs text-slate-300">Shift assigned</p>
+            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.withShift }}</p>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
             <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Affiliated</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ userStats.withAffiliation }}</p>
-            <p class="mt-1 text-xs text-slate-300">Dept or college set</p>
+            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.withAffiliation }}</p>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_480px]">
       <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -963,11 +977,14 @@ const closeEnrollModal = () => {
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick Action</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Create a new user record.</p>
 
-        <div class="mt-4 grid gap-3">
-          <Button @click="addUser" :className="'h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary"
-            :startIcon="PlusIcon">Add User</Button>
-          <Button @click="openImportUserDatModal" :className="'h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
+        <div class="mt-4 grid grid-cols-7 gap-3">
+          <Button @click="addUser" :className="'col-span-2 h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary"
+            :startIcon="PlusIcon">User</Button>
+          <Button @click="openImportUserDatModal" :className="'col-span-2 h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
             Import user.dat
+          </Button>
+          <Button @click="openImportBiometricTemplateDatModal" :className="'col-span-3 h-12 justify-center text-sm rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
+            Import biotemplate.dat
           </Button>
         </div>
       </div>
@@ -1006,6 +1023,11 @@ const closeEnrollModal = () => {
       v-if="isImportUserDatModal"
       @close="isImportUserDatModal = false"
       @imported="handleUserDatImported"
+    />
+    <ImportBiometricTemplateDatModal
+      v-if="isImportBiometricTemplateDatModal"
+      @close="isImportBiometricTemplateDatModal = false"
+      @imported="handleBiometricTemplateDatImported"
     />
   </div>
 </template>

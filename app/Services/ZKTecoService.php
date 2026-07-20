@@ -280,8 +280,13 @@ class ZKTecoService
     /**
      * Decode an encrypted attendance export file and return attendance rows.
      *
-     * The export used in this project is XOR-0x55 obfuscated before the usual
-     * 40-byte attendance parser is applied.
+     * Self Service Reader exports use 256-byte slots. The meaningful part of
+     * each slot is a nibble stream: 0x78..0x87 represent values 0..15, two
+     * nibbles form one byte, and the resulting byte has an offset of +2.
+     * Decoding that stream produces the familiar tab-separated attlog row:
+     * PIN, timestamp, punch state, verification mode, work code, reserved.
+     *
+     * Keep the legacy XOR parser as a fallback for older binary exports.
      *
      * @return array<int, array{pin: string, check_time: string, check_type: string, verify_code: int, uid?: int}>
      */
@@ -291,7 +296,101 @@ class ZKTecoService
             return [];
         }
 
+        $selfServiceRows = $this->parseSelfServiceAttendanceDat($raw);
+
+        if ($selfServiceRows !== []) {
+            return $selfServiceRows;
+        }
+
         return $this->parseAttendanceLogs($this->xorBuffer($raw, 0x55));
+    }
+
+    /**
+     * @return array<int, array{pin:string,check_time:string,check_type:string,verify_code:int,uid:int,punch_code:int,work_code:int,reserved:int}>
+     */
+    private function parseSelfServiceAttendanceDat(string $raw): array
+    {
+        $slotSize = 256;
+        $length = strlen($raw);
+
+        if ($length < $slotSize || $length % $slotSize !== 0) {
+            return [];
+        }
+
+        $records = [];
+
+        for ($offset = 0; $offset < $length; $offset += $slotSize) {
+            $slot = substr($raw, $offset, $slotSize);
+            $encodedLength = strpos($slot, "\x00");
+            $encodedLength = $encodedLength === false ? $slotSize : $encodedLength;
+
+            if ($encodedLength === 0) {
+                continue;
+            }
+
+            if ($encodedLength % 2 !== 0) {
+                return [];
+            }
+
+            $plain = '';
+
+            for ($index = 0; $index < $encodedLength; $index += 2) {
+                $high = ord($slot[$index]) - 0x78;
+                $low = ord($slot[$index + 1]) - 0x78;
+
+                if ($high < 0 || $high > 15 || $low < 0 || $low > 15) {
+                    return [];
+                }
+
+                $decoded = (($high << 4) | $low) - 2;
+
+                if ($decoded < 0 || $decoded > 255) {
+                    return [];
+                }
+
+                $plain .= chr($decoded);
+            }
+
+            $columns = explode("\t", trim($plain));
+
+            if (count($columns) < 4) {
+                return [];
+            }
+
+            $pin = trim($columns[0]);
+            $checkTime = trim($columns[1]);
+            $punchCode = trim($columns[2]);
+            $verifyCode = trim($columns[3]);
+            $workCode = trim($columns[4] ?? '0');
+            $reserved = trim($columns[5] ?? '0');
+            $validTimestamp = \DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $checkTime);
+            $timestampErrors = \DateTimeImmutable::getLastErrors();
+
+            if (
+                $pin === '' || !ctype_digit($pin)
+                || $validTimestamp === false
+                || (is_array($timestampErrors) && ($timestampErrors['warning_count'] > 0 || $timestampErrors['error_count'] > 0))
+                || !is_numeric($punchCode)
+                || !is_numeric($verifyCode)
+            ) {
+                return [];
+            }
+
+            $punch = (int) $punchCode;
+
+            $records[] = [
+                'uid' => (int) $pin,
+                'pin' => ltrim($pin, '0') ?: '0',
+                'check_time' => $checkTime,
+                'check_type' => $punch === 1 ? 'O' : 'I',
+                'verify_code' => (int) $verifyCode,
+                'punch_code' => $punch,
+                'work_code' => is_numeric($workCode) ? (int) $workCode : 0,
+                'reserved' => is_numeric($reserved) ? (int) $reserved : 0,
+            ];
+        }
+
+        return $records;
     }
 
     /**

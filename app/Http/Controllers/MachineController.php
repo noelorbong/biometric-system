@@ -417,8 +417,12 @@ class MachineController extends Controller
 
         $textCandidate = trim($raw);
 
-        if ($textCandidate !== '' && preg_match('/^USERID\s+(CHECKTIME|Time)\s+/im', $textCandidate)) {
-            return $this->parseAttendanceTableText($textCandidate);
+        if ($textCandidate !== '') {
+            $textRows = $this->parseAttendanceTableText($textCandidate);
+
+            if ($textRows !== []) {
+                return $textRows;
+            }
         }
 
         $zk = new ZKTecoService(ip: '127.0.0.1');
@@ -441,9 +445,9 @@ class MachineController extends Controller
                 'VERIFYCODE' => (int) ($log['verify_code'] ?? 0),
                 'SENSORID' => null,
                 'Memoinfo' => $biometric ? null : trim('UNMAPPED PIN:' . $pin . ' UID:' . ($log['uid'] ?? '')),
-                'WorkCode' => null,
+                'WorkCode' => isset($log['work_code']) ? (int) $log['work_code'] : null,
                 'sn' => null,
-                'UserExtFmt' => 0,
+                'UserExtFmt' => isset($log['reserved']) ? (int) $log['reserved'] : 0,
             ];
         }
 
@@ -468,16 +472,14 @@ class MachineController extends Controller
                 continue;
             }
 
-            $columns = str_contains($line, "\t")
-                ? array_map('trim', str_getcsv($line, "\t"))
-                : (preg_split('/\s{2,}/', $line) ?: []);
+            $columns = $this->splitAttendanceTableLine($line);
 
             if ($columns === []) {
                 continue;
             }
 
             if ($header === null) {
-                $upperColumns = array_map(static fn ($value) => strtoupper(trim((string) $value)), $columns);
+                $upperColumns = array_map(fn ($value) => $this->normalizeAttendanceHeaderName($value), $columns);
 
                 if (!in_array('USERID', $upperColumns, true) || !in_array('CHECKTIME', $upperColumns, true)) {
                     continue;
@@ -487,12 +489,7 @@ class MachineController extends Controller
                 continue;
             }
 
-            $mapped = [];
-
-            foreach ($header as $index => $columnName) {
-                $mapped[$columnName] = $columns[$index] ?? null;
-            }
-
+            $mapped = $this->mapAttendanceTableColumns($header, $columns);
             $checkTime = $this->normalizeAttendanceCheckTime($mapped['CHECKTIME'] ?? null);
 
             if ($checkTime === null) {
@@ -515,6 +512,112 @@ class MachineController extends Controller
         return $rows;
     }
 
+    private function splitAttendanceTableLine(string $line): array
+    {
+        if (str_contains($line, "\t")) {
+            return array_map('trim', str_getcsv($line, "\t"));
+        }
+
+        if (str_contains($line, ',')) {
+            return array_map('trim', str_getcsv($line));
+        }
+
+        return array_values(array_filter(
+            array_map('trim', preg_split('/\s{2,}/', $line) ?: []),
+            static fn ($value) => $value !== ''
+        ));
+    }
+
+    private function normalizeAttendanceHeaderName(mixed $value): string
+    {
+        $header = strtoupper(preg_replace('/[^A-Z0-9]/i', '', trim((string) $value)) ?? '');
+
+        return match ($header) {
+            'USERID', 'USER', 'UID', 'PIN', 'BADGENUMBER', 'BADGE', 'ACNO', 'ACNOID' => 'USERID',
+            'CHECKTIME', 'TIME', 'DATETIME', 'CHECKDATETIME', 'PUNCHTIME', 'LOGTIME' => 'CHECKTIME',
+            'CHECKTYPE', 'TYPE', 'PUNCH', 'INOUT', 'STATUS' => 'CHECKTYPE',
+            'VERIFYCODE', 'VERIFY', 'VERIFICATION', 'VERIFYTYPE' => 'VERIFYCODE',
+            'SENSORID', 'SENSOR', 'MACHINE', 'MACHINEID', 'TERMINAL' => 'SENSORID',
+            'MEMOINFO', 'MEMO', 'MEMOINFORMATION' => 'MEMOINFO',
+            'WORKCODE', 'WORK' => 'WORKCODE',
+            'SN', 'SERIAL', 'SERIALNUMBER' => 'SN',
+            'USEREXTFMT', 'EXTFMT', 'USEREXTFORMAT' => 'USEREXTFMT',
+            default => $header,
+        };
+    }
+
+    private function mapAttendanceTableColumns(array $header, array $columns): array
+    {
+        $mapped = [];
+
+        foreach ($header as $index => $columnName) {
+            if ($columnName === '') {
+                continue;
+            }
+
+            $mapped[$columnName] = $columns[$index] ?? null;
+        }
+
+        $allValues = array_values(array_map(static fn ($value) => trim((string) ($value ?? '')), $columns));
+
+        if (!$this->looksLikeAttendanceUserId($mapped['USERID'] ?? null)) {
+            $userCandidate = $this->firstAttendanceValue($allValues, fn ($value) => $this->looksLikeAttendanceUserId($value));
+            if ($userCandidate !== null) {
+                $mapped['USERID'] = $userCandidate;
+            }
+        }
+
+        if (!$this->looksLikeAttendanceDateTime($mapped['CHECKTIME'] ?? null)) {
+            $timeCandidate = $this->firstAttendanceValue($allValues, fn ($value) => $this->looksLikeAttendanceDateTime($value));
+            if ($timeCandidate !== null) {
+                $mapped['CHECKTIME'] = $timeCandidate;
+            }
+        }
+
+        if (!$this->looksLikeAttendanceCheckType($mapped['CHECKTYPE'] ?? null)) {
+            $typeCandidate = $this->firstAttendanceValue($allValues, fn ($value) => $this->looksLikeAttendanceCheckType($value));
+            if ($typeCandidate !== null) {
+                $mapped['CHECKTYPE'] = $typeCandidate;
+            }
+        }
+
+        return $mapped;
+    }
+
+    private function firstAttendanceValue(array $values, callable $predicate): mixed
+    {
+        foreach ($values as $value) {
+            if ($predicate($value)) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeAttendanceUserId(mixed $value): bool
+    {
+        $value = trim((string) ($value ?? ''));
+
+        return $value !== '' && ctype_digit($value) && (int) $value > 0;
+    }
+
+    private function looksLikeAttendanceDateTime(mixed $value): bool
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '' || !preg_match('/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/', $value)) {
+            return false;
+        }
+
+        return $this->normalizeAttendanceCheckTime($value) !== null;
+    }
+
+    private function looksLikeAttendanceCheckType(mixed $value): bool
+    {
+        return in_array(strtoupper(trim((string) ($value ?? ''))), ['I', 'O', 'IN', 'OUT', '0', '1'], true);
+    }
+
     private function normalizeAttendanceCheckTime(mixed $value): ?string
     {
         $value = trim((string) ($value ?? ''));
@@ -534,7 +637,7 @@ class MachineController extends Controller
     {
         $value = strtoupper(trim((string) ($value ?? 'I')));
 
-        return $value === 'O' ? 'O' : 'I';
+        return in_array($value, ['O', 'OUT', '1'], true) ? 'O' : 'I';
     }
 
     private function nullableAttendanceField(mixed $value): ?string
@@ -557,7 +660,7 @@ class MachineController extends Controller
         $originalName = $uploadedFile?->getClientOriginalName();
 
         if (is_string($originalName) && str_ends_with(strtolower($originalName), '.dat')) {
-            return 'This AttEncryptLog.dat file appears to require ZKTeco Self Service Reader or a similar vendor tool to decode first. Export the decoded attendance table, or paste the attendance rows with USERID, CHECKTIME, CHECKTYPE, and VERIFYCODE so they can be imported correctly.';
+            return 'This DAT file is not a recognized Granding/ZKTeco Self Service Reader attendance export. Check that the original AttEncryptLog.dat file is complete and was not modified.';
         }
 
         return 'The attendance source could not be decoded into importable rows.';
@@ -929,7 +1032,7 @@ class MachineController extends Controller
                     $newUser = new User([
                         'name' => (string) ($previewRow['name'] ?: ('Imported User ' . $resolvedUserId)),
                         'email' => $this->buildImportedUserEmail($resolvedUserId, (string) ($previewRow['pin'] ?? '')),
-                        'password' => Str::random(16),
+                        'password' => 'secret123',
                         'role' => 0,
                         'status' => true,
                     ]);
@@ -944,14 +1047,18 @@ class MachineController extends Controller
             $deviceName = (string) ($previewRow['name'] ?? '');
             if ($deviceName !== '') {
                 $nameParts = $this->parseDeviceName($deviceName);
-                UserProfile::updateOrCreate(
-                    ['user_id' => $resolvedUserId],
-                    array_filter([
-                        'first_name'  => $nameParts['first_name']  ?: null,
-                        'last_name'   => $nameParts['last_name']   ?: null,
-                        'middle_name' => $nameParts['middle_name'] ?: null,
-                    ], fn ($v) => $v !== null)
-                );
+                $existingProfile = UserProfile::withTrashed()->where('user_id', $resolvedUserId)->first();
+                $normalizedNameParts = $this->normalizeImportedProfileName($nameParts, $existingProfile);
+
+                $profile = $existingProfile ?: new UserProfile(['user_id' => $resolvedUserId]);
+                if ($profile->trashed()) {
+                    $profile->restore();
+                }
+
+                $profile->first_name = $normalizedNameParts['first_name'];
+                $profile->last_name = $normalizedNameParts['last_name'];
+                $profile->middle_name = $normalizedNameParts['middle_name'];
+                $profile->save();
             }
 
             $payload = $this->buildBiometricPayload($previewRow, $resolvedUserId);
@@ -1445,6 +1552,40 @@ class MachineController extends Controller
         $middle = implode(' ', array_map($toTitle, $parts));
 
         return ['first_name' => $first, 'last_name' => $last, 'middle_name' => $middle];
+    }
+
+    private function normalizeImportedProfileName(array $nameParts, ?UserProfile $existingProfile = null): array
+    {
+        $first = trim((string) ($nameParts['first_name'] ?? ''));
+        $last = trim((string) ($nameParts['last_name'] ?? ''));
+        $middle = trim((string) ($nameParts['middle_name'] ?? ''));
+
+        if ($first === '' && $existingProfile?->first_name) {
+            $first = trim((string) $existingProfile->first_name);
+        }
+
+        if ($last === '' && $existingProfile?->last_name) {
+            $last = trim((string) $existingProfile->last_name);
+        }
+
+        if ($first === '' && $last !== '') {
+            $first = $last;
+        }
+
+        if ($last === '' && $first !== '') {
+            $last = $first;
+        }
+
+        if ($first === '' && $last === '') {
+            $first = 'Imported';
+            $last = 'User';
+        }
+
+        return [
+            'first_name' => $first,
+            'last_name' => $last,
+            'middle_name' => $middle !== '' ? $middle : null,
+        ];
     }
 
     private function downloadAndStoreUserTemplates(ZKTecoService $zk, int $userId, ?string $machineMarker): array
@@ -2577,4 +2718,3 @@ class MachineController extends Controller
         ];
     }
 }
-

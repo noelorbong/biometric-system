@@ -104,6 +104,10 @@
                         <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700" v-if="authStore.user.role == 1">
                             <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Profile</h5>
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <div class="lg:col-span-2">
+                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Display Name</label>
+                                    <input type="text" v-model="form_data.display_name" placeholder="Optional custom name shown in user table" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+                                </div>
                                 <div>
                                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Last Name<span class="text-error-500">*</span></label>
                                     <input required type="text" v-model="form_data.last_name" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
@@ -267,6 +271,7 @@ const newAddress = () => ({ id: null, label: 'home', address1: '', address2: '',
 const createDefaultFormData = () => ({
     id: null,
     name: '',
+    display_name: '',
     first_name: '',
     middle_name: '',
     last_name: '',
@@ -340,6 +345,7 @@ const hydrateForm = () => {
         ...createDefaultFormData(),
         ...JSON.parse(JSON.stringify(props.user)),
         id: normalizeNullableNumber(props.user.id),
+        display_name: props.user.display_name ?? props.user.profile?.display_name ?? '',
         status: Number(props.user.status ?? 1),
         role: Number(props.user.role ?? 0),
         office_shift_id: normalizeNullableNumber(props.user.office_shift_id),

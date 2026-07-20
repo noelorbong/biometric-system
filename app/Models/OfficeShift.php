@@ -14,10 +14,16 @@ class OfficeShift extends Model
         'name',
         'schedule',
         'is_flexible',
+        'grace_enabled',
+        'grace_before_minutes',
+        'grace_after_minutes',
     ];
 
     protected $casts = [
         'is_flexible' => 'boolean',
+        'grace_enabled' => 'boolean',
+        'grace_before_minutes' => 'integer',
+        'grace_after_minutes' => 'integer',
     ];
 
     public function users()

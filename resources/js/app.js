@@ -96,9 +96,58 @@ app.use(VueApexCharts)
 app.mount('#app');
 
 if ('serviceWorker' in navigator) {
-	window.addEventListener('load', () => {
-		navigator.serviceWorker.register('/sw.js').catch((error) => {
+	window.addEventListener('load', async () => {
+		try {
+			const registration = await navigator.serviceWorker.register('/sw.js', {
+				updateViaCache: 'none',
+			})
+
+			const promptWorkerToActivate = () => {
+				if (registration.waiting) {
+					registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+				}
+			}
+
+			if (registration.waiting) {
+				promptWorkerToActivate()
+			}
+
+			registration.addEventListener('updatefound', () => {
+				const newWorker = registration.installing
+				if (!newWorker) {
+					return
+				}
+
+				newWorker.addEventListener('statechange', () => {
+					if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+						promptWorkerToActivate()
+					}
+				})
+			})
+
+			let hasRefreshed = false
+			navigator.serviceWorker.addEventListener('controllerchange', () => {
+				if (hasRefreshed) {
+					return
+				}
+
+				hasRefreshed = true
+				window.location.reload()
+			})
+
+			const checkForUpdates = () => {
+				registration.update().catch(() => {})
+			}
+
+			setInterval(checkForUpdates, 60 * 1000)
+			window.addEventListener('focus', checkForUpdates)
+			document.addEventListener('visibilitychange', () => {
+				if (document.visibilityState === 'visible') {
+					checkForUpdates()
+				}
+			})
+		} catch (error) {
 			console.warn('Service worker registration failed:', error)
-		})
+		}
 	})
 }

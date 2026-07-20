@@ -21,6 +21,9 @@ const form = ref({
   id: null,
   name: '',
   is_flexible: false,
+  grace_enabled: false,
+  grace_before_minutes: 0,
+  grace_after_minutes: 0,
   schedules: [{ time_in: '', time_out: '', is_next_day: false }],
 })
 
@@ -73,6 +76,9 @@ const openCreate = () => {
     id: null,
     name: '',
     is_flexible: false,
+    grace_enabled: false,
+    grace_before_minutes: 0,
+    grace_after_minutes: 0,
     schedules: [{ time_in: '', time_out: '', is_next_day: false }],
   }
   isModalOpen.value = true
@@ -84,6 +90,9 @@ const openEdit = (shift) => {
     id: shift.id,
     name: shift.name || '',
     is_flexible: Boolean(shift.is_flexible),
+    grace_enabled: Boolean(shift.grace_enabled),
+    grace_before_minutes: Number(shift.grace_before_minutes || 0),
+    grace_after_minutes: Number(shift.grace_after_minutes || 0),
     schedules: shift.schedules?.length
       ? shift.schedules.map((row) => ({
           time_in: (row.time_in || '').slice(0, 5),
@@ -107,6 +116,9 @@ const saveShift = async () => {
     id: form.value.id,
     name: form.value.name,
     is_flexible: form.value.is_flexible,
+    grace_enabled: form.value.is_flexible ? false : form.value.grace_enabled,
+    grace_before_minutes: form.value.grace_enabled ? Number(form.value.grace_before_minutes || 0) : 0,
+    grace_after_minutes: form.value.grace_enabled ? Number(form.value.grace_after_minutes || 0) : 0,
     schedules: form.value.is_flexible ? [] : schedules,
   }
 
@@ -247,6 +259,7 @@ const formatScheduleChip = (row) => {
             <tr>
               <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Name</th>
               <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Schedule</th>
+              <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Grace</th>
               <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Type</th>
               <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Assigned Users</th>
               <th class="px-5 py-3 text-right text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Actions</th>
@@ -269,6 +282,15 @@ const formatScheduleChip = (row) => {
               </td>
               <td class="px-5 py-3 text-sm text-slate-600 dark:text-slate-300">
                 <span
+                  v-if="shift.grace_enabled"
+                  class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-400/10 dark:text-violet-300"
+                >
+                  -{{ shift.grace_before_minutes || 0 }} / +{{ shift.grace_after_minutes || 0 }} min
+                </span>
+                <span v-else class="text-xs text-slate-400">Disabled</span>
+              </td>
+              <td class="px-5 py-3 text-sm text-slate-600 dark:text-slate-300">
+                <span
                   :class="shift.is_flexible
                     ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-400/10 dark:text-amber-300'
                     : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-400/10 dark:text-emerald-300'"
@@ -286,7 +308,7 @@ const formatScheduleChip = (row) => {
               </td>
             </tr>
             <tr v-if="!filteredOfficeShifts.length">
-              <td colspan="5" class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              <td colspan="6" class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                 No office shifts found.
               </td>
             </tr>
@@ -350,6 +372,29 @@ const formatScheduleChip = (row) => {
                 Flexible Time
               </label>
               <p class="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">When enabled, schedule rows are ignored and users can clock in/out at any time.</p>
+            </div>
+
+            <div class="rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 dark:border-violet-800/40 dark:bg-violet-400/10">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <label class="inline-flex items-center gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
+                    <input v-model="form.grace_enabled" :disabled="form.is_flexible" type="checkbox" class="h-4 w-4" />
+                    Enable schedule grace correction
+                  </label>
+                  <p class="mt-1 text-xs text-violet-700/80 dark:text-violet-300/80">Punches inside the grace window are treated as the scheduled IN/OUT, even if the selected punch type is wrong.</p>
+                </div>
+              </div>
+
+              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Grace before scheduled time (minutes)</label>
+                  <input v-model.number="form.grace_before_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Grace after scheduled time (minutes)</label>
+                  <input v-model.number="form.grace_after_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                </div>
+              </div>
             </div>
           </div>
 
