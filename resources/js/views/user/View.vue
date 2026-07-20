@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import ProfileCard from './components/ProfileCard.vue'
 import PrintableAttendance from './components/PrintableAttendance.vue'
+import ModalUser from './components/Modal.vue'
 import Modal from '@/components/common/Modal.vue'
 import { useUserStore } from '@/store/UserStore'
 import { useAppSettingStore } from '@/store/AppSettingStore'
@@ -29,6 +30,9 @@ const checkinoutLoading = ref(false)
 const rawLogModalOpen = ref(false)
 const rawLogModalDate = ref('')
 const rawLogRows = ref([])
+const isUserEditModalOpen = ref(false)
+const userEditSaving = ref(false)
+const editableUser = ref(null)
 
 const userId = computed(() => Number(route.params.id))
 
@@ -113,30 +117,16 @@ const hasOvernightShift = computed(() => {
   })
 })
 
-const overnightEndMinute = computed(() => {
-  return shiftSchedules.value
-    .filter((row) => Boolean(row?.is_next_day))
-    .map((row) => {
-      const [h, m] = String(row?.time_out || '00:00:00').split(':')
-      return (Number(h) * 60) + Number(m)
-    })
-    .sort((a, b) => a - b)
-    .at(-1) ?? 0
-})
-
-const resolveLogicalDateKey = (value) => {
+const resolveLogicalDateKey = (recordOrValue) => {
+  const value = typeof recordOrValue === 'object' && recordOrValue !== null
+    ? recordOrValue.CHECKTIME
+    : recordOrValue
   const dateTime = new Date(value)
   if (Number.isNaN(dateTime.getTime())) {
     return null
   }
 
   const logicalDate = new Date(dateTime)
-  if (hasOvernightShift.value) {
-    const minutes = (dateTime.getHours() * 60) + dateTime.getMinutes()
-    if (minutes <= overnightEndMinute.value) {
-      logicalDate.setDate(logicalDate.getDate() - 1)
-    }
-  }
 
   return `${logicalDate.getFullYear()}-${String(logicalDate.getMonth() + 1).padStart(2, '0')}-${String(logicalDate.getDate()).padStart(2, '0')}`
 }
@@ -146,7 +136,7 @@ const rawLogsByDate = computed(() => {
   const records = [...checkinouts.value].sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
 
   records.forEach((record) => {
-    const dateKey = resolveLogicalDateKey(record.CHECKTIME)
+    const dateKey = resolveLogicalDateKey(record)
     if (!dateKey) {
       return
     }
@@ -268,9 +258,22 @@ const resolveCheckInSlotIndex = (minutes, slotMeta) => {
   return slotMeta.length - 1
 }
 
-const resolveCheckOutSlotIndex = (minutes, slotMeta) => {
+const resolveCheckOutSlotIndex = (minutes, slotMeta, graceAfter = 0) => {
   if (minutes === null || !slotMeta.length) {
     return null
+  }
+
+  for (let index = 0; index < slotMeta.length; index += 1) {
+    const slot = slotMeta[index]
+    const isOvernight = Boolean(slot.isNextDay) || (slot.inMinute !== null && slot.outMinute !== null && slot.outMinute <= slot.inMinute)
+
+    if (!isOvernight || slot.outMinute === null) {
+      continue
+    }
+
+    if (minutes <= slot.outMinute + graceAfter) {
+      return index
+    }
   }
 
   for (let index = 0; index < slotMeta.length - 1; index += 1) {
@@ -318,7 +321,7 @@ const attendanceRows = computed(() => {
   const records = [...checkinouts.value].sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
 
   records.forEach((record) => {
-    const dateKey = resolveLogicalDateKey(record.CHECKTIME)
+    const dateKey = resolveLogicalDateKey(record)
     if (!dateKey) {
       return
     }
@@ -334,6 +337,7 @@ const attendanceRows = computed(() => {
       const slotMeta = scheduleSlots.value.map((slot) => ({
         inMinute: toMinutesFromScheduleTime(slot?.time_in),
         outMinute: toMinutesFromScheduleTime(slot?.time_out),
+        isNextDay: Boolean(slot?.is_next_day),
       }))
       const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
       const normalizedPunches = []
@@ -431,9 +435,10 @@ const attendanceRows = computed(() => {
       if (hasScheduleBoundaries) {
         normalizedPunches.forEach((punch) => {
           const minutes = toMinutesFromDateTime(punch.time)
+          const graceAfter = shiftGraceSettings.value.enabled ? shiftGraceSettings.value.after : 0
           const slotIndex = punch.type === 'I'
             ? resolveCheckInSlotIndex(minutes, slotMeta)
-            : resolveCheckOutSlotIndex(minutes, slotMeta)
+            : resolveCheckOutSlotIndex(minutes, slotMeta, graceAfter)
 
           if (slotIndex === null || !slots[slotIndex]) {
             return
@@ -933,6 +938,48 @@ const buildPrintableAttendanceRecords = () => {
     }
   })
 }
+
+const openEditUserModal = async () => {
+  if (!isSuperAdmin.value || !selectedUser.value) {
+    return
+  }
+
+  if (!users.value.length) {
+    await userStore.loadUsers()
+  }
+
+  editableUser.value = { ...selectedUser.value }
+  isUserEditModalOpen.value = true
+}
+
+const saveEditedUser = async (payload) => {
+  if (!isSuperAdmin.value) {
+    return
+  }
+
+  userEditSaving.value = true
+  const result = await userStore.updateUser(payload)
+  userEditSaving.value = false
+
+  if (!result.success) {
+    await Swal.fire({
+      icon: 'error',
+      title: 'Unable to update user',
+      text: result?.data?.response?.data?.message || 'Please check the user details and try again.',
+    })
+    return
+  }
+
+  isUserEditModalOpen.value = false
+  editableUser.value = null
+
+  await Swal.fire({
+    icon: 'success',
+    title: 'User Updated',
+    timer: 1400,
+    showConfirmButton: false,
+  })
+}
 </script>
 
 <template>
@@ -971,17 +1018,32 @@ const buildPrintableAttendanceRecords = () => {
 
         <!-- Stats + Back -->
         <div class="flex flex-col items-start gap-3 md:items-end">
-          <button
-            v-if="canGoBackToUsers"
-            type="button"
-            @click="router.push({ name: 'User' })"
-            class="flex items-center gap-1.5 rounded-xl border border-sky-300/30 bg-sky-400/20 px-4 py-2 text-sm font-medium text-sky-50 backdrop-blur-sm transition hover:bg-sky-400/30"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-            Back to Users
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              v-if="isSuperAdmin"
+              type="button"
+              @click="openEditUserModal"
+              :disabled="userEditSaving"
+              class="flex items-center gap-1.5 rounded-xl border border-emerald-300/30 bg-emerald-400/20 px-4 py-2 text-sm font-medium text-emerald-50 backdrop-blur-sm transition hover:bg-emerald-400/30 disabled:opacity-60"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit User
+            </button>
+            <button
+              v-if="canGoBackToUsers"
+              type="button"
+              @click="router.push({ name: 'User' })"
+              class="flex items-center gap-1.5 rounded-xl border border-sky-300/30 bg-sky-400/20 px-4 py-2 text-sm font-medium text-sky-50 backdrop-blur-sm transition hover:bg-sky-400/30"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+              Back to Users
+            </button>
+          </div>
           <div class="flex flex-wrap gap-2">
             <div class="rounded-xl bg-white/10 px-4 py-2 text-center backdrop-blur-sm ring-1 ring-inset ring-white/10">
               <p class="text-xs text-slate-300">Department</p>
@@ -1387,6 +1449,19 @@ const buildPrintableAttendanceRecords = () => {
           :show-logo="companySchoolLogoPrintEnabled"
         />
       </div>
+
+      <ModalUser
+        v-if="isUserEditModalOpen && editableUser"
+        :authUser="authStore.user"
+        :isEditUser="true"
+        :user="editableUser"
+        :officeShifts="userStore.officeShifts"
+        :departments="userStore.departments"
+        :colleges="userStore.colleges"
+        :edit_type="1"
+        @save="saveEditedUser"
+        @close="isUserEditModalOpen = false"
+      />
     </template>
   </div>
 </template>

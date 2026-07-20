@@ -57,6 +57,55 @@
       <p v-else class="text-sm text-gray-400 dark:text-gray-500">No address records</p>
     </div>
 
+    <!-- Office Shift Schedule -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-2">
+      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h5 class="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Office Shift Schedule</h5>
+          <p class="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-200">{{ officeShift?.name || 'No office shift assigned' }}</p>
+        </div>
+        <span
+          v-if="officeShift?.grace_enabled"
+          class="inline-flex w-fit rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-inset ring-violet-200 dark:bg-violet-900/20 dark:text-violet-300 dark:ring-violet-800"
+        >
+          Grace -{{ officeShift.grace_before_minutes || 0 }} / +{{ officeShift.grace_after_minutes || 0 }} min
+        </span>
+      </div>
+
+      <div v-if="officeShiftSchedules.length" class="grid gap-3 sm:grid-cols-2">
+        <div
+          v-for="(schedule, index) in officeShiftSchedules"
+          :key="`office-shift-schedule-${schedule.id || index}`"
+          class="rounded-xl border border-sky-100 bg-sky-50/70 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-900/20"
+        >
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <p class="text-xs font-bold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+              Schedule {{ schedule.sequence || index + 1 }}
+            </p>
+            <span
+              v-if="schedule.is_next_day"
+              class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-800"
+            >
+              Next day
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="rounded-lg bg-white px-3 py-2 dark:bg-gray-950/70">
+              <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">Time In</p>
+              <p class="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-200">{{ formatScheduleTime(schedule.time_in) }}</p>
+            </div>
+            <div class="rounded-lg bg-white px-3 py-2 dark:bg-gray-950/70">
+              <p class="text-[10px] font-bold uppercase tracking-wide text-gray-400">Time Out</p>
+              <p class="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-200">{{ formatScheduleTime(schedule.time_out) }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p v-else class="text-sm text-gray-400 dark:text-gray-500">
+        {{ officeShift?.is_flexible ? 'Flexible time — no fixed schedule rows.' : 'No office shift schedule rows.' }}
+      </p>
+    </div>
+
   </div>
 </template>
 
@@ -90,6 +139,12 @@ const collegeDisplay = computed(() => {
   const name = props.user?.college_ref?.college_long || props.user?.college_ref?.college_short
   if (!name) return props.user?.college_id ? `#${props.user.college_id}` : '-'
   return props.user?.college_id ? `${name} (#${props.user.college_id})` : name
+})
+
+const officeShift = computed(() => props.user.office_shift || props.user.officeShift || null)
+
+const officeShiftSchedules = computed(() => {
+  return [...(officeShift.value?.schedules || [])].sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
 })
 
 const formatDob = (value) => {
@@ -127,5 +182,24 @@ const formatAddress = (address) => {
     address?.province,
     address?.zipcode,
   ].filter(Boolean).join(', ') || '-'
+}
+
+const formatScheduleTime = (value) => {
+  if (!value) {
+    return '--:--'
+  }
+
+  const [hoursRaw, minutesRaw] = String(value).split(':')
+  const hours = Number(hoursRaw)
+  const minutes = Number(minutesRaw)
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return String(value)
+  }
+
+  const suffix = hours >= 12 ? 'PM' : 'AM'
+  const displayHour = hours % 12 === 0 ? 12 : hours % 12
+
+  return `${displayHour}:${String(minutes).padStart(2, '0')} ${suffix}`
 }
 </script>

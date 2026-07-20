@@ -443,30 +443,16 @@ const hasOvernightShift = (user) => {
   })
 }
 
-const getOvernightEndMinute = (user) => {
-  return getScheduleSlots(user)
-    .filter((row) => Boolean(row?.is_next_day))
-    .map((row) => {
-      const [h, m] = String(row?.time_out || '00:00:00').split(':')
-      return (Number(h) * 60) + Number(m)
-    })
-    .sort((a, b) => a - b)
-    .at(-1) ?? 0
-}
-
-const resolveLogicalDateKey = (user, value) => {
+const resolveLogicalDateKey = (user, recordOrValue) => {
+  const value = typeof recordOrValue === 'object' && recordOrValue !== null
+    ? recordOrValue.CHECKTIME
+    : recordOrValue
   const dateTime = new Date(value)
   if (Number.isNaN(dateTime.getTime())) {
     return null
   }
 
   const logicalDate = new Date(dateTime)
-  if (hasOvernightShift(user)) {
-    const minutes = (dateTime.getHours() * 60) + dateTime.getMinutes()
-    if (minutes <= getOvernightEndMinute(user)) {
-      logicalDate.setDate(logicalDate.getDate() - 1)
-    }
-  }
 
   return `${logicalDate.getFullYear()}-${String(logicalDate.getMonth() + 1).padStart(2, '0')}-${String(logicalDate.getDate()).padStart(2, '0')}`
 }
@@ -489,9 +475,22 @@ const resolveCheckInSlotIndex = (minutes, slotMeta) => {
   return slotMeta.length - 1
 }
 
-const resolveCheckOutSlotIndex = (minutes, slotMeta) => {
+const resolveCheckOutSlotIndex = (minutes, slotMeta, graceAfter = 0) => {
   if (minutes === null || !slotMeta.length) {
     return null
+  }
+
+  for (let index = 0; index < slotMeta.length; index += 1) {
+    const slot = slotMeta[index]
+    const isOvernight = Boolean(slot.isNextDay) || (slot.inMinute !== null && slot.outMinute !== null && slot.outMinute <= slot.inMinute)
+
+    if (!isOvernight || slot.outMinute === null) {
+      continue
+    }
+
+    if (minutes <= slot.outMinute + graceAfter) {
+      return index
+    }
   }
 
   for (let index = 0; index < slotMeta.length - 1; index += 1) {
@@ -584,7 +583,7 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
   const records = [...checkinouts].sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
 
   records.forEach((record) => {
-    const dateKey = resolveLogicalDateKey(user, record.CHECKTIME)
+    const dateKey = resolveLogicalDateKey(user, record)
     if (!dateKey) {
       return
     }
@@ -600,6 +599,7 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
   const slotMeta = scheduleSlots.map((slot) => ({
     inMinute: toMinutesFromScheduleTime(slot?.time_in),
     outMinute: toMinutesFromScheduleTime(slot?.time_out),
+    isNextDay: Boolean(slot?.is_next_day),
   }))
   const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
 
@@ -666,9 +666,11 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
     if (hasScheduleBoundaries) {
       normalizedPunches.forEach((punch) => {
         const minutes = toMinutesFromDateTime(punch.time)
+        const grace = getShiftGraceSettings(user)
+        const graceAfter = grace.enabled ? grace.after : 0
         const slotIndex = punch.type === 'I'
           ? resolveCheckInSlotIndex(minutes, slotMeta)
-          : resolveCheckOutSlotIndex(minutes, slotMeta)
+          : resolveCheckOutSlotIndex(minutes, slotMeta, graceAfter)
 
         if (slotIndex === null || !slots[slotIndex]) {
           return
