@@ -69,6 +69,152 @@ class UserController extends Controller
         return $rows;
     }
 
+    private function userInfoExportColumns(): array
+    {
+        return [
+            'USERID', 'Badgenumber', 'SSN', 'Name', 'Gender', 'TITLE', 'PAGER', 'BIRTHDAY', 'HIREDDAY',
+            'street', 'CITY', 'STATE', 'ZIP', 'OPHONE', 'FPHONE', 'VERIFICATIONMETHOD', 'DEFAULTDEPTID',
+            'SECURITYFLAGS', 'ATT', 'INLATE', 'OUTEARLY', 'OVERTIME', 'SEP', 'HOLIDAY', 'MINZU',
+            'PASSWORD', 'LUNCHDURATION', 'PHOTO', 'mverifypass', 'Notes', 'privilege', 'InheritDeptSch',
+            'InheritDeptSchClass', 'AutoSchPlan', 'MinAutoSchInterval', 'RegisterOT', 'InheritDeptRule',
+            'EMPRIVILEGE', 'CardNo', 'FaceGroup', 'AccGroup', 'UseAccGroupTZ', 'VerifyCode', 'Expires',
+            'ValidCount', 'ValidTimeBegin', 'ValidTimeEnd', 'TimeZone1', 'TimeZone2', 'TimeZone3',
+            'SALARYVALUE', 'Pin1', 'isPrint',
+        ];
+    }
+
+    private function normalizeUserInfoTextValue(mixed $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if (str_starts_with($value, "\xEF\xBB\xBF")) {
+            $value = substr($value, 3);
+        }
+
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            $value = mb_convert_encoding($value, 'UTF-8', 'Windows-1252');
+        }
+
+        return $value;
+    }
+
+    private function parseUserInfoTableRows(array $tableRows): array
+    {
+        $expectedColumns = $this->userInfoExportColumns();
+        $header = null;
+        $rows = [];
+
+        foreach ($tableRows as $columns) {
+            if (!is_array($columns) || $columns === []) {
+                continue;
+            }
+
+            $columns = array_map(fn ($value) => $this->normalizeUserInfoTextValue($value), $columns);
+
+            if ($header === null) {
+                $normalized = array_map(static fn ($value) => strtoupper(preg_replace('/[^A-Z0-9]/i', '', $value) ?? ''), $columns);
+                if (in_array('USERID', $normalized, true) && in_array('BADGENUMBER', $normalized, true)) {
+                    $header = $normalized;
+                    continue;
+                }
+
+                // CNCHS text exports omit the header but preserve USERINFO's database column order.
+                $header = array_map('strtoupper', $expectedColumns);
+            }
+
+            $mapped = [];
+            foreach ($header as $index => $name) {
+                $mapped[$name] = $columns[$index] ?? '';
+            }
+
+            $userIdValue = $mapped['USERID'] ?? '';
+            $pin = trim((string) ($mapped['BADGENUMBER'] ?? ''));
+            $resolvedUserId = ctype_digit($userIdValue)
+                ? (int) $userIdValue
+                : (ctype_digit($pin) ? (int) $pin : null);
+            $password = trim((string) ($mapped['PASSWORD'] ?? ''));
+            if ($password === '') {
+                $password = trim((string) ($mapped['MVERIFYPASS'] ?? ''));
+            }
+
+            $cardValue = trim((string) ($mapped['CARDNO'] ?? ''));
+            $rows[] = [
+                'row' => count($rows) + 1,
+                'uid' => ctype_digit($userIdValue) ? (int) $userIdValue : 0,
+                'pin' => $pin,
+                'name' => trim((string) ($mapped['NAME'] ?? '')),
+                'password' => $password,
+                'privilege' => is_numeric($mapped['PRIVILEGE'] ?? null) ? (int) $mapped['PRIVILEGE'] : 0,
+                'card' => is_numeric($cardValue) ? (int) $cardValue : 0,
+                'resolved_user_id' => $resolvedUserId,
+                'valid_for_import' => $resolvedUserId !== null && $resolvedUserId > 0 && ctype_digit($pin),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function parseUserInfoText(string $raw): array
+    {
+        $tableRows = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', trim($raw)) ?: [] as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+
+            $delimiter = str_contains($line, ';') ? ';' : ',';
+            $tableRows[] = str_getcsv($line, $delimiter);
+        }
+
+        return $this->parseUserInfoTableRows($tableRows);
+    }
+
+    private function parseUserInfoXlsx(string $path): array
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) {
+            throw new \RuntimeException('Unable to open the Excel workbook.');
+        }
+
+        try {
+            $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            if (!is_string($sheetXml) || ($xml = simplexml_load_string($sheetXml)) === false) {
+                throw new \RuntimeException('Unable to read the first Excel worksheet.');
+            }
+
+            $tableRows = [];
+            foreach ($xml->sheetData->row as $row) {
+                $columns = [];
+                foreach ($row->c as $cell) {
+                    preg_match('/^[A-Z]+/i', (string) $cell['r'], $matches);
+                    $columnIndex = 0;
+                    foreach (str_split(strtoupper($matches[0] ?? 'A')) as $letter) {
+                        $columnIndex = ($columnIndex * 26) + (ord($letter) - 64);
+                    }
+                    $columnIndex--;
+
+                    if ((string) $cell['t'] === 'inlineStr') {
+                        $cell->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                        $parts = $cell->xpath('.//x:is//x:t') ?: [];
+                        $value = implode('', array_map(static fn ($part) => (string) $part, $parts));
+                    } else {
+                        $value = (string) $cell->v;
+                    }
+                    $columns[$columnIndex] = $value;
+                }
+
+                if ($columns !== []) {
+                    $tableRows[] = array_replace(array_fill(0, max(array_keys($columns)) + 1, ''), $columns);
+                }
+            }
+
+            return $this->parseUserInfoTableRows($tableRows);
+        } finally {
+            $zip->close();
+        }
+    }
+
     private function enrichUserDatRowsWithExistingFlags(array $rows): array
     {
         $ids = array_values(array_unique(array_filter(array_map(
@@ -328,8 +474,10 @@ class UserController extends Controller
 
         $uploaded = $validated['file'];
 
-        if (strtolower((string) $uploaded->getClientOriginalExtension()) !== 'dat') {
-            return response()->json(['message' => 'Please upload a .dat file.'], 422);
+        $extension = strtolower((string) $uploaded->getClientOriginalExtension());
+
+        if (!in_array($extension, ['dat', 'txt', 'xlsx'], true)) {
+            return response()->json(['message' => 'Please upload a .dat, .txt, or .xlsx file.'], 422);
         }
 
         $raw = file_get_contents($uploaded->getRealPath());
@@ -339,7 +487,11 @@ class UserController extends Controller
         }
 
         try {
-            $rows = $this->parseUserDatRecords($raw);
+            $rows = match ($extension) {
+                'txt' => $this->parseUserInfoText($raw),
+                'xlsx' => $this->parseUserInfoXlsx($uploaded->getRealPath()),
+                default => $this->parseUserDatRecords($raw),
+            };
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -350,7 +502,7 @@ class UserController extends Controller
         $existingCount = count(array_filter($validRows, static fn (array $row) => (bool) ($row['has_existing_id'] ?? false)));
 
         return response()->json([
-            'message' => 'user.dat decoded successfully.',
+            'message' => 'User data decoded successfully.',
             'rows' => $rows,
             'summary' => [
                 'total_rows' => count($rows),
@@ -536,7 +688,7 @@ class UserController extends Controller
         });
 
         return response()->json([
-            'message' => 'user.dat import completed.',
+            'message' => 'User data import completed.',
             'processed_ids' => $processedIds,
             'summary' => [
                 'selected' => count($rowsByUserId),

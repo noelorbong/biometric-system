@@ -105,7 +105,7 @@ const onAttendanceDatTextInput = () => {
 
 const loadAttendanceDatPreview = async () => {
   if (!attendanceDatHasInput.value) {
-    attendanceDatError.value = 'Please choose an attendance DAT/TXT file or paste attendance text.'
+    attendanceDatError.value = 'Please choose an attendance DAT/TXT/Excel file or paste attendance text.'
     return false
   }
 
@@ -137,7 +137,7 @@ const loadAttendanceDatPreview = async () => {
 
 const importAttendanceDat = async () => {
   if (!attendanceDatHasInput.value) {
-    attendanceDatError.value = 'Please choose an attendance DAT/TXT file or paste attendance text.'
+    attendanceDatError.value = 'Please choose an attendance DAT/TXT/Excel file or paste attendance text.'
     return
   }
 
@@ -1494,7 +1494,7 @@ onUnmounted(() => {
         <div class="max-w-3xl">
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Device Control Deck</p>
           <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Machines</h1>
-          <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200/90">
+          <p class="hidden mt-3 max-w-2xl text-sm leading-6 text-slate-200/90">
             Monitor machine health, run downloads, control background sync, and manage template operations from one screen.
           </p>
 
@@ -1549,7 +1549,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[460px]">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[660px]">
           <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
             <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Total</p>
             <p class="mt-2 text-3xl font-semibold text-white">{{ machineStats.total }}</p>
@@ -1579,7 +1579,6 @@ onUnmounted(() => {
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Machine Directory</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Search by alias, IP, serial, firmware, or product type.</p>
           </div>
           <div class="text-sm text-slate-500 dark:text-slate-400">
             Showing <span class="font-semibold text-slate-900 dark:text-white">{{ filteredMachines.length }}</span> of {{ machineStats.total }} machines
@@ -1598,7 +1597,6 @@ onUnmounted(() => {
 
       <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick Actions</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Run global actions without leaving the page.</p>
 
         <div class="mt-4 grid grid-cols-3 gap-3">
           <button
@@ -1607,7 +1605,7 @@ onUnmounted(() => {
             class="flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-medium transition bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
           >
             <RefreshIcon class="h-4 w-4" />
-            <span>Decode / Import Attendance DAT</span>
+            <span>Import Attendance</span>
           </button>
 
           <button
@@ -1872,7 +1870,7 @@ onUnmounted(() => {
           <div class="flex items-start justify-between gap-4">
             <div>
               <h4 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Attendance Import</h4>
-              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload the original <strong>AttEncryptLog.dat</strong> or an exported <strong>inout.txt</strong>. The app decodes/maps the rows, shows every record, and lets you export or import the result.</p>
+              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload the original <strong>AttEncryptLog.dat</strong> or an exported <strong>CHECKINOUT.txt, CHECKINOUT.csv, or CHECKINOUT.xlsx</strong>. The app decodes/maps the rows, shows every record, and lets you export or import the result.</p>
             </div>
             <button type="button" @click="closeAttendanceDatImport" class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
           </div>
@@ -1882,7 +1880,7 @@ onUnmounted(() => {
               <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
                 <div>
                   <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Attendance Export File</label>
-                  <input type="file" accept=".dat,.bin,.txt,.csv,.tsv" @change="onAttendanceDatFileChange" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+                  <input type="file" accept=".dat,.bin,.txt,.csv,.tsv,.xlsx" @change="onAttendanceDatFileChange" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ attendanceDatFileName || 'No file selected' }}</p>
                 </div>
                 <div class="hidden">
@@ -2007,7 +2005,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <p v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT/TXT attendance file to preview the decoded rows.</p>
+              <p v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT, text, CSV, or Excel attendance file to preview the decoded rows.</p>
             </div>
           </div>
         </div>

@@ -763,8 +763,8 @@ const getPrintableRecords = (user) => {
         class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
         <div class="flex flex-col gap-1 xl:flex-row xl:items-end xl:justify-between">
           <div class="max-w-xl">
-            <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Reporting Deck</p>
-            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Bulk Report</h1>
+            <p class="hidden text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Reporting Deck</p>
+            <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Report</h1>
             
             <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
               <span
@@ -778,30 +778,30 @@ const getPrintableRecords = (user) => {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:min-w-[600px]">
+          <div class="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:min-w-[500px]">
             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Users</p>
+              <p class="text-xs  tracking-[0.25em] text-slate-300">Users</p>
               <p class="mt-2 text-3xl font-semibold text-white">{{ reportUsers.length }}</p>
               <p class="mt-1 text-xs text-slate-300">Matched records</p>
             </div>
             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Selected</p>
+              <p class="text-xs  tracking-[0.25em] text-slate-300">Selected</p>
               <p class="mt-2 text-3xl font-semibold text-white">{{ selectedCount }}</p>
               <p class="mt-1 text-xs text-slate-300">Ready to print</p>
             </div>
             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Unselected</p>
+              <p class="text-xs  tracking-[0.25em] text-slate-300">Unselected</p>
               <p class="mt-2 text-3xl font-semibold text-white">{{ unselectedCount }}</p>
               <p class="mt-1 text-xs text-slate-300">Excluded from print</p>
             </div>
             <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-              <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Copies/User</p>
+              <p class="text-xs  tracking-[0.25em] text-slate-300">Copies/User</p>
               <p class="mt-2 text-3xl font-semibold text-white">{{ copiesPerUser }}</p>
               <p class="mt-1 text-xs text-slate-300">Print multiplier</p>
             </div>
           </div>
         </div>
-        <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200/90 hidden md:block">
+        <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-200/90 hidden ">
               Generate and print attendance forms for multiple users by month, office shift, department, and college.
             </p>
       </section>
@@ -814,7 +814,7 @@ const getPrintableRecords = (user) => {
             <span class="font-medium text-slate-700 dark:text-slate-200">Calculate Undertime</span>
             <input v-model="calculateUndertime" type="checkbox" class="h-4 w-4" />
           </label>
-          <div class="flex">
+          <div class="flex gap-2">
           <div class="w-full">
             <label
               class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Copies

@@ -17,6 +17,14 @@ import ImportBiometricTemplateDatModal from './components/ImportBiometricTemplat
 
 import FingerprintEnrollModal from './components/FingerprintEnrollModal.vue'
 import { useAuthStore } from '@/store/AuthStore'
+
+const props = defineProps({
+  web_layout: {
+    type: Object,
+    default: () => {},
+  }
+})
+
 const authStore = useAuthStore();
 const router = useRouter();
 
@@ -981,7 +989,7 @@ const closeEnrollModal = () => {
           <Button @click="addUser" :className="'col-span-2 h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary"
             :startIcon="PlusIcon">User</Button>
           <Button @click="openImportUserDatModal" :className="'col-span-2 h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
-            Import user.dat
+            Import Users
           </Button>
           <Button @click="openImportBiometricTemplateDatModal" :className="'col-span-3 h-12 justify-center text-sm rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
             Import biotemplate.dat
@@ -1001,6 +1009,7 @@ const closeEnrollModal = () => {
       :officeShifts="officeShifts"
       :departments="departments"
       :colleges="colleges"
+      :web_layout="web_layout"
     />
     <ModalUser :authUser="authStore.user" :isEditUser="isEditUser" :user="user" :officeShifts="officeShifts" :departments="departments" :colleges="colleges" v-if="isUserAddModal" @save="saveUser"
       @close="isUserAddModal = false" :edit_type="1"/>

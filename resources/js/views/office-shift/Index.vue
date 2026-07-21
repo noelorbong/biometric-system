@@ -269,14 +269,16 @@ const formatScheduleChip = (row) => {
             <tr v-for="shift in filteredOfficeShifts" :key="shift.id" class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
               <td class="px-5 py-3 text-sm font-medium text-slate-800 dark:text-slate-100">{{ shift.name }}</td>
               <td class="px-5 py-3 text-sm text-slate-600 dark:text-slate-300">
-                <div v-if="shift.schedules?.length" class="flex flex-wrap gap-1.5">
-                  <span
-                    v-for="row in shift.schedules"
-                    :key="`shift-${shift.id}-row-${row.sequence}`"
+                <div v-if="shift.schedules?.length" class="">
+                  <div  v-for="row in shift.schedules" :key="`shift-${shift.id}-row-${row.sequence}`" class="pb-1">
+                  <p
+                   
+                    
                     class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:border-sky-900/50 dark:bg-sky-900/20 dark:text-sky-300"
                   >
-                    {{ formatScheduleChip(row) }}
-                  </span>
+                    {{ formatScheduleChip(row) }} 
+                  </p> </br>
+                  </div>
                 </div>
                 <span v-else>{{ shift.schedule || 'Flexible Time' }}</span>
               </td>

@@ -305,7 +305,7 @@ class MachineController extends Controller
         }
 
         return response()->json([
-            'message' => 'Attendance DAT preview generated successfully.',
+            'message' => 'Attendance preview generated successfully.',
             'total' => count($rows),
             'importable' => $importable,
             'unmapped' => $unmapped,
@@ -389,7 +389,7 @@ class MachineController extends Controller
         }
 
         return response()->json([
-            'message' => 'Attendance DAT imported successfully.',
+            'message' => 'Attendance imported successfully.',
             'total' => count($rows),
             'imported' => $imported,
             'skipped' => $skipped,
@@ -407,6 +407,12 @@ class MachineController extends Controller
 
         if ($uploadedFile === null) {
             return [];
+        }
+
+        $extension = strtolower((string) $uploadedFile->getClientOriginalExtension());
+
+        if ($extension === 'xlsx') {
+            return $this->parseAttendanceXlsx($uploadedFile->getRealPath());
         }
 
         $raw = file_get_contents($uploadedFile->getRealPath());
@@ -454,6 +460,87 @@ class MachineController extends Controller
         return $rows;
     }
 
+    private function parseAttendanceXlsx(string $path): array
+    {
+        $zip = new \ZipArchive();
+
+        if ($zip->open($path) !== true) {
+            return [];
+        }
+
+        try {
+            $sharedStrings = [];
+            $sharedStringsXml = $zip->getFromName('xl/sharedStrings.xml');
+
+            if (is_string($sharedStringsXml)) {
+                $xml = simplexml_load_string($sharedStringsXml);
+                if ($xml !== false) {
+                    foreach ($xml->si as $item) {
+                        $item->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                        $parts = $item->xpath('.//x:t') ?: [];
+                        $sharedStrings[] = implode('', array_map(static fn ($part) => (string) $part, $parts));
+                    }
+                }
+            }
+
+            $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            if (!is_string($sheetXml)) {
+                return [];
+            }
+
+            $xml = simplexml_load_string($sheetXml);
+            if ($xml === false) {
+                return [];
+            }
+
+            $tableRows = [];
+            foreach ($xml->sheetData->row as $row) {
+                $columns = [];
+                foreach ($row->c as $cell) {
+                    $reference = (string) $cell['r'];
+                    $columnIndex = $this->xlsxColumnIndex($reference);
+                    $type = (string) $cell['t'];
+                    $value = (string) $cell->v;
+
+                    if ($type === 's') {
+                        $value = $sharedStrings[(int) $value] ?? '';
+                    } elseif ($type === 'inlineStr') {
+                        $cell->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                        $parts = $cell->xpath('.//x:is//x:t') ?: [];
+                        $value = implode('', array_map(static fn ($part) => (string) $part, $parts));
+                    }
+
+                    $columns[$columnIndex] = $value;
+                }
+
+                if ($columns !== []) {
+                    $lastColumn = max(array_keys($columns));
+                    $tableRows[] = array_map(
+                        static fn ($value) => trim((string) $value),
+                        array_replace(array_fill(0, $lastColumn + 1, ''), $columns)
+                    );
+                }
+            }
+
+            return $this->parseAttendanceTableRows($tableRows, excelDates: true);
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function xlsxColumnIndex(string $reference): int
+    {
+        preg_match('/^[A-Z]+/i', $reference, $matches);
+        $letters = strtoupper($matches[0] ?? 'A');
+        $index = 0;
+
+        foreach (str_split($letters) as $letter) {
+            $index = ($index * 26) + (ord($letter) - 64);
+        }
+
+        return max(0, $index - 1);
+    }
+
     private function parseAttendanceTableText(string $textContent): array
     {
         $lines = preg_split('/\r\n|\n|\r/', trim($textContent)) ?: [];
@@ -462,35 +549,42 @@ class MachineController extends Controller
             return [];
         }
 
-        $rows = [];
-        $header = null;
+        $tableRows = [];
 
         foreach ($lines as $line) {
             $line = trim($line);
-
-            if ($line === '') {
-                continue;
+            if ($line !== '') {
+                $tableRows[] = $this->splitAttendanceTableLine($line);
             }
+        }
 
-            $columns = $this->splitAttendanceTableLine($line);
+        return $this->parseAttendanceTableRows($tableRows);
+    }
 
-            if ($columns === []) {
+    private function parseAttendanceTableRows(array $tableRows, bool $excelDates = false): array
+    {
+        $rows = [];
+        $header = null;
+
+        foreach ($tableRows as $columns) {
+            if (!is_array($columns) || $columns === []) {
                 continue;
             }
 
             if ($header === null) {
                 $upperColumns = array_map(fn ($value) => $this->normalizeAttendanceHeaderName($value), $columns);
 
-                if (!in_array('USERID', $upperColumns, true) || !in_array('CHECKTIME', $upperColumns, true)) {
+                if (in_array('USERID', $upperColumns, true) && in_array('CHECKTIME', $upperColumns, true)) {
+                    $header = $upperColumns;
                     continue;
                 }
 
-                $header = $upperColumns;
-                continue;
+                // CNCHS/Access exports may omit headings but retain CHECKINOUT's column order.
+                $header = ['USERID', 'CHECKTIME', 'CHECKTYPE', 'VERIFYCODE', 'SENSORID', 'MEMOINFO', 'WORKCODE', 'SN', 'USEREXTFMT'];
             }
 
             $mapped = $this->mapAttendanceTableColumns($header, $columns);
-            $checkTime = $this->normalizeAttendanceCheckTime($mapped['CHECKTIME'] ?? null);
+            $checkTime = $this->normalizeAttendanceCheckTime($mapped['CHECKTIME'] ?? null, $excelDates);
 
             if ($checkTime === null) {
                 continue;
@@ -516,6 +610,10 @@ class MachineController extends Controller
     {
         if (str_contains($line, "\t")) {
             return array_map('trim', str_getcsv($line, "\t"));
+        }
+
+        if (str_contains($line, ';')) {
+            return array_map('trim', str_getcsv($line, ';'));
         }
 
         if (str_contains($line, ',')) {
@@ -618,12 +716,21 @@ class MachineController extends Controller
         return in_array(strtoupper(trim((string) ($value ?? ''))), ['I', 'O', 'IN', 'OUT', '0', '1'], true);
     }
 
-    private function normalizeAttendanceCheckTime(mixed $value): ?string
+    private function normalizeAttendanceCheckTime(mixed $value, bool $excelDate = false): ?string
     {
         $value = trim((string) ($value ?? ''));
 
         if ($value === '') {
             return null;
+        }
+
+        if ($excelDate && is_numeric($value)) {
+            $serial = (float) $value;
+            if ($serial > 0) {
+                return Carbon::create(1899, 12, 30, 0, 0, 0, 'UTC')
+                    ->addSeconds((int) round($serial * 86400))
+                    ->format('Y-m-d H:i:s');
+            }
         }
 
         try {
@@ -661,6 +768,10 @@ class MachineController extends Controller
 
         if (is_string($originalName) && str_ends_with(strtolower($originalName), '.dat')) {
             return 'This DAT file is not a recognized Granding/ZKTeco Self Service Reader attendance export. Check that the original AttEncryptLog.dat file is complete and was not modified.';
+        }
+
+        if (is_string($originalName) && str_ends_with(strtolower($originalName), '.xlsx')) {
+            return 'The Excel workbook does not contain recognizable CHECKINOUT attendance rows.';
         }
 
         return 'The attendance source could not be decoded into importable rows.';

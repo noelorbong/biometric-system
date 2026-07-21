@@ -10,19 +10,19 @@
         </button>
 
         <div class="pr-10">
-          <h3 class="text-2xl font-semibold text-gray-800 dark:text-white">Import Users From user.dat</h3>
+          <h3 class="text-2xl font-semibold text-gray-800 dark:text-white">Import User Data</h3>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Upload a user.dat file, review decoded users, select rows to import, and optionally replace existing IDs.
+            Upload user.dat or a USERINFO text/Excel export, review users, select rows to import, and optionally replace existing IDs.
           </p>
         </div>
 
         <div class="mt-5 rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
             <div class="flex-1">
-              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">user.dat file</label>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">User data file</label>
               <input
                 type="file"
-                accept=".dat"
+                accept=".dat,.txt,.xlsx"
                 class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800"
                 @change="onFileChange"
               />
@@ -397,7 +397,7 @@ const previewFile = async () => {
     })
     selectedMap.value = next
   } else {
-    errorText.value = result?.data?.response?.data?.message || 'Unable to decode user.dat file.'
+    errorText.value = result?.data?.response?.data?.message || 'Unable to decode the user data file.'
   }
 
   loadingPreview.value = false

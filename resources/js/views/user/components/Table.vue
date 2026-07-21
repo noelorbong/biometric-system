@@ -73,7 +73,7 @@
         </p>
       </div>
 
-      <div class="hidden max-w-full overflow-x-auto custom-scrollbar md:block">
+      <div :style="web_layout.bodyWidth > 928 && web_layout.bodyWidth < 1500 ? { width: (web_layout.bodyWidth-50) + 'px' } : {}" class="hidden max-w-full overflow-x-auto custom-scrollbar md:block">
         <table class="min-w-full border-collapse">
           <thead>
             <tr class="border-b border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-900/80">
@@ -95,8 +95,8 @@
                   <span v-if="sortBy === 'role'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
-              <th class="px-4 py-3 text-left">
-                <button type="button" @click="toggleSort('office_shift')" class="inline-flex min-w-[110px] items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-4 py-3 text-left ">
+                <button type="button" @click="toggleSort('office_shift')" class="inline-flex min-w-[140px] items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   Office Shift
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('office_shift')" />
                   <span v-if="sortBy === 'office_shift'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
@@ -482,6 +482,10 @@ const props = defineProps({
   colleges: {
     type: Array,
     default: () => [],
+  },
+  web_layout: {
+    type: Object,
+    default: () => {},
   }
 })
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onUnmounted, onBeforeUnmount, onMounted } from "vue";
+import { ref, watch, nextTick, onUnmounted, onBeforeUnmount, onMounted } from "vue";
 import { storeToRefs } from 'pinia'
 import moment from 'moment'
 import AppSidebar from './AppSidebar.vue'
@@ -34,22 +34,29 @@ let headerBar = ref(null);
 let siderBarWidth = ref(0);
 let headerHeight = ref(0);
 
-onMounted(async() => {
-
-  
-window.addEventListener("resize", myEventHandler);
-
-web_layout.value.screenWidth = window.innerWidth;
-web_layout.value.screenHeight = window.innerHeight;
-web_layout.value.bodyWidth = web_layout.value.screenWidth - siderBarWidth.value;
-web_layout.value.bodyHeight = web_layout.value.screenHeight - headerHeight.value;
-})
-
-let myEventHandler = (e) => {
-  web_layout.value.screenWidth = e.target.innerWidth;
-  web_layout.value.screenHeight = e.target.innerHeight;
+const updateDimensions = () => {
+  siderBarWidth.value = sideBar.value?.$el?.offsetWidth ?? 0;
+  headerHeight.value = headerBar.value?.$el?.offsetHeight ?? 0;
+  web_layout.value.screenWidth = window.innerWidth;
+  web_layout.value.screenHeight = window.innerHeight;
   web_layout.value.bodyWidth = web_layout.value.screenWidth - siderBarWidth.value;
   web_layout.value.bodyHeight = web_layout.value.screenHeight - headerHeight.value;
+};
+
+onMounted(async() => {
+  window.addEventListener("resize", myEventHandler);
+  updateDimensions();
+})
+
+// Re-measure after sidebar drawer animates open/closed (300ms transition)
+watch([isExpanded, isHovered], () => {
+  nextTick(() => {
+    setTimeout(updateDimensions, 310);
+  });
+});
+
+let myEventHandler = (e) => {
+  updateDimensions();
 };
 
 </script>
