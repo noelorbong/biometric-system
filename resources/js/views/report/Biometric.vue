@@ -1,7 +1,9 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import Swal from 'sweetalert2'
 import 'sweetalert2/src/sweetalert2.scss'
+import flatPickr from 'vue-flatpickr-component'
+import 'flatpickr/dist/flatpickr.css'
 import Button from '@/components/ui/Button.vue'
 import Modal from '@/components/common/Modal.vue'
 import { useUserStore } from '@/store/UserStore'
@@ -15,13 +17,98 @@ const { officeShifts, departments, colleges } = storeToRefs(userStore)
 const { companySchoolName, companySchoolLogo, companySchoolLogoPrintEnabled } = storeToRefs(appSettingStore)
 
 const now = new Date()
+const formatDateInput = (date) => {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+const parseDateInputValue = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+    return null
+  }
+
+  const [year, month, day] = String(value).split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  if (
+    Number.isNaN(date.getTime())
+    || date.getFullYear() !== year
+    || date.getMonth() !== (month - 1)
+    || date.getDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+const toDateOnlyKey = (value) => {
+  const parsed = parseDateInputValue(value)
+  return parsed ? formatDateInput(parsed) : null
+}
+
+const formatRangeModelValue = (dateFrom, dateTo) => {
+  const from = toDateOnlyKey(dateFrom)
+  const to = toDateOnlyKey(dateTo)
+
+  if (!from && !to) return ''
+  if (from && !to) return from
+  if (from && to && from === to) return from
+  return `${from} to ${to}`
+}
+
+const applyRangeSelection = (selectedDates = []) => {
+  if (!Array.isArray(selectedDates) || selectedDates.length === 0) {
+    filters.value.date_from = ''
+    filters.value.date_to = ''
+    customDateRange.value = ''
+    return
+  }
+
+  const from = selectedDates[0] instanceof Date ? formatDateInput(selectedDates[0]) : ''
+  const to = selectedDates[1] instanceof Date
+    ? formatDateInput(selectedDates[1])
+    : from
+
+  filters.value.date_from = from
+  filters.value.date_to = to
+  customDateRange.value = formatRangeModelValue(from, to)
+}
+
+const customRangePickerConfig = {
+  mode: 'range',
+  dateFormat: 'Y-m-d',
+  altInput: true,
+  altFormat: 'M j, Y',
+  allowInput: false,
+  onChange: applyRangeSelection,
+  onClose: applyRangeSelection,
+}
+const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+const filterMode = ref('monthly')
 const filters = ref({
   year: now.getFullYear(),
   month: now.getMonth() + 1,
+  date_from: formatDateInput(monthStart),
+  date_to: formatDateInput(monthEnd),
   office_shift_id: '',
   department_id: '',
   college_id: '',
 })
+const customDateRange = ref('')
+
+watch(
+  () => [filters.value.date_from, filters.value.date_to],
+  ([dateFrom, dateTo]) => {
+    customDateRange.value = formatRangeModelValue(dateFrom, dateTo)
+  },
+  { immediate: true },
+)
 
 const reportUsers = ref([])
 const loading = ref(false)
@@ -73,6 +160,137 @@ const monthYearLabel = computed(() => {
   return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 })
 
+const customRangeLabel = computed(() => {
+  const from = filters.value.date_from
+  const to = filters.value.date_to
+
+  if (!from || !to) {
+    return 'Select date range'
+  }
+
+  const fromDate = parseDateInputValue(from)
+  const toDate = parseDateInputValue(to)
+  if (!fromDate || !toDate) {
+    return 'Invalid date range'
+  }
+
+  const fromLabel = fromDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  const toLabel = toDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+
+  return `${fromLabel} - ${toLabel}`
+})
+
+const periodLabel = computed(() => (filterMode.value === 'custom' ? customRangeLabel.value : monthYearLabel.value))
+
+const selectedPeriodStart = computed(() => {
+  if (filterMode.value === 'custom') {
+    return filters.value.date_from || null
+  }
+
+  return `${filters.value.year}-${String(filters.value.month).padStart(2, '0')}-01`
+})
+
+const selectedPeriodYear = computed(() => {
+  const start = selectedPeriodStart.value
+  if (!start) return Number(filters.value.year)
+
+  const [year] = String(start).split('-').map(Number)
+  return Number.isNaN(year) ? Number(filters.value.year) : year
+})
+
+const selectedPeriodMonth = computed(() => {
+  const start = selectedPeriodStart.value
+  if (!start) return Number(filters.value.month)
+
+  const [, month] = String(start).split('-').map(Number)
+  return Number.isNaN(month) ? Number(filters.value.month) : month
+})
+
+const getCustomRangeBounds = () => {
+  const dateFrom = filters.value.date_from
+  const dateTo = filters.value.date_to
+
+  if (!dateFrom || !dateTo) {
+    return { error: 'Select both start and end dates for custom filter.' }
+  }
+
+  const fromDate = parseDateInputValue(dateFrom)
+  const toDate = parseDateInputValue(dateTo)
+
+  if (!fromDate || !toDate) {
+    return { error: 'Invalid custom date range.' }
+  }
+
+  if (fromDate > toDate) {
+    return { error: 'Start date must not be later than end date.' }
+  }
+
+  return {
+    dateFrom,
+    dateTo,
+    fromDate,
+    toDate,
+    fromYear: fromDate.getFullYear(),
+    fromMonth: fromDate.getMonth() + 1,
+    toYear: toDate.getFullYear(),
+    toMonth: toDate.getMonth() + 1,
+  }
+}
+
+const buildDateFilterPayload = () => {
+  if (filterMode.value === 'custom') {
+    const range = getCustomRangeBounds()
+    if (range.error) {
+      return { error: range.error }
+    }
+
+    if (range.fromYear !== range.toYear || range.fromMonth !== range.toMonth) {
+      return { error: 'Custom filter currently supports dates within the same month only.' }
+    }
+
+    return {
+      year: range.fromYear,
+      month: range.fromMonth,
+      date_from: range.dateFrom,
+      date_to: range.dateTo,
+    }
+  }
+
+  return {
+    year: Number(filters.value.year),
+    month: Number(filters.value.month),
+  }
+}
+
+const getSelectedDateKeys = () => {
+  if (filterMode.value === 'custom') {
+    const range = getCustomRangeBounds()
+    if (range.error) {
+      return []
+    }
+
+    const keys = []
+    const cursor = new Date(range.fromDate)
+    const end = new Date(range.toDate)
+
+    while (cursor <= end) {
+      keys.push(formatDateInput(cursor))
+      cursor.setDate(cursor.getDate() + 1)
+    }
+
+    return keys
+  }
+
+  const totalDaysInMonth = new Date(Number(filters.value.year), Number(filters.value.month), 0).getDate()
+  const keys = []
+
+  for (let day = 1; day <= totalDaysInMonth; day += 1) {
+    keys.push(`${filters.value.year}-${String(filters.value.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+  }
+
+  return keys
+}
+
 const selectedCount = computed(() => selectedUserIds.value.length)
 const allSelected = computed(() => {
   return reportUsers.value.length > 0 && selectedUserIds.value.length === reportUsers.value.length
@@ -91,13 +309,18 @@ const loadOptions = async () => {
 }
 
 const generateReport = async () => {
+  const dateFilterPayload = buildDateFilterPayload()
+  if (dateFilterPayload.error) {
+    toastResult(dateFilterPayload.error, 'info')
+    return
+  }
+
   loading.value = true
   preparingPrintData.value = false
 
   try {
     const payload = {
-      year: Number(filters.value.year),
-      month: Number(filters.value.month),
+      ...dateFilterPayload,
       office_shift_id: filters.value.office_shift_id === '' ? null : Number(filters.value.office_shift_id),
       department_id: filters.value.department_id === '' ? null : Number(filters.value.department_id),
       college_id: filters.value.college_id === '' ? null : Number(filters.value.college_id),
@@ -127,6 +350,11 @@ const generateReport = async () => {
 }
 
 const fetchOverridesForUsers = async (users) => {
+  const dateFilterPayload = buildDateFilterPayload()
+  if (dateFilterPayload.error) {
+    return
+  }
+
   const concurrency = 8
   let cursor = 0
 
@@ -134,8 +362,7 @@ const fetchOverridesForUsers = async (users) => {
     try {
       const resp = await axios.post('/api/user/checkinout', {
         user_id: user.id,
-        year: Number(filters.value.year),
-        month: Number(filters.value.month),
+        ...dateFilterPayload,
       })
       user._effective_checkinouts = resp?.data?.checkinouts || []
       user._overrides = resp?.data?.overrides || []
@@ -325,6 +552,12 @@ const mergedBiometricLogs = computed(() => {
 })
 
 const openBiometricLogs = async (user) => {
+  const dateFilterPayload = buildDateFilterPayload()
+  if (dateFilterPayload.error) {
+    toastResult(dateFilterPayload.error, 'info')
+    return
+  }
+
   biometricModalOpen.value = true
   biometricModalLoading.value = true
   biometricLogUser.value = user
@@ -334,8 +567,7 @@ const openBiometricLogs = async (user) => {
   try {
     const resp = await axios.post('/api/user/checkinout', {
       user_id: user.id,
-      year: Number(filters.value.year),
-      month: Number(filters.value.month),
+      ...dateFilterPayload,
     })
 
     biometricLogRows.value = resp?.data?.checkinouts || []
@@ -699,11 +931,10 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
     return { date, slots }
   }
 
-  const totalDaysInMonth = new Date(Number(filters.value.year), Number(filters.value.month), 0).getDate()
+  const dateKeys = getSelectedDateKeys()
   const rows = []
 
-  for (let day = 1; day <= totalDaysInMonth; day += 1) {
-    const dateKey = `${filters.value.year}-${String(filters.value.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  for (const dateKey of dateKeys) {
     rows.push(buildAttendanceRow(dateKey, grouped.get(dateKey) || []))
   }
 
@@ -769,7 +1000,7 @@ const getPrintableRecords = (user) => {
             <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
               <span
                 class="inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
-                Period: {{ monthYearLabel }}
+                Period: {{ periodLabel }}
               </span>
               <span class="inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
                 :class="loading ? 'bg-amber-400/15 text-amber-100 ring-amber-300/30' : 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'">
@@ -845,57 +1076,86 @@ const getPrintableRecords = (user) => {
           
         </div>
 
-        <div class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-6">
+        <div class="mt-2 space-y-3">
           <div>
             <label
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
-            <select v-model.number="filters.year"
-              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
-            </select>
+              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
+            <div class="inline-flex rounded-lg border border-slate-300 p-1 dark:border-slate-700">
+              <button type="button" @click="filterMode = 'monthly'"
+                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
+                Month
+              </button>
+              <button type="button" @click="filterMode = 'custom'"
+                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
+                Custom
+              </button>
+            </div>
           </div>
-          <div>
-            <label
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
-            <select v-model.number="filters.month"
-              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}
-              </option>
-            </select>
+
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-6">
+            <div v-if="filterMode === 'monthly'">
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
+              <select v-model.number="filters.year"
+                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
+              </select>
+            </div>
+            <div v-if="filterMode === 'monthly'">
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
+              <select v-model.number="filters.month"
+                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}
+                </option>
+              </select>
+            </div>
+            <div v-if="filterMode === 'custom'" class="md:col-span-2">
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
+              <flat-pickr
+                v-model="customDateRange"
+                :config="customRangePickerConfig"
+                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700"
+                placeholder="Select date range"
+              />
+            </div>
+            <div>
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office
+                Shift</label>
+              <select v-model="filters.office_shift_id"
+                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option value="">All</option>
+                <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{
+                  shift.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
+              <select v-model="filters.department_id"
+                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option value="">All</option>
+                <option v-for="department in departments" :key="`report-department-${department.id}`"
+                  :value="String(department.id)">{{ department.department_name }}</option>
+              </select>
+            </div>
+            <div>
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
+              <select v-model="filters.college_id"
+                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option value="">All</option>
+                <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{
+                  college.college_long || college.college_short || `College #${college.id}` }}</option>
+              </select>
+            </div>
+            <Button @click="generateReport" size="sm" variant="primary"
+              :className="'mt-auto h-11 bg-sky-500 hover:bg-sky-600 text-white'">Generate</Button>
           </div>
-          <div>
-            <label
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office
-              Shift</label>
-            <select v-model="filters.office_shift_id"
-              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option value="">All</option>
-              <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{
-                shift.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
-            <select v-model="filters.department_id"
-              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option value="">All</option>
-              <option v-for="department in departments" :key="`report-department-${department.id}`"
-                :value="String(department.id)">{{ department.department_name }}</option>
-            </select>
-          </div>
-          <div>
-            <label
-              class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
-            <select v-model="filters.college_id"
-              class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option value="">All</option>
-              <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{
-                college.college_long || college.college_short || `College #${college.id}` }}</option>
-            </select>
-          </div>
-          <Button @click="generateReport" size="sm" variant="primary"
-            :className="'mt-auto h-11 bg-sky-500 hover:bg-sky-600 text-white'">Generate</Button>
         </div>
       </div>
 
@@ -907,7 +1167,7 @@ const getPrintableRecords = (user) => {
       <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <div class="text-sm text-slate-600 dark:text-slate-300">
           <span class="font-semibold text-slate-900 dark:text-white">{{ loading ? 'Generating...' : reportUsers.length
-            }}</span> user(s) matched for {{ monthYearLabel }}
+            }}</span> user(s) matched for {{ periodLabel }}
           <span v-if="!loading" class="ml-2">({{ selectedCount }} selected)</span>
           <span v-if="preparingPrintData" class="ml-2 text-xs text-amber-600 dark:text-amber-300">Preparing print data...</span>
         </div>
@@ -966,7 +1226,7 @@ const getPrintableRecords = (user) => {
                 <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Audit</p>
                 <h4 class="mt-3 text-2xl font-semibold tracking-tight text-white">Raw Biometric Logs</h4>
                 <p class="mt-2 text-sm text-slate-200/90">
-                  {{ biometricLogUser?.name || '-' }} - {{ monthYearLabel }}
+                  {{ biometricLogUser?.name || '-' }} - {{ periodLabel }}
                 </p>
                 <p class="mt-2 text-xs text-slate-300/90">All entries are shown as-is, including duplicate IN/OUT
                   punches.</p>
@@ -1054,7 +1314,7 @@ const getPrintableRecords = (user) => {
 
     <div class="hidden">
       <PrintableAttendance v-for="user in reportUsers" :key="`report-printable-${user.id}`" ref="printableRefs"
-        :user="user" :selected-year="filters.year" :selected-month="filters.month"
+        :user="user" :selected-year="selectedPeriodYear" :selected-month="selectedPeriodMonth"
         :attendance-records="getPrintableRecords(user)" :company-name="companySchoolName"
         :company-logo="companySchoolLogo" :show-logo="companySchoolLogoPrintEnabled" :show-controls="false"
         :calculate-undertime="calculateUndertime" />

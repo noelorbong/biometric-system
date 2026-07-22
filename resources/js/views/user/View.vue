@@ -10,6 +10,8 @@ import { useUserStore } from '@/store/UserStore'
 import { useAppSettingStore } from '@/store/AppSettingStore'
 import { useAuthStore } from '@/store/AuthStore'
 import Swal from 'sweetalert2'
+import flatPickr from 'vue-flatpickr-component'
+import 'flatpickr/dist/flatpickr.css'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,8 +24,51 @@ const { companySchoolName, companySchoolLogo, companySchoolLogoPrintEnabled } = 
 
 const activeTab = ref('userinfo')
 const currentDate = new Date()
+const formatDateInput = (date) => {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+const parseDateInputValue = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+    return null
+  }
+
+  const [year, month, day] = String(value).split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  if (
+    Number.isNaN(date.getTime())
+    || date.getFullYear() !== year
+    || date.getMonth() !== (month - 1)
+    || date.getDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+const toDateOnlyKey = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return formatDateInput(date)
+}
+
+const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
+const filterMode = ref('monthly')
 const selectedYear = ref(currentDate.getFullYear())
 const selectedMonth = ref(currentDate.getMonth() + 1)
+const customDateFrom = ref(formatDateInput(monthStart))
+const customDateTo = ref(formatDateInput(monthEnd))
+const customDateRange = ref('')
 const checkinouts = ref([])
 const checkinoutOverrides = ref([])
 const checkinoutLoading = ref(false)
@@ -33,6 +78,142 @@ const rawLogRows = ref([])
 const isUserEditModalOpen = ref(false)
 const userEditSaving = ref(false)
 const editableUser = ref(null)
+
+const formatRangeModelValue = (dateFrom, dateTo) => {
+  const from = parseDateInputValue(dateFrom) ? String(dateFrom) : ''
+  const to = parseDateInputValue(dateTo) ? String(dateTo) : ''
+
+  if (!from && !to) return ''
+  if (from && !to) return from
+  if (from && to && from === to) return from
+  return `${from} to ${to}`
+}
+
+const applyRangeSelection = (selectedDates = []) => {
+  if (!Array.isArray(selectedDates) || selectedDates.length === 0) {
+    customDateFrom.value = ''
+    customDateTo.value = ''
+    customDateRange.value = ''
+    return
+  }
+
+  const from = selectedDates[0] instanceof Date ? formatDateInput(selectedDates[0]) : ''
+  const to = selectedDates[1] instanceof Date
+    ? formatDateInput(selectedDates[1])
+    : from
+
+  customDateFrom.value = from
+  customDateTo.value = to
+  customDateRange.value = formatRangeModelValue(from, to)
+
+  if (from) {
+    const parsedFrom = parseDateInputValue(from)
+    if (parsedFrom) {
+      selectedYear.value = parsedFrom.getFullYear()
+      selectedMonth.value = parsedFrom.getMonth() + 1
+    }
+  }
+}
+
+const customRangePickerConfig = {
+  mode: 'range',
+  dateFormat: 'Y-m-d',
+  altInput: true,
+  altFormat: 'M j, Y',
+  allowInput: false,
+  onChange: applyRangeSelection,
+  onClose: applyRangeSelection,
+}
+
+watch(
+  () => [customDateFrom.value, customDateTo.value],
+  ([dateFrom, dateTo]) => {
+    customDateRange.value = formatRangeModelValue(dateFrom, dateTo)
+  },
+  { immediate: true },
+)
+
+const getCustomRangeBounds = () => {
+  if (!customDateFrom.value || !customDateTo.value) {
+    return { error: 'Select both start and end dates.' }
+  }
+
+  const fromDate = parseDateInputValue(customDateFrom.value)
+  const toDate = parseDateInputValue(customDateTo.value)
+
+  if (!fromDate || !toDate) {
+    return { error: 'Invalid date range selected.' }
+  }
+
+  if (fromDate > toDate) {
+    return { error: 'Start date must not be later than end date.' }
+  }
+
+  return {
+    dateFrom: customDateFrom.value,
+    dateTo: customDateTo.value,
+    fromDate,
+    toDate,
+    fromYear: fromDate.getFullYear(),
+    fromMonth: fromDate.getMonth() + 1,
+    toYear: toDate.getFullYear(),
+    toMonth: toDate.getMonth() + 1,
+  }
+}
+
+const selectedPeriodLabel = computed(() => {
+  if (filterMode.value === 'monthly') {
+    return `${monthOptions.find((m) => m.value === selectedMonth.value)?.label || ''} ${selectedYear.value}`.trim()
+  }
+
+  const bounds = getCustomRangeBounds()
+  if (bounds.error) {
+    return 'Select date range'
+  }
+
+  const fromLabel = bounds.fromDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  const toLabel = bounds.toDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+  return `${fromLabel} - ${toLabel}`
+})
+
+const selectedDateKeys = computed(() => {
+  if (filterMode.value === 'monthly') {
+    const totalDaysInMonth = new Date(selectedYear.value, selectedMonth.value, 0).getDate()
+    const keys = []
+
+    for (let day = 1; day <= totalDaysInMonth; day += 1) {
+      keys.push(`${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+    }
+
+    return keys
+  }
+
+  const bounds = getCustomRangeBounds()
+  if (bounds.error) {
+    return []
+  }
+
+  const keys = []
+  const cursor = new Date(bounds.fromDate)
+  const end = new Date(bounds.toDate)
+
+  while (cursor <= end) {
+    keys.push(formatDateInput(cursor))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return keys
+})
+
+const isDateWithinCustomRange = (value) => {
+  const bounds = getCustomRangeBounds()
+  if (bounds.error) {
+    return false
+  }
+
+  const key = toDateOnlyKey(value)
+  return Boolean(key && key >= bounds.dateFrom && key <= bounds.dateTo)
+}
 
 const userId = computed(() => Number(route.params.id))
 
@@ -474,11 +655,9 @@ const attendanceRows = computed(() => {
       }
     }
 
-  const totalDaysInMonth = new Date(selectedYear.value, selectedMonth.value, 0).getDate()
   const rows = []
 
-  for (let day = 1; day <= totalDaysInMonth; day += 1) {
-    const dateKey = `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  for (const dateKey of selectedDateKeys.value) {
     rows.push(buildAttendanceRow(dateKey, grouped.get(dateKey) || []))
   }
 
@@ -486,7 +665,11 @@ const attendanceRows = computed(() => {
 })
 
 const overrideHistoryRows = computed(() => {
-  return [...checkinoutOverrides.value]
+  const rows = filterMode.value === 'custom'
+    ? checkinoutOverrides.value.filter((row) => isDateWithinCustomRange(row?.new_checktime || row?.old_checktime))
+    : checkinoutOverrides.value
+
+  return [...rows]
     .sort((a, b) => new Date(b.created_at || b.updated_at || 0) - new Date(a.created_at || a.updated_at || 0))
 })
 
@@ -543,14 +726,72 @@ const loadCheckinouts = async () => {
 
   checkinoutLoading.value = true
   try {
-    const resp = await axios.post('/api/user/checkinout', {
-      user_id: userId.value,
-      year: selectedYear.value,
-      month: selectedMonth.value,
+    if (filterMode.value === 'monthly') {
+      const resp = await axios.post('/api/user/checkinout', {
+        user_id: userId.value,
+        year: selectedYear.value,
+        month: selectedMonth.value,
+      })
+
+      checkinouts.value = resp?.data?.checkinouts || []
+      checkinoutOverrides.value = resp?.data?.overrides || []
+      return
+    }
+
+    const bounds = getCustomRangeBounds()
+    if (bounds.error) {
+      checkinouts.value = []
+      checkinoutOverrides.value = []
+      return
+    }
+
+    const monthPairs = []
+    const cursor = new Date(bounds.fromYear, bounds.fromMonth - 1, 1)
+    const endMonth = new Date(bounds.toYear, bounds.toMonth - 1, 1)
+
+    while (cursor <= endMonth) {
+      monthPairs.push({
+        year: cursor.getFullYear(),
+        month: cursor.getMonth() + 1,
+      })
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+
+    const responses = await Promise.all(
+      monthPairs.map(({ year, month }) => axios.post('/api/user/checkinout', {
+        user_id: userId.value,
+        year,
+        month,
+      })),
+    )
+
+    const logsById = new Map()
+    const overridesById = new Map()
+
+    responses.forEach((resp) => {
+      const logs = resp?.data?.checkinouts || []
+      const overrides = resp?.data?.overrides || []
+
+      logs.forEach((log) => {
+        if (!isDateWithinCustomRange(log?.CHECKTIME)) {
+          return
+        }
+
+        logsById.set(String(log.id), log)
+      })
+
+      overrides.forEach((override) => {
+        const dateValue = override?.new_checktime || override?.old_checktime
+        if (!isDateWithinCustomRange(dateValue)) {
+          return
+        }
+
+        overridesById.set(String(override.id), override)
+      })
     })
 
-    checkinouts.value = resp?.data?.checkinouts || []
-    checkinoutOverrides.value = resp?.data?.overrides || []
+    checkinouts.value = [...logsById.values()].sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
+    checkinoutOverrides.value = [...overridesById.values()]
   } catch (error) {
     console.log(error)
     checkinouts.value = []
@@ -560,7 +801,7 @@ const loadCheckinouts = async () => {
   }
 }
 
-watch([selectedYear, selectedMonth, userId], async () => {
+watch([selectedYear, selectedMonth, userId, filterMode, customDateFrom, customDateTo], async () => {
   await loadCheckinouts()
 })
 
@@ -691,6 +932,14 @@ const toOverrideEditableLog = (row) => ({
 })
 
 const refreshCheckinoutState = async (payload = {}) => {
+  if (filterMode.value === 'custom') {
+    await loadCheckinouts()
+    if (rawLogModalOpen.value && rawLogModalDate.value) {
+      rawLogRows.value = [...(rawLogsByDate.value.get(rawLogModalDate.value) || [])]
+    }
+    return
+  }
+
   checkinoutLoading.value = true
   try {
     const resp = await axios.post('/api/user/checkinout', {
@@ -1115,6 +1364,27 @@ const saveEditedUser = async (payload) => {
         <!-- Filters -->
         <div class="flex flex-wrap items-end gap-4 rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
           <div>
+            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
+            <div class="inline-flex rounded-lg border border-slate-300 p-1 dark:border-slate-700">
+              <button
+                type="button"
+                @click="filterMode = 'monthly'"
+                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+              >
+                Month
+              </button>
+              <button
+                type="button"
+                @click="filterMode = 'custom'"
+                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+              >
+                Custom
+              </button>
+            </div>
+          </div>
+          <div v-if="filterMode === 'monthly'">
             <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
             <select
               v-model.number="selectedYear"
@@ -1123,7 +1393,7 @@ const saveEditedUser = async (payload) => {
               <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
             </select>
           </div>
-          <div>
+          <div v-if="filterMode === 'monthly'">
             <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
             <select
               v-model.number="selectedMonth"
@@ -1131,6 +1401,15 @@ const saveEditedUser = async (payload) => {
             >
               <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
             </select>
+          </div>
+          <div v-if="filterMode === 'custom'" class="min-w-[280px]">
+            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
+            <flat-pickr
+              v-model="customDateRange"
+              :config="customRangePickerConfig"
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              placeholder="Select date range"
+            />
           </div>
           <div v-if="checkinoutLoading" class="flex items-center gap-2 pb-0.5 text-sm text-slate-500 dark:text-slate-400">
             <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1167,7 +1446,7 @@ const saveEditedUser = async (payload) => {
           <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
             <h3 class="text-base font-semibold text-slate-800 dark:text-white/90">Override History</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">
-              Audit trail of added and overridden biometric logs for the selected month.
+              Audit trail of added and overridden biometric logs for {{ selectedPeriodLabel }}.
             </p>
           </div>
           <div class="overflow-x-auto">
@@ -1247,7 +1526,7 @@ const saveEditedUser = async (payload) => {
           <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
             <h3 class="text-base font-semibold text-slate-800 dark:text-white/90">Attendance Record</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">
-              {{ monthOptions.find(m => m.value === selectedMonth)?.label }} {{ selectedYear }}
+              {{ selectedPeriodLabel }}
             </p>
           </div>
           <div class="overflow-x-auto">
