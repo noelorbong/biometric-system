@@ -66,6 +66,7 @@ Route::post('/machine/auto-sync-status', [MachineController::class, 'autoSyncSta
 Route::post('/machine/sync-attendance', [MachineController::class, 'syncAttendance'])->middleware('auth:sanctum');
 Route::post('/machine/import-attendance-dat/preview', [MachineController::class, 'previewAttendanceDatImport'])->middleware('auth:sanctum');
 Route::post('/machine/import-attendance-dat', [MachineController::class, 'importAttendanceDat'])->middleware('auth:sanctum');
+Route::post('/machine/import-attendance-dat/progress', [MachineController::class, 'attendanceImportProgress'])->middleware('auth:sanctum');
 Route::post('/machine/download-users', [MachineController::class, 'downloadUsers'])->middleware('auth:sanctum');
 Route::post('/machine/download-users-progress', [MachineController::class, 'downloadUsersProgress'])->middleware('auth:sanctum');
 Route::post('/machine/clear-attendance', [MachineController::class, 'clearAttendanceLogs'])->middleware('auth:sanctum');

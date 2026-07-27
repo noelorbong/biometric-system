@@ -138,6 +138,36 @@
                                     </select>
                                 </div>
                             </div>
+
+                            <div class="mt-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300">In-Charge</h6>
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Assign another existing user as the default signatory for this user's DTR.
+                                        </p>
+                                    </div>
+                                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <input v-model="form_data.in_charge_enabled" type="checkbox" class="h-4 w-4" />
+                                        Use in-charge
+                                    </label>
+                                </div>
+
+                                <div class="mt-4">
+                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Choose In-Charge</label>
+                                    <select
+                                        v-model="form_data.in_charge_user_id"
+                                        :disabled="!form_data.in_charge_enabled"
+                                        class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <option :value="null">Select user</option>
+                                        <option v-for="item in inChargeUsers" :key="`in-charge-${item.id}`" :value="item.id">
+                                            {{ getUserOptionLabel(item) }}
+                                        </option>
+                                    </select>
+                                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Display name is used when available, otherwise the user name.</p>
+                                </div>
+                            </div>
                         </section>
 
                         <section v-if="!props.isEditUser || authStore.user.role === 0 || authStore.user.role === 1" class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
@@ -236,7 +266,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/store/AuthStore'
 const authStore = useAuthStore();
 import Modal from '@/components/common/Modal.vue'
@@ -252,6 +282,10 @@ const props = defineProps({
         default: () => [],
     },
     colleges: {
+        type: Array,
+        default: () => [],
+    },
+    users: {
         type: Array,
         default: () => [],
     },
@@ -281,6 +315,8 @@ const createDefaultFormData = () => ({
     office_shift_id: null,
     department_id: null,
     college_id: null,
+    in_charge_enabled: false,
+    in_charge_user_id: null,
     image: '',
     thumbnail: '',
     name_extension: '',
@@ -351,7 +387,16 @@ const hydrateForm = () => {
         office_shift_id: normalizeNullableNumber(props.user.office_shift_id),
         department_id: normalizeNullableNumber(props.user.department_id),
         college_id: normalizeNullableNumber(props.user.college_id),
+        in_charge_enabled: Boolean(props.user.in_charge_enabled),
+        in_charge_user_id: normalizeNullableNumber(props.user.in_charge_user_id ?? props.user.in_charge_user?.id),
+        first_name: props.user.first_name ?? props.user.profile?.first_name ?? '',
+        middle_name: props.user.middle_name ?? props.user.profile?.middle_name ?? '',
+        last_name: props.user.last_name ?? props.user.profile?.last_name ?? '',
+        name_extension: props.user.name_extension ?? props.user.profile?.name_extension ?? '',
         dob: normalizeDateInputValue(props.user.dob || props.user.profile?.dob),
+        gender: props.user.gender ?? props.user.profile?.gender ?? '',
+        image: props.user.image ?? props.user.profile?.image ?? '',
+        thumbnail: props.user.thumbnail ?? props.user.profile?.thumbnail ?? '',
         password: '',
         contacts: props.user.contacts?.length
             ? JSON.parse(JSON.stringify(props.user.contacts)).map((item) => ({
@@ -382,6 +427,16 @@ const hydrateForm = () => {
 const form_data = ref(createDefaultFormData())
 
 const showPassword = ref(false)
+
+const getUserOptionLabel = (user) => {
+    const displayName = String(user?.display_name || user?.profile?.display_name || '').trim()
+    return displayName || user?.name || `User #${user?.id || ''}`
+}
+
+const inChargeUsers = computed(() => {
+    const currentUserId = Number(form_data.value.id || 0)
+    return (Array.isArray(props.users) ? props.users : []).filter((user) => Number(user?.id || 0) !== currentUserId)
+})
 
 const togglePasswordVisibility = () => {
     showPassword.value = !showPassword.value
@@ -430,6 +485,8 @@ const submitForm = () => {
         office_shift_id: normalizeNullableNumber(form_data.value.office_shift_id),
         department_id: normalizeNullableNumber(form_data.value.department_id),
         college_id: normalizeNullableNumber(form_data.value.college_id),
+        in_charge_enabled: Boolean(form_data.value.in_charge_enabled),
+        in_charge_user_id: normalizeNullableNumber(form_data.value.in_charge_user_id),
         contacts: form_data.value.contacts.filter((item) => item.type || item.value),
         addresses: form_data.value.addresses.filter((item) => normalizeNullableNumber(item?.id) !== null || hasAddressContent(item)),
     }

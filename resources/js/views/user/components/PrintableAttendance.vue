@@ -181,6 +181,10 @@
 
                     <!-- In-Charge -->
                     <div style="margin-left:auto; width:50%; text-align: center;">
+                        <div v-if="signatorySignatureEnabled && signatorySignature" style="display:flex; justify-content:center; margin-bottom: 6px;">
+                            <img :src="signatorySignature" alt="Signatory e-signature" style="max-height: 40px; max-width: 160px; object-fit: contain;" />
+                        </div>
+                        <p  style="font-size: 7pt;   text-transform: uppercase; ">{{ signatoryName }}</p>
                         <div style="border-top: 1px solid #111827; "></div>
                         <p style="color: #111827;  margin-top: 0px; font-style: italic; font-size: 8pt;">In-Charge</p>
                     </div>
@@ -219,6 +223,18 @@ const props = defineProps({
         default: true,
     }
     ,
+    signatoryName: {
+        type: String,
+        default: 'In-Charge',
+    },
+    signatorySignature: {
+        type: String,
+        default: '',
+    },
+    signatorySignatureEnabled: {
+        type: Boolean,
+        default: false,
+    },
     calculateUndertime: {
         type: Boolean,
         default: undefined,

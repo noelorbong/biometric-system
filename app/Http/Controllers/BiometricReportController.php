@@ -31,7 +31,9 @@ class BiometricReportController extends Controller
 
         $usersQuery = User::query()
             ->with([
-                'profile:id,user_id,first_name,middle_name,last_name,name_extension',
+                'profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
+                'inChargeUser:id,name,in_charge_user_id',
+                'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
                 'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'departmentRef:id,department_name',
@@ -53,7 +55,17 @@ class BiometricReportController extends Controller
 
         $users = $usersQuery
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'office_shift_id', 'department_id', 'college_id', 'department']);
+            ->get([
+                'id',
+                'name',
+                'email',
+                'office_shift_id',
+                'department_id',
+                'college_id',
+                'department',
+                'in_charge_user_id',
+                'in_charge_enabled',
+            ]);
 
         if ($users->isEmpty()) {
             return response()->json([
@@ -297,12 +309,23 @@ class BiometricReportController extends Controller
                 $profile?->last_name,
                 $profile?->name_extension,
             ])));
+            $inChargeUser = $user->inChargeUser;
+            $inChargeDisplayName = trim((string) ($inChargeUser?->profile?->display_name ?? ''));
+
+            if ($inChargeDisplayName === '') {
+                $inChargeDisplayName = (string) ($inChargeUser?->name ?? '');
+            }
 
             return [
                 'id' => $user->id,
                 'name' => $fullName ?: $user->name,
+                'display_name' => $profile?->display_name,
                 'email' => $user->email,
                 'office_shift' => $user->officeShift,
+                'in_charge_enabled' => (bool) ($user->in_charge_enabled ?? false),
+                'in_charge_user_id' => $user->in_charge_user_id,
+                'in_charge_user' => $inChargeUser,
+                'in_charge_user_label' => $inChargeDisplayName !== '' ? $inChargeDisplayName : null,
                 'department' => $user->departmentRef?->department_name ?? $user->department,
                 'college' => $user->collegeRef?->college_long ?? $user->collegeRef?->college_short,
                 'attendance_records' => $attendanceRecords,

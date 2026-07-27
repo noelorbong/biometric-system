@@ -175,6 +175,19 @@ export const useMachineStore = defineStore('machines', {
       })
     },
 
+    async importAttendanceDatProgress(payload) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/machine/import-attendance-dat/progress', payload).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
     async downloadUsers(payload) {
       const auth = useAuthStore()
 

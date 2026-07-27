@@ -28,6 +28,7 @@ const attendanceDatImporting = ref(false)
 const attendanceDatError = ref('')
 const attendanceDatPreview = ref(null)
 const attendanceDatPage = ref(1)
+const attendanceDatProgress = ref(null)
 const attendanceDatPageSize = 20
 
 const connectingIds = ref(new Set())
@@ -46,6 +47,7 @@ const webAutoFallbackEnabled = ref(false)
 let autoSyncStatusTimer = null
 let machineRefreshTimer = null
 let webAutoFallbackTimer = null
+let attendanceDatProgressTimer = null
 let webAutoFallbackRunning = false
 const webLastRunAt = new Map()
 const WEB_AUTO_FALLBACK_STORAGE_KEY = 'machine-web-auto-fallback-enabled'
@@ -67,6 +69,57 @@ const attendanceDatHasInput = computed(() => {
   return !!attendanceDatFile.value || attendanceDatText.value.trim() !== ''
 })
 
+const attendanceDatProgressPercent = computed(() => {
+  const total = Number(attendanceDatProgress.value?.total || 0)
+  const processed = Number(attendanceDatProgress.value?.processed || 0)
+
+  if (total <= 0) {
+    return 0
+  }
+
+  return Math.min(100, Math.max(0, Math.round((processed / total) * 100)))
+})
+
+const attendanceDatProgressText = computed(() => {
+  const total = Number(attendanceDatProgress.value?.total || 0)
+  const processed = Number(attendanceDatProgress.value?.processed || 0)
+
+  if (total <= 0) {
+    return 'Starting...'
+  }
+
+  return `${processed} / ${total} (${attendanceDatProgressPercent.value}%)`
+})
+
+const attendanceDatProgressVisible = computed(() => {
+  const state = attendanceDatProgress.value?.state || 'idle'
+  return attendanceDatImporting.value || (state !== 'idle' && state !== '')
+})
+
+const clearAttendanceDatProgressTimer = () => {
+  if (attendanceDatProgressTimer) {
+    clearInterval(attendanceDatProgressTimer)
+    attendanceDatProgressTimer = null
+  }
+}
+
+const pollAttendanceDatProgress = async (progressKey) => {
+  if (!progressKey) {
+    return
+  }
+
+  const progressResp = await machineStore.importAttendanceDatProgress({ progress_key: progressKey })
+  if (!progressResp.success) {
+    return
+  }
+
+  attendanceDatProgress.value = progressResp.data || null
+
+  if (['completed', 'failed'].includes(progressResp.data?.state)) {
+    clearAttendanceDatProgressTimer()
+  }
+}
+
 const resetAttendanceDatImportState = () => {
   attendanceDatFile.value = null
   attendanceDatFileName.value = ''
@@ -77,6 +130,8 @@ const resetAttendanceDatImportState = () => {
   attendanceDatError.value = ''
   attendanceDatPreview.value = null
   attendanceDatPage.value = 1
+  attendanceDatProgress.value = null
+  clearAttendanceDatProgressTimer()
 }
 
 const openAttendanceDatImport = () => {
@@ -86,6 +141,7 @@ const openAttendanceDatImport = () => {
 
 const closeAttendanceDatImport = () => {
   isAttendanceDatModalOpen.value = false
+  clearAttendanceDatProgressTimer()
 }
 
 const onAttendanceDatFileChange = (event) => {
@@ -149,6 +205,18 @@ const importAttendanceDat = async () => {
   }
 
   attendanceDatImporting.value = true
+  attendanceDatError.value = ''
+
+  const progressKey = `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  attendanceDatProgress.value = {
+    state: 'running',
+    phase: 'uploading',
+    total: Number(attendanceDatPreview.value?.total || 0),
+    processed: 0,
+    imported: 0,
+    skipped: 0,
+    message: 'Uploading attendance file...',
+  }
 
   const formData = new FormData()
   if (attendanceDatFile.value) {
@@ -158,10 +226,19 @@ const importAttendanceDat = async () => {
     formData.append('text_content', attendanceDatText.value)
   }
   formData.append('user_filter', attendanceDatUserFilter.value)
+  formData.append('progress_key', progressKey)
+
+  clearAttendanceDatProgressTimer()
+  attendanceDatProgressTimer = window.setInterval(() => {
+    pollAttendanceDatProgress(progressKey)
+  }, 900)
+  pollAttendanceDatProgress(progressKey)
 
   const resp = await machineStore.importAttendanceDat(formData)
 
+  await pollAttendanceDatProgress(progressKey)
   attendanceDatImporting.value = false
+  clearAttendanceDatProgressTimer()
 
   if (!resp.success) {
     attendanceDatError.value = resp?.data?.response?.data?.message || 'Import failed.'
@@ -406,6 +483,8 @@ const clearMachineTimers = () => {
     clearInterval(webAutoFallbackTimer)
     webAutoFallbackTimer = null
   }
+
+  clearAttendanceDatProgressTimer()
 }
 
 const applyMachineTimerSettings = () => {
@@ -1490,26 +1569,38 @@ onUnmounted(() => {
 <template>
   <div class="space-y-6">
     <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
-      <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-        <div class="max-w-3xl">
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Device Control Deck</p>
-          <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Machines</h1>
+      <div class="grid grid-cols-2" >
+        <h1 class=" text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Machines</h1>
+        <div>
+              <p class="text-right text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Device Control Deck</p>
+              <div class=" mt-1 mb-1 lg:flex items-right justify-end gap-2 text-sm font-medium text-white/80">
+                 <span
+                  class="float-right inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
+                  :class="autoSyncDaemonStatus.running
+                    ? 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'
+                    : 'bg-rose-400/15 text-rose-100 ring-rose-300/30'"
+                >
+                  {{ autoSyncDaemonStatus.running ? 'Daemon Running' : 'Daemon Stopped' }}
+                </span>
+                <span class="float-right inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
+                  Heartbeat: {{ formatLastAutoSync(autoSyncDaemonStatus.last_heartbeat) }}
+                </span>
+              </div>
+        </div>
+        
+          
           <p class="hidden mt-3 max-w-2xl text-sm leading-6 text-slate-200/90">
             Monitor machine health, run downloads, control background sync, and manage template operations from one screen.
           </p>
 
+      </div>
+
+      <div class="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
+        <div class="max-w-3xl">
+          
+
           <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
-            <span
-              class="inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
-              :class="autoSyncDaemonStatus.running
-                ? 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'
-                : 'bg-rose-400/15 text-rose-100 ring-rose-300/30'"
-            >
-              {{ autoSyncDaemonStatus.running ? 'Daemon Running' : 'Daemon Stopped' }}
-            </span>
-            <span class="inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
-              Heartbeat: {{ formatLastAutoSync(autoSyncDaemonStatus.last_heartbeat) }}
-            </span>
+           
             <button
               type="button"
               @click="toggleWebAutoFallback"
@@ -1946,6 +2037,31 @@ onUnmounted(() => {
               <p v-if="attendanceDatError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
                 {{ attendanceDatError }}
               </p>
+
+              <div v-if="attendanceDatProgressVisible" class="rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-900/20">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-medium text-sky-800 dark:text-sky-200">
+                    {{ attendanceDatProgress?.message || (attendanceDatImporting ? 'Importing attendance records...' : 'Preparing import...') }}
+                  </p>
+                  <span class="text-xs font-semibold text-sky-700 dark:text-sky-300">{{ attendanceDatProgressText }}</span>
+                </div>
+
+                <div class="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-sky-100 dark:bg-sky-900/40">
+                  <div
+                    v-if="Number(attendanceDatProgress?.total || 0) > 0"
+                    class="h-full rounded-full bg-sky-500 transition-all duration-300"
+                    :style="{ width: `${attendanceDatProgressPercent}%` }"
+                  ></div>
+                  <div v-else class="h-full w-full rounded-full bg-sky-400/70 animate-pulse"></div>
+                </div>
+
+                <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-4">
+                  <p>State: <strong>{{ attendanceDatProgress?.state || 'running' }}</strong></p>
+                  <p>Processed: <strong>{{ Number(attendanceDatProgress?.processed || 0) }}</strong></p>
+                  <p>Imported: <strong class="text-emerald-700 dark:text-emerald-300">{{ Number(attendanceDatProgress?.imported || 0) }}</strong></p>
+                  <p>Skipped: <strong class="text-amber-700 dark:text-amber-300">{{ Number(attendanceDatProgress?.skipped || 0) }}</strong></p>
+                </div>
+              </div>
 
               <div v-if="attendanceDatPreview" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">

@@ -22,6 +22,10 @@ const {
   companySchoolName,
   companySchoolLogo,
   companySchoolLogoPrintEnabled,
+  biometricDtrSignatoryName,
+  biometricDtrSignatorySignature,
+  biometricDtrSignatoryUseDefault,
+  biometricDtrSignatorySignatureEnabled,
   machineAutoSyncStatusTimerEnabled,
   machineAutoSyncStatusTimerMs,
   machineRefreshTimerEnabled,
@@ -34,6 +38,10 @@ const form = ref({
   company_school_name: '',
   company_school_logo: '',
   company_school_logo_print_enabled: false,
+  biometric_dtr_signatory_name: 'In-Charge',
+  biometric_dtr_signatory_signature: '',
+  biometric_dtr_signatory_use_default: true,
+  biometric_dtr_signatory_signature_enabled: false,
   machine_auto_sync_status_timer_enabled: true,
   machine_auto_sync_status_timer_ms: 5000,
   machine_refresh_timer_enabled: true,
@@ -158,6 +166,31 @@ const uploadLogo = async (event) => {
   }
 }
 
+const uploadSignature = async (event) => {
+  const files = event?.target?.files
+  if (!files || files.length <= 0) {
+    return
+  }
+
+  const formData = new FormData()
+  formData.append('file', files[0])
+
+  try {
+    const response = await axios.post('/api/media/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    form.value.biometric_dtr_signatory_signature = response?.data?.path || ''
+    toastResult('Signature uploaded')
+  } catch (error) {
+    toastResult(error?.response?.data?.message || 'Unable to upload signature', 'error')
+  } finally {
+    event.target.value = ''
+  }
+}
+
 const loadSettings = async () => {
   const resp = await appSettingStore.loadSettings()
   if (!resp.success) {
@@ -168,6 +201,10 @@ const loadSettings = async () => {
   form.value.company_school_name = companySchoolName.value || 'Biometric System'
   form.value.company_school_logo = companySchoolLogo.value || ''
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
+  form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value || 'In-Charge'
+  form.value.biometric_dtr_signatory_signature = biometricDtrSignatorySignature.value || ''
+  form.value.biometric_dtr_signatory_use_default = Boolean(biometricDtrSignatoryUseDefault.value)
+  form.value.biometric_dtr_signatory_signature_enabled = Boolean(biometricDtrSignatorySignatureEnabled.value)
   form.value.machine_auto_sync_status_timer_enabled = Boolean(machineAutoSyncStatusTimerEnabled.value)
   form.value.machine_auto_sync_status_timer_ms = Number(machineAutoSyncStatusTimerMs.value || 5000)
   form.value.machine_refresh_timer_enabled = Boolean(machineRefreshTimerEnabled.value)
@@ -190,6 +227,10 @@ const saveSettings = async () => {
     company_school_name: form.value.company_school_name,
     company_school_logo: form.value.company_school_logo,
     company_school_logo_print_enabled: Boolean(form.value.company_school_logo_print_enabled),
+    biometric_dtr_signatory_name: form.value.biometric_dtr_signatory_name,
+    biometric_dtr_signatory_signature: form.value.biometric_dtr_signatory_signature,
+    biometric_dtr_signatory_use_default: Boolean(form.value.biometric_dtr_signatory_use_default),
+    biometric_dtr_signatory_signature_enabled: Boolean(form.value.biometric_dtr_signatory_signature_enabled),
     machine_auto_sync_status_timer_enabled: Boolean(form.value.machine_auto_sync_status_timer_enabled),
     machine_auto_sync_status_timer_ms: clampMs(form.value.machine_auto_sync_status_timer_ms, 5000),
     machine_refresh_timer_enabled: Boolean(form.value.machine_refresh_timer_enabled),
@@ -207,6 +248,10 @@ const saveSettings = async () => {
   form.value.company_school_name = companySchoolName.value || form.value.company_school_name
   form.value.company_school_logo = companySchoolLogo.value || form.value.company_school_logo
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
+  form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value || form.value.biometric_dtr_signatory_name
+  form.value.biometric_dtr_signatory_signature = biometricDtrSignatorySignature.value || form.value.biometric_dtr_signatory_signature
+  form.value.biometric_dtr_signatory_use_default = Boolean(biometricDtrSignatoryUseDefault.value)
+  form.value.biometric_dtr_signatory_signature_enabled = Boolean(biometricDtrSignatorySignatureEnabled.value)
   form.value.machine_auto_sync_status_timer_enabled = Boolean(machineAutoSyncStatusTimerEnabled.value)
   form.value.machine_auto_sync_status_timer_ms = Number(machineAutoSyncStatusTimerMs.value || 5000)
   form.value.machine_refresh_timer_enabled = Boolean(machineRefreshTimerEnabled.value)
@@ -521,6 +566,66 @@ onMounted(async () => {
           <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
             When enabled, the uploaded logo will appear in printable attendance forms.
           </p>
+        </div>
+
+        <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300">Biometric DTR Signatory</h3>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Enter the default signatory name and optional e-signature used in printable biometric DTR forms.
+              </p>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input v-model="form.biometric_dtr_signatory_use_default" type="checkbox" class="h-4 w-4" />
+              Use as default in Biometric DTR
+            </label>
+          </div>
+
+          <div class="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
+            <div>
+              <label class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Signatory Name</label>
+              <input
+                v-model.trim="form.biometric_dtr_signatory_name"
+                type="text"
+                placeholder="Enter in-charge name"
+                :disabled="!form.biometric_dtr_signatory_use_default"
+                class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+              />
+              <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">This name prints above the signature line when the default is enabled.</p>
+            </div>
+
+            <div>
+              <label class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">E-Signature</label>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                @change="uploadSignature"
+                :disabled="!form.biometric_dtr_signatory_use_default"
+                class="block w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-sky-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-sky-700 hover:file:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
+              />
+              <div v-if="form.biometric_dtr_signatory_signature" class="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/30">
+                <img :src="form.biometric_dtr_signatory_signature" alt="Signatory signature" class="h-12 max-w-[160px] object-contain" />
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-slate-800 dark:text-white">Signature ready</p>
+                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.biometric_dtr_signatory_signature }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-400">
+            <div>
+              <p class="font-semibold text-slate-700 dark:text-slate-300">Print Preview</p>
+              <p class="mt-1">
+                {{ form.biometric_dtr_signatory_use_default ? (form.biometric_dtr_signatory_name || 'In-Charge') : 'Manual / default off' }}
+              </p>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input v-model="form.biometric_dtr_signatory_signature_enabled" type="checkbox" class="h-4 w-4" />
+              Use e-signature in Biometric DTR
+            </label>
+          </div>
         </div>
 
         <div class="mt-6">

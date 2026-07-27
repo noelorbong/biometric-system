@@ -20,7 +20,33 @@ const appSettingStore = useAppSettingStore()
 const authStore = useAuthStore()
 const { users } = storeToRefs(userStore)
 const { user: authUser } = storeToRefs(authStore)
-const { companySchoolName, companySchoolLogo, companySchoolLogoPrintEnabled } = storeToRefs(appSettingStore)
+const {
+  companySchoolName,
+  companySchoolLogo,
+  companySchoolLogoPrintEnabled,
+  biometricDtrSignatoryName,
+  biometricDtrSignatorySignature,
+  biometricDtrSignatoryUseDefault,
+  biometricDtrSignatorySignatureEnabled,
+} = storeToRefs(appSettingStore)
+
+const selectedUserSignatoryName = computed(() => {
+  const assignedInCharge = selectedUser.value?.in_charge_user_id || selectedUser.value?.in_charge_user
+  if (assignedInCharge) {
+    const inChargeDisplayName = String(
+      selectedUser.value?.in_charge_user_label
+        || selectedUser.value?.in_charge_user?.profile?.display_name
+        || selectedUser.value?.in_charge_user?.name
+        || '',
+    ).trim()
+
+    if (inChargeDisplayName) {
+      return inChargeDisplayName
+    }
+  }
+
+  return biometricDtrSignatoryName.value || 'In-Charge'
+})
 
 const activeTab = ref('userinfo')
 const currentDate = new Date()
@@ -1197,7 +1223,18 @@ const openEditUserModal = async () => {
     await userStore.loadUsers()
   }
 
-  editableUser.value = { ...selectedUser.value }
+  editableUser.value = {
+    ...selectedUser.value,
+    display_name: selectedUser.value?.display_name ?? selectedUser.value?.profile?.display_name ?? '',
+    first_name: selectedUser.value?.first_name ?? selectedUser.value?.profile?.first_name ?? '',
+    middle_name: selectedUser.value?.middle_name ?? selectedUser.value?.profile?.middle_name ?? '',
+    last_name: selectedUser.value?.last_name ?? selectedUser.value?.profile?.last_name ?? '',
+    name_extension: selectedUser.value?.name_extension ?? selectedUser.value?.profile?.name_extension ?? '',
+    dob: selectedUser.value?.dob ?? selectedUser.value?.profile?.dob ?? '',
+    gender: selectedUser.value?.gender ?? selectedUser.value?.profile?.gender ?? '',
+    image: selectedUser.value?.image ?? selectedUser.value?.profile?.image ?? '',
+    thumbnail: selectedUser.value?.thumbnail ?? selectedUser.value?.profile?.thumbnail ?? '',
+  }
   isUserEditModalOpen.value = true
 }
 
@@ -1726,6 +1763,9 @@ const saveEditedUser = async (payload) => {
           :company-name="companySchoolName"
           :company-logo="companySchoolLogo"
           :show-logo="companySchoolLogoPrintEnabled"
+          :signatory-name="selectedUserSignatoryName"
+          :signatory-signature="biometricDtrSignatorySignature"
+          :signatory-signature-enabled="biometricDtrSignatorySignatureEnabled"
         />
       </div>
 
@@ -1734,6 +1774,7 @@ const saveEditedUser = async (payload) => {
         :authUser="authStore.user"
         :isEditUser="true"
         :user="editableUser"
+        :users="users"
         :officeShifts="userStore.officeShifts"
         :departments="userStore.departments"
         :colleges="userStore.colleges"

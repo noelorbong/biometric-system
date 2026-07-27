@@ -319,6 +319,22 @@ class MachineController extends Controller
             'file' => ['nullable', 'file', 'required_without:text_content'],
             'text_content' => ['nullable', 'string', 'required_without:file'],
             'user_filter' => ['nullable', 'string', Rule::in(['existing', 'all'])],
+            'progress_key' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $progressKey = $this->attendanceImportProgressKey(
+            (int) auth()->id(),
+            $validated['progress_key'] ?? null,
+        );
+
+        $this->putAttendanceImportProgress($progressKey, [
+            'state' => 'running',
+            'phase' => 'decoding',
+            'total' => 0,
+            'processed' => 0,
+            'imported' => 0,
+            'skipped' => 0,
+            'message' => 'Decoding attendance file...',
         ]);
 
         $rows = $this->buildAttendanceImportRows(
@@ -327,74 +343,201 @@ class MachineController extends Controller
         );
 
         if ($rows === []) {
+            $message = $this->attendanceImportDecodeFailureMessage(
+                uploadedFile: $validated['file'] ?? null,
+                textContent: $validated['text_content'] ?? null,
+            );
+
+            $this->putAttendanceImportProgress($progressKey, [
+                'state' => 'failed',
+                'phase' => 'decoding',
+                'total' => 0,
+                'processed' => 0,
+                'imported' => 0,
+                'skipped' => 0,
+                'message' => $message,
+            ]);
+
             return response()->json([
-                'message' => $this->attendanceImportDecodeFailureMessage(
-                    uploadedFile: $validated['file'] ?? null,
-                    textContent: $validated['text_content'] ?? null,
-                ),
+                'message' => $message,
             ], 422);
         }
 
-        $userFilter = $validated['user_filter'] ?? 'all';
-        $validUserIds = User::pluck('id')->flip()->all();
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
 
+        $userFilter = $validated['user_filter'] ?? 'all';
+        $validUserIds = $userFilter === 'existing' ? User::pluck('id')->flip()->all() : [];
+
+        $total = count($rows);
         $imported = 0;
         $skipped = 0;
+        $processed = 0;
+        $chunkSize = 500;
 
-        foreach ($rows as $row) {
-            $resolvedUserId = isset($row['USERID']) && is_numeric($row['USERID'])
-                ? (int) $row['USERID']
-                : null;
+        $this->putAttendanceImportProgress($progressKey, [
+            'state' => 'running',
+            'phase' => 'importing',
+            'total' => $total,
+            'processed' => 0,
+            'imported' => 0,
+            'skipped' => 0,
+            'message' => $total > 0 ? 'Starting import...' : 'No rows found to import.',
+        ]);
 
-            if ($resolvedUserId === null || $resolvedUserId <= 0) {
-                $skipped++;
-                continue;
+        try {
+            foreach (array_chunk($rows, $chunkSize) as $chunk) {
+                $seenInChunk = [];
+                $candidateRows = [];
+                $chunkUserIds = [];
+                $chunkTimes = [];
+
+                foreach ($chunk as $row) {
+                    $processed++;
+
+                    $resolvedUserId = isset($row['USERID']) && is_numeric($row['USERID'])
+                        ? (int) $row['USERID']
+                        : null;
+
+                    if ($resolvedUserId === null || $resolvedUserId <= 0) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    if ($userFilter === 'existing' && !isset($validUserIds[$resolvedUserId])) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $checkTime = $row['CHECKTIME'] ?? null;
+
+                    if (!$checkTime) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $compositeKey = $resolvedUserId . '|' . $checkTime;
+                    if (isset($seenInChunk[$compositeKey])) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $seenInChunk[$compositeKey] = true;
+                    $chunkUserIds[$resolvedUserId] = true;
+                    $chunkTimes[] = $checkTime;
+
+                    $candidateRows[$compositeKey] = [
+                        'USERID' => $resolvedUserId,
+                        'CHECKTIME' => $checkTime,
+                        'CHECKTYPE' => $this->normalizeAttendanceCheckType($row['CHECKTYPE'] ?? 'I'),
+                        'VERIFYCODE' => (int) ($row['VERIFYCODE'] ?? 0),
+                        'SENSORID' => $row['SENSORID'] ?? null,
+                        'Memoinfo' => $row['Memoinfo'] ?? null,
+                        'WorkCode' => $row['WorkCode'] ?? null,
+                        'sn' => $row['sn'] ?? null,
+                        'UserExtFmt' => $row['UserExtFmt'] ?? null,
+                    ];
+                }
+
+                if ($candidateRows !== []) {
+                    $existingLookup = [];
+                    $minCheckTime = min($chunkTimes);
+                    $maxCheckTime = max($chunkTimes);
+
+                    $existingRows = Checkinout::query()
+                        ->whereIn('USERID', array_keys($chunkUserIds))
+                        ->whereBetween('CHECKTIME', [$minCheckTime, $maxCheckTime])
+                        ->get(['USERID', 'CHECKTIME']);
+
+                    foreach ($existingRows as $existingRow) {
+                        $existingLookup[$existingRow->USERID . '|' . $existingRow->CHECKTIME] = true;
+                    }
+
+                    $rowsToInsert = [];
+                    foreach ($candidateRows as $key => $payload) {
+                        if (isset($existingLookup[$key])) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        $rowsToInsert[] = $payload;
+                    }
+
+                    if ($rowsToInsert !== []) {
+                        Checkinout::insert($rowsToInsert);
+                        $imported += count($rowsToInsert);
+                    }
+                }
+
+                $this->putAttendanceImportProgress($progressKey, [
+                    'state' => 'running',
+                    'phase' => 'importing',
+                    'total' => $total,
+                    'processed' => $processed,
+                    'imported' => $imported,
+                    'skipped' => $skipped,
+                    'message' => "Imported {$processed} of {$total} records",
+                ]);
             }
-
-            if ($userFilter === 'existing' && !isset($validUserIds[$resolvedUserId])) {
-                $skipped++;
-                continue;
-            }
-
-            $checkTime = $row['CHECKTIME'] ?? null;
-
-            if (!$checkTime) {
-                $skipped++;
-                continue;
-            }
-
-            $exists = Checkinout::query()
-                ->where('USERID', $resolvedUserId)
-                ->where('CHECKTIME', $checkTime)
-                ->exists();
-
-            if ($exists) {
-                $skipped++;
-                continue;
-            }
-
-            Checkinout::create([
-                'USERID' => $resolvedUserId,
-                'CHECKTIME' => $checkTime,
-                'CHECKTYPE' => $row['CHECKTYPE'] ?? 'I',
-                'VERIFYCODE' => $row['VERIFYCODE'] ?? 0,
-                'SENSORID' => $row['SENSORID'] ?? null,
-                'Memoinfo' => $row['Memoinfo'] ?? null,
-                'WorkCode' => $row['WorkCode'] ?? null,
-                'sn' => $row['sn'] ?? null,
-                'UserExtFmt' => $row['UserExtFmt'] ?? null,
+        } catch (\Throwable $e) {
+            $this->putAttendanceImportProgress($progressKey, [
+                'state' => 'failed',
+                'phase' => 'importing',
+                'total' => $total,
+                'processed' => $processed,
+                'imported' => $imported,
+                'skipped' => $skipped,
+                'message' => $e->getMessage(),
             ]);
 
-            $imported++;
+            return response()->json([
+                'message' => 'Import failed: ' . $e->getMessage(),
+            ], 500);
         }
+
+        $this->putAttendanceImportProgress($progressKey, [
+            'state' => 'completed',
+            'phase' => 'done',
+            'total' => $total,
+            'processed' => $processed,
+            'imported' => $imported,
+            'skipped' => $skipped,
+            'message' => 'Attendance import complete.',
+        ]);
 
         return response()->json([
             'message' => 'Attendance imported successfully.',
-            'total' => count($rows),
+            'total' => $total,
             'imported' => $imported,
             'skipped' => $skipped,
             'user_filter' => $userFilter,
+            'progress_key' => $validated['progress_key'] ?? null,
         ]);
+    }
+
+    public function attendanceImportProgress(Request $request)
+    {
+        $validated = $request->validate([
+            'progress_key' => ['required', 'string', 'max:100'],
+        ]);
+
+        $key = $this->attendanceImportProgressKey((int) auth()->id(), $validated['progress_key']);
+        $progress = Cache::get($key);
+
+        if (!is_array($progress)) {
+            $progress = [
+                'state' => 'idle',
+                'phase' => 'idle',
+                'total' => 0,
+                'processed' => 0,
+                'imported' => 0,
+                'skipped' => 0,
+                'message' => 'No active attendance import.',
+            ];
+        }
+
+        return response()->json($progress);
     }
 
     private function buildAttendanceImportRows(mixed $uploadedFile = null, ?string $textContent = null): array
@@ -1346,10 +1489,36 @@ class MachineController extends Controller
         return "machine:download-users:progress:user:{$userId}:ip:{$hash}";
     }
 
+    private function attendanceImportProgressKey(int $userId, ?string $progressToken = null): string
+    {
+        $token = trim((string) ($progressToken ?? 'default'));
+        $safeToken = preg_replace('/[^A-Za-z0-9:_-]/', '', $token) ?: md5($token);
+
+        return "machine:attendance-import:progress:user:{$userId}:{$safeToken}";
+    }
+
     /**
      * @param array<string, mixed> $state
      */
     private function putDownloadUsersProgress(string $key, array $state): void
+    {
+        $existing = Cache::get($key);
+        if (is_array($existing) && !isset($state['started_at']) && isset($existing['started_at'])) {
+            $state['started_at'] = $existing['started_at'];
+        }
+
+        if (!isset($state['started_at'])) {
+            $state['started_at'] = now()->toIso8601String();
+        }
+
+        $state['updated_at'] = now()->toIso8601String();
+        Cache::put($key, $state, now()->addMinutes(30));
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function putAttendanceImportProgress(string $key, array $state): void
     {
         $existing = Cache::get($key);
         if (is_array($existing) && !isset($state['started_at']) && isset($existing['started_at'])) {

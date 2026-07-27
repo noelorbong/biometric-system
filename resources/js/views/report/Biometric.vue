@@ -14,7 +14,41 @@ import PrintableAttendance from '@/views/user/components/PrintableAttendance.vue
 const userStore = useUserStore()
 const appSettingStore = useAppSettingStore()
 const { officeShifts, departments, colleges } = storeToRefs(userStore)
-const { companySchoolName, companySchoolLogo, companySchoolLogoPrintEnabled } = storeToRefs(appSettingStore)
+const {
+  companySchoolName,
+  companySchoolLogo,
+  companySchoolLogoPrintEnabled,
+  biometricDtrSignatoryName,
+  biometricDtrSignatorySignature,
+  biometricDtrSignatoryUseDefault,
+  biometricDtrSignatorySignatureEnabled,
+} = storeToRefs(appSettingStore)
+
+const biometricDtrSignatoryDisplayName = computed(() => {
+  if (!biometricDtrSignatoryUseDefault.value) {
+    return 'In-Charge'
+  }
+
+  return biometricDtrSignatoryName.value?.trim() || 'In-Charge'
+})
+
+const resolveUserSignatoryName = (user) => {
+  const assignedInCharge = user?.in_charge_user_id || user?.in_charge_user
+  if (assignedInCharge) {
+    const inChargeDisplayName = String(
+      user?.in_charge_user_label
+        || user?.in_charge_user?.profile?.display_name
+        || user?.in_charge_user?.name
+        || '',
+    ).trim()
+
+    if (inChargeDisplayName) {
+      return inChargeDisplayName
+    }
+  }
+
+  return biometricDtrSignatoryDisplayName.value
+}
 
 const now = new Date()
 const formatDateInput = (date) => {
@@ -1317,6 +1351,9 @@ const getPrintableRecords = (user) => {
         :user="user" :selected-year="selectedPeriodYear" :selected-month="selectedPeriodMonth"
         :attendance-records="getPrintableRecords(user)" :company-name="companySchoolName"
         :company-logo="companySchoolLogo" :show-logo="companySchoolLogoPrintEnabled" :show-controls="false"
+        :signatory-name="resolveUserSignatoryName(user)"
+        :signatory-signature="biometricDtrSignatorySignature"
+        :signatory-signature-enabled="biometricDtrSignatorySignatureEnabled"
         :calculate-undertime="calculateUndertime" />
     </div>
   </div>

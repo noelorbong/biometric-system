@@ -26,6 +26,8 @@ class User extends Authenticatable
         'department_id',
         'college_id',
         'office_shift_id',
+        'in_charge_user_id',
+        'in_charge_enabled',
         'main_account',
         'last_activity',
         'last_login',
@@ -46,6 +48,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'last_activity' => 'datetime',
         'last_login' => 'datetime',
+        'in_charge_enabled' => 'boolean',
         'main_account' => 'boolean',
         'status' => 'boolean',
     ];
@@ -88,6 +91,11 @@ class User extends Authenticatable
     public function officeShift()
     {
         return $this->belongsTo(OfficeShift::class, 'office_shift_id');
+    }
+
+    public function inChargeUser()
+    {
+        return $this->belongsTo(User::class, 'in_charge_user_id');
     }
 
     public function departmentRef()

@@ -1011,7 +1011,7 @@ const closeEnrollModal = () => {
       :colleges="colleges"
       :web_layout="web_layout"
     />
-    <ModalUser :authUser="authStore.user" :isEditUser="isEditUser" :user="user" :officeShifts="officeShifts" :departments="departments" :colleges="colleges" v-if="isUserAddModal" @save="saveUser"
+    <ModalUser :authUser="authStore.user" :isEditUser="isEditUser" :user="user" :users="users" :officeShifts="officeShifts" :departments="departments" :colleges="colleges" v-if="isUserAddModal" @save="saveUser"
       @close="isUserAddModal = false" :edit_type="1"/>
     <ModalDelete head="User" :data="user" :text="user.name" v-if="isDeleteModal" @save="saveUser" @close="isDeleteModal = false"
       @delete="deleteUser" />

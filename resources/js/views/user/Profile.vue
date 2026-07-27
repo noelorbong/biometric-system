@@ -12,6 +12,7 @@ import { useUserStore } from '@/store/UserStore'
 
 const userStore = useUserStore();
 const router = useRouter()
+const { users } = storeToRefs(userStore)
 
 import { useAuthStore } from '@/store/AuthStore'
 const authStore = useAuthStore();
@@ -192,7 +193,7 @@ const selectedCollege = (event) => {
       <ProfileCard :user="user" />
     </section>
 
-    <ModalUser :authUser="authStore.user" :isEditUser="true" :user="l_user" v-if="isUserAddModal" @save="saveUser"
+    <ModalUser :authUser="authStore.user" :isEditUser="true" :user="l_user" :users="users" v-if="isUserAddModal" @save="saveUser"
       @close="isUserAddModal = false" :edit_type="2" :campuses="[]" :colleges="[]"/>
   </div>
 </template>

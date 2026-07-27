@@ -1267,11 +1267,18 @@ class UserController extends Controller
         $profile = $user->profile;
         $primaryContact = $user->contacts->firstWhere('is_primary', true) ?? $user->contacts->first();
         $primaryAddress = $user->addresses->firstWhere('is_primary', true) ?? $user->addresses->first();
+        $inChargeUser = $user->inChargeUser;
+        $inChargeDisplayName = trim((string) ($inChargeUser?->profile?->display_name ?? ''));
+
+        if ($inChargeDisplayName === '') {
+            $inChargeDisplayName = (string) ($inChargeUser?->name ?? '');
+        }
 
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'display_name' => $profile?->display_name,
             'avatar' => $user->avatar,
             'thumbnail' => $profile?->thumbnail,
             'role' => $user->role,
@@ -1281,6 +1288,10 @@ class UserController extends Controller
             'user_add_name' => $user->addedBy?->name,
             'office_shift_id' => $user->office_shift_id,
             'office_shift' => $user->officeShift,
+            'in_charge_enabled' => (bool) ($user->in_charge_enabled ?? false),
+            'in_charge_user_id' => $user->in_charge_user_id,
+            'in_charge_user' => $inChargeUser,
+            'in_charge_user_label' => $inChargeDisplayName !== '' ? $inChargeDisplayName : null,
             'department_id' => $user->department_id,
             'department' => $user->departmentRef?->department_name ?? $user->department,
             'department_ref' => $user->departmentRef,
@@ -1301,6 +1312,8 @@ class UserController extends Controller
         return User::with([
             'addedBy:id,name',
             'profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension,dob,gender,image,thumbnail',
+            'inChargeUser:id,name,in_charge_user_id',
+            'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
             'contacts:id,user_id,type,value,is_primary',
             'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
             'biometricInfo',
@@ -1570,6 +1583,8 @@ class UserController extends Controller
             'role' => ['required', 'integer', 'min:0', 'max:6'],
             'status' => ['required', 'boolean'],
             'office_shift_id' => ['nullable', 'integer', 'exists:office_shifts,id'],
+            'in_charge_enabled' => ['required', 'boolean'],
+            'in_charge_user_id' => ['nullable', 'integer', 'exists:users,id', 'required_if:in_charge_enabled,1,true'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'college_id' => ['nullable', 'integer', 'exists:colleges,id'],
 
@@ -1637,6 +1652,8 @@ class UserController extends Controller
                 'role' => $validated['role'],
                 'status' => $validated['status'],
                 'office_shift_id' => $validated['office_shift_id'] ?? null,
+                'in_charge_enabled' => $validated['in_charge_enabled'] ? 1 : 0,
+                'in_charge_user_id' => $validated['in_charge_user_id'] ?? null,
                 'department_id' => $departmentId,
                 'college_id' => $validated['college_id'] ?? null,
                 'department' => $departmentName,
@@ -1684,6 +1701,8 @@ class UserController extends Controller
             'role' => ['required', 'integer', 'min:0', 'max:6'],
             'status' => ['required', 'boolean'],
             'office_shift_id' => ['nullable', 'integer', 'exists:office_shifts,id'],
+            'in_charge_enabled' => ['required', 'boolean'],
+            'in_charge_user_id' => ['nullable', 'integer', 'exists:users,id', 'required_if:in_charge_enabled,1,true'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'college_id' => ['nullable', 'integer', 'exists:colleges,id'],
 
@@ -1768,6 +1787,8 @@ class UserController extends Controller
                 'role' => $isSuperAdmin ? $validated['role'] : $user->role,
                 'status' => $isSuperAdmin ? $validated['status'] : $user->status,
                 'office_shift_id' => $isSuperAdmin ? ($validated['office_shift_id'] ?? null) : $user->office_shift_id,
+                'in_charge_enabled' => $validated['in_charge_enabled'] ? 1 : 0,
+                'in_charge_user_id' => $validated['in_charge_user_id'] ?? null,
                 'avatar' => $canEditPrivate ? ($validated['thumbnail'] ?? $user->avatar) : $user->avatar,
                 'user_last_modify' => $request->user()?->id,
             ];
@@ -1890,6 +1911,8 @@ class UserController extends Controller
                 'biometricInfo',
                 'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
+                'inChargeUser:id,name,in_charge_user_id',
+                'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
             ])
             ->select('users.*')
             ->first();
