@@ -736,8 +736,11 @@ class AppSettingController extends Controller
                 $startupLauncherPath = rtrim($startupDir, '\\/') . DIRECTORY_SEPARATOR . self::ATTENDANCE_DAEMON_TASK_NAME . '-startup.bat';
                 $launcherContent = implode(PHP_EOL, [
                     '@echo off',
+                    'setlocal',
+                    'set LOG_DIR=' . str_replace('/', DIRECTORY_SEPARATOR, dirname($logPath)),
+                    'if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"',
                     'cd /d "' . $workingPath . '"',
-                    'start "" /min cmd /c "\"' . $resolvedPhpBinary . '\" \"' . $artisanPath . '\" attendance:auto-sync:daemon --sleep=' . $sleep . ' >> \"' . $logPath . '\" 2>> \"' . $errorLogPath . '\""',
+                    'start "Attendance Auto Sync" /min cmd /c ""' . $resolvedPhpBinary . '" "' . $artisanPath . '" attendance:auto-sync:daemon --sleep=' . $sleep . ' >> "' . $logPath . '" 2>> "' . $errorLogPath . '""',
                     '',
                 ]);
 

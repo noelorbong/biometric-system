@@ -2,9 +2,12 @@
 setlocal
 
 set APP_ROOT=C:\Users\Admin\Documents\Github\biometric-system
-set LOG_FILE=%APP_ROOT%\storage\logs\attendance-auto-sync.log
-set ERR_FILE=%APP_ROOT%\storage\logs\attendance-auto-sync-error.log
+set LOG_DIR=%APP_ROOT%\storage\logs
+set LOG_FILE=%LOG_DIR%\attendance-auto-sync.log
+set ERR_FILE=%LOG_DIR%\attendance-auto-sync-error.log
 set PHP_EXE=
+
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
 if exist "%APP_ROOT%\vendor\nativephp\electron\resources\js\resources\php\php.exe" set PHP_EXE=%APP_ROOT%\vendor\nativephp\electron\resources\js\resources\php\php.exe
 if not defined PHP_EXE if exist "C:\php\php.exe" set PHP_EXE=C:\php\php.exe
@@ -23,5 +26,5 @@ exit /b 1
 )
 
 cd /d "%APP_ROOT%"
-start "" /min cmd /c ""%PHP_EXE%" "%APP_ROOT%\artisan" attendance:auto-sync:daemon --sleep=1 >> "%LOG_FILE%" 2>> "%ERR_FILE%""
+start "Attendance Auto Sync" /min cmd /c ""%PHP_EXE%" artisan attendance:auto-sync:daemon --sleep=1 >> "%LOG_FILE%" 2>> "%ERR_FILE%""
 exit /b 0
