@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   patching: { type: Boolean, required: true },
   patchResults: { type: Array, required: true },
@@ -12,6 +14,21 @@ const props = defineProps({
   onInstallDaemon: { type: Function, required: true },
   onRunMaintenancePatch: { type: Function, required: true },
   onRunSystemUpdate: { type: Function, required: true },
+})
+
+const daemonPlatformLabel = computed(() => {
+  const os = String(props.daemonStatus?.os || '').toLowerCase()
+  if (os.includes('win')) {
+    return 'Windows'
+  }
+  if (os.includes('linux')) {
+    return 'Ubuntu/Linux'
+  }
+  return 'Server'
+})
+
+const daemonConfigHint = computed(() => {
+  return props.daemonStatus?.config_path || '/etc/supervisor/conf.d/attendance-auto-sync.conf'
 })
 </script>
 
@@ -63,7 +80,7 @@ const props = defineProps({
 
     <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
       <div class="flex items-start justify-between gap-3">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Attendance Daemon (Ubuntu)</h3>
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Attendance Daemon ({{ daemonPlatformLabel }})</h3>
         <button
           type="button"
           @click="props.onRefreshDaemonStatus()"
@@ -75,7 +92,7 @@ const props = defineProps({
       </div>
 
       <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-        Checks and installs <span class="font-mono">/etc/supervisor/conf.d/attendance-auto-sync.conf</span>.
+        Checks and installs <span class="font-mono">{{ daemonConfigHint }}</span>.
       </p>
 
       <div class="mt-3 space-y-2 text-xs">

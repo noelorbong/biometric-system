@@ -23,7 +23,7 @@ export const useAppSettingStore = defineStore('appSettings', {
     companySchoolName: 'Biometric System',
     companySchoolLogo: '',
     companySchoolLogoPrintEnabled: false,
-    biometricDtrSignatoryName: 'In-Charge',
+    biometricDtrSignatoryName: '',
     biometricDtrSignatorySignature: '',
     biometricDtrSignatoryUseDefault: true,
     biometricDtrSignatorySignatureEnabled: false,
@@ -67,7 +67,7 @@ export const useAppSettingStore = defineStore('appSettings', {
         app.companySchoolName = resp?.data?.settings?.company_school_name || 'Biometric System'
         app.companySchoolLogo = resp?.data?.settings?.company_school_logo || ''
         app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? false)
-        app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name || 'In-Charge'
+        app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name ?? ''
         app.biometricDtrSignatorySignature = resp?.data?.settings?.biometric_dtr_signatory_signature || ''
         app.biometricDtrSignatoryUseDefault = Boolean(resp?.data?.settings?.biometric_dtr_signatory_use_default ?? true)
         app.biometricDtrSignatorySignatureEnabled = Boolean(resp?.data?.settings?.biometric_dtr_signatory_signature_enabled ?? false)
@@ -95,7 +95,7 @@ export const useAppSettingStore = defineStore('appSettings', {
         app.companySchoolName = resp?.data?.settings?.company_school_name || app.companySchoolName
         app.companySchoolLogo = resp?.data?.settings?.company_school_logo || app.companySchoolLogo
         app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? app.companySchoolLogoPrintEnabled)
-        app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name || app.biometricDtrSignatoryName
+        app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name ?? app.biometricDtrSignatoryName
         app.biometricDtrSignatorySignature = resp?.data?.settings?.biometric_dtr_signatory_signature || app.biometricDtrSignatorySignature
         app.biometricDtrSignatoryUseDefault = Boolean(resp?.data?.settings?.biometric_dtr_signatory_use_default ?? app.biometricDtrSignatoryUseDefault)
         app.biometricDtrSignatorySignatureEnabled = Boolean(resp?.data?.settings?.biometric_dtr_signatory_signature_enabled ?? app.biometricDtrSignatorySignatureEnabled)

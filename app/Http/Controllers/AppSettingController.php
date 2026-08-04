@@ -14,11 +14,13 @@ use Symfony\Component\Process\Process;
 
 class AppSettingController extends Controller
 {
+    private const ATTENDANCE_DAEMON_TASK_NAME = 'attendance-auto-sync';
+
     private const DEFAULT_SETTINGS = [
         'company_school_name' => 'Biometric System',
         'company_school_logo' => '',
         'company_school_logo_print_enabled' => false,
-        'biometric_dtr_signatory_name' => 'In-Charge',
+        'biometric_dtr_signatory_name' => '',
         'biometric_dtr_signatory_signature' => '',
         'biometric_dtr_signatory_use_default' => true,
         'biometric_dtr_signatory_signature_enabled' => false,
@@ -346,19 +348,218 @@ class AppSettingController extends Controller
         ];
     }
 
+    private function resolveWindowsPhpBinary(): array
+    {
+        $candidates = [];
+
+        $fromWhere = $this->runShellCommand('where php');
+        if (($fromWhere['success'] ?? false) && filled($fromWhere['output'] ?? null)) {
+            $lines = preg_split('/\r\n|\r|\n/', (string) $fromWhere['output']) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $candidates[] = $line;
+                }
+            }
+        }
+
+        $envNativePath = env('NATIVEPHP_PHP_BINARY_PATH');
+        if (filled($envNativePath)) {
+            $nativePath = (string) $envNativePath;
+            $candidates[] = $nativePath;
+            $candidates[] = rtrim($nativePath, '\\/') . DIRECTORY_SEPARATOR . 'php.exe';
+            $candidates[] = rtrim($nativePath, '\\/') . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'php.exe';
+        }
+
+        $candidates[] = PHP_BINARY;
+        $candidates[] = PHP_BINDIR . DIRECTORY_SEPARATOR . 'php.exe';
+        $candidates[] = dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . 'php.exe';
+        $candidates[] = base_path('vendor/nativephp/electron/resources/js/resources/php/php.exe');
+        $candidates[] = base_path('vendor/nativephp/php-bin/bin/php.exe');
+        $candidates[] = 'C:\\php\\php.exe';
+        $candidates[] = 'C:\\xampp\\php\\php.exe';
+        $candidates[] = 'C:\\laragon\\bin\\php\\php.exe';
+        $candidates[] = 'C:\\Program Files\\PHP\\php.exe';
+
+        $normalized = [];
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate, " \t\n\r\0\x0B\"");
+            if ($candidate === '') {
+                continue;
+            }
+
+            $candidate = str_replace('/', DIRECTORY_SEPARATOR, $candidate);
+            $key = strtolower($candidate);
+
+            if (isset($normalized[$key])) {
+                continue;
+            }
+
+            $normalized[$key] = $candidate;
+        }
+
+        foreach ($normalized as $candidate) {
+            if (!is_file($candidate)) {
+                continue;
+            }
+
+            $filename = strtolower((string) pathinfo($candidate, PATHINFO_BASENAME));
+            if (in_array($filename, ['php.exe', 'php-cgi.exe'], true)) {
+                return [
+                    'path' => $candidate,
+                    'source' => ($fromWhere['success'] ?? false) ? 'PATH/where or fallback candidates' : 'fallback candidates',
+                    'probe' => $fromWhere,
+                ];
+            }
+        }
+
+        return [
+            'path' => null,
+            'source' => 'not found',
+            'probe' => $fromWhere,
+            'candidates' => array_values($normalized),
+        ];
+    }
+
+    private function resolveWindowsSchtasksBinary(): array
+    {
+        $candidates = [];
+        $fromWhere = $this->runShellCommand('where schtasks');
+
+        if (($fromWhere['success'] ?? false) && filled($fromWhere['output'] ?? null)) {
+            $lines = preg_split('/\r\n|\r|\n/', (string) $fromWhere['output']) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $candidates[] = $line;
+                }
+            }
+        }
+
+        $windowsDir = getenv('WINDIR') ?: 'C:\\Windows';
+        $candidates[] = rtrim((string) $windowsDir, '\\/') . DIRECTORY_SEPARATOR . 'System32' . DIRECTORY_SEPARATOR . 'schtasks.exe';
+        $candidates[] = rtrim((string) $windowsDir, '\\/') . DIRECTORY_SEPARATOR . 'Sysnative' . DIRECTORY_SEPARATOR . 'schtasks.exe';
+        $candidates[] = 'C:\\Windows\\System32\\schtasks.exe';
+        $candidates[] = 'C:\\Windows\\Sysnative\\schtasks.exe';
+
+        $normalized = [];
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate, " \t\n\r\0\x0B\"");
+            if ($candidate === '') {
+                continue;
+            }
+
+            $candidate = str_replace('/', DIRECTORY_SEPARATOR, $candidate);
+            $key = strtolower($candidate);
+
+            if (isset($normalized[$key])) {
+                continue;
+            }
+
+            $normalized[$key] = $candidate;
+        }
+
+        foreach ($normalized as $candidate) {
+            if (is_file($candidate)) {
+                return [
+                    'path' => $candidate,
+                    'probe' => $fromWhere,
+                ];
+            }
+        }
+
+        return [
+            'path' => null,
+            'probe' => $fromWhere,
+            'candidates' => array_values($normalized),
+        ];
+    }
+
+    private function resolveWindowsStartupDirectory(): ?string
+    {
+        $appData = getenv('APPDATA');
+        if (is_string($appData) && trim($appData) !== '') {
+            return rtrim($appData, '\\/') . DIRECTORY_SEPARATOR . 'Microsoft' . DIRECTORY_SEPARATOR . 'Windows' . DIRECTORY_SEPARATOR . 'Start Menu' . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'Startup';
+        }
+
+        $userProfile = getenv('USERPROFILE');
+        if (is_string($userProfile) && trim($userProfile) !== '') {
+            return rtrim($userProfile, '\\/') . DIRECTORY_SEPARATOR . 'AppData' . DIRECTORY_SEPARATOR . 'Roaming' . DIRECTORY_SEPARATOR . 'Microsoft' . DIRECTORY_SEPARATOR . 'Windows' . DIRECTORY_SEPARATOR . 'Start Menu' . DIRECTORY_SEPARATOR . 'Programs' . DIRECTORY_SEPARATOR . 'Startup';
+        }
+
+        return null;
+    }
+
     public function attendanceDaemonStatus(Request $request)
     {
         if (!$this->isSuperAdmin($request)) {
             return $this->forbiddenResponse();
         }
 
+        $isWindows = DIRECTORY_SEPARATOR === '\\';
         $isLinux = DIRECTORY_SEPARATOR === '/';
         $configPath = '/etc/supervisor/conf.d/attendance-auto-sync.conf';
+
+        if ($isWindows) {
+            $taskName = self::ATTENDANCE_DAEMON_TASK_NAME;
+            $schtasksResolution = $this->resolveWindowsSchtasksBinary();
+            $schtasksBinary = $schtasksResolution['path'] ?? null;
+            $schedulerInstalled = is_string($schtasksBinary) && $schtasksBinary !== '';
+            $startupDir = $this->resolveWindowsStartupDirectory();
+            $startupLauncherPath = $startupDir
+                ? rtrim($startupDir, '\\/') . DIRECTORY_SEPARATOR . self::ATTENDANCE_DAEMON_TASK_NAME . '-startup.bat'
+                : null;
+            $startupLauncherExists = is_string($startupLauncherPath) && is_file($startupLauncherPath);
+
+            if (!$schedulerInstalled) {
+                return response()->json([
+                    'available' => true,
+                    'os' => php_uname('s'),
+                    'config_path' => $startupLauncherExists
+                        ? ('Startup Folder: ' . $startupLauncherPath)
+                        : ('Task Scheduler: ' . $taskName),
+                    'config_exists' => $startupLauncherExists,
+                    'service_running' => false,
+                    'status_output' => $schtasksResolution['probe']['output'] ?? '',
+                    'status_exit_code' => $schtasksResolution['probe']['exit_code'] ?? null,
+                    'scheduler_installed' => false,
+                    'scheduler_candidates' => $schtasksResolution['candidates'] ?? [],
+                    'startup_launcher_exists' => $startupLauncherExists,
+                    'startup_launcher_path' => $startupLauncherPath,
+                    'php_binary' => PHP_BINARY,
+                    'app_path' => base_path(),
+                ]);
+            }
+
+            $query = $this->runShellCommand('"' . $schtasksBinary . '" /Query /TN "' . $taskName . '" /V /FO LIST');
+            $taskExists = $query['success'] ?? false;
+            $statusOutput = (string) ($query['output'] ?? '');
+            $running = $taskExists && preg_match('/^Status:\s*Running\b/im', $statusOutput) === 1;
+            $configExists = $taskExists || $startupLauncherExists;
+            $configPath = $taskExists
+                ? ('Task Scheduler: ' . $taskName)
+                : ($startupLauncherPath ? ('Startup Folder: ' . $startupLauncherPath) : ('Task Scheduler: ' . $taskName));
+
+            return response()->json([
+                'available' => true,
+                'os' => php_uname('s'),
+                'config_path' => $configPath,
+                'config_exists' => $configExists,
+                'service_running' => $running,
+                'status_output' => $statusOutput,
+                'status_exit_code' => $query['exit_code'] ?? null,
+                'scheduler_installed' => $schedulerInstalled,
+                'startup_launcher_exists' => $startupLauncherExists,
+                'startup_launcher_path' => $startupLauncherPath,
+                'php_binary' => PHP_BINARY,
+                'app_path' => base_path(),
+            ]);
+        }
 
         if (!$isLinux) {
             return response()->json([
                 'available' => false,
-                'message' => 'Supervisor status is only available on Linux servers.',
+                'message' => 'Attendance daemon status is only available on Linux and Windows servers.',
             ]);
         }
 
@@ -401,10 +602,11 @@ class AppSettingController extends Controller
             return $this->forbiddenResponse();
         }
 
+        $isWindows = DIRECTORY_SEPARATOR === '\\';
         $isLinux = DIRECTORY_SEPARATOR === '/';
-        if (!$isLinux) {
+        if (!$isLinux && !$isWindows) {
             return response()->json([
-                'message' => 'Installation is only supported on Linux servers.',
+                'message' => 'Installation is only supported on Linux and Windows servers.',
             ], 422);
         }
 
@@ -413,6 +615,205 @@ class AppSettingController extends Controller
         ]);
 
         $sleep = (int) ($validated['sleep'] ?? 1);
+
+        if ($isWindows) {
+            $taskName = self::ATTENDANCE_DAEMON_TASK_NAME;
+            $steps = [];
+
+            $schtasksResolution = $this->resolveWindowsSchtasksBinary();
+            $schtasksBinary = $schtasksResolution['path'] ?? null;
+            if (!is_string($schtasksBinary) || trim($schtasksBinary) === '') {
+                return response()->json([
+                    'message' => 'Unable to resolve schtasks.exe for Windows scheduled task operations.',
+                    'output' => $schtasksResolution['probe']['output'] ?? '',
+                    'candidates' => $schtasksResolution['candidates'] ?? [],
+                ], 422);
+            }
+
+            $steps[] = [
+                'command' => 'resolve schtasks binary',
+                'success' => true,
+                'exit_code' => 0,
+                'output' => $schtasksBinary,
+            ];
+
+            $phpResolution = $this->resolveWindowsPhpBinary();
+            $resolvedPhpBinary = $phpResolution['path'] ?? null;
+
+            if (!is_string($resolvedPhpBinary) || trim($resolvedPhpBinary) === '') {
+                return response()->json([
+                    'message' => 'Unable to resolve a valid CLI php binary for Windows scheduled task.',
+                    'output' => $phpResolution['probe']['output'] ?? '',
+                    'candidates' => $phpResolution['candidates'] ?? [],
+                    'php_binary_runtime' => PHP_BINARY,
+                    'php_bindir' => PHP_BINDIR,
+                ], 422);
+            }
+
+            $resolvedPhpBinary = trim($resolvedPhpBinary);
+            $steps[] = [
+                'command' => 'resolve php binary',
+                'success' => true,
+                'exit_code' => 0,
+                'output' => $resolvedPhpBinary,
+            ];
+
+            $logPath = str_replace('/', DIRECTORY_SEPARATOR, storage_path('logs/attendance-auto-sync.log'));
+            $errorLogPath = str_replace('/', DIRECTORY_SEPARATOR, storage_path('logs/attendance-auto-sync-error.log'));
+            $artisanPath = str_replace('/', DIRECTORY_SEPARATOR, base_path('artisan'));
+            $workingPath = str_replace('/', DIRECTORY_SEPARATOR, base_path());
+
+            $batPath = str_replace('/', DIRECTORY_SEPARATOR, storage_path('app/private/attendance-auto-sync-daemon.bat'));
+            @mkdir(dirname($batPath), 0755, true);
+
+            $batContent = implode(PHP_EOL, [
+                '@echo off',
+                'cd /d "' . $workingPath . '"',
+                '"' . $resolvedPhpBinary . '" "' . $artisanPath . '" attendance:auto-sync:daemon --sleep=' . $sleep . ' >> "' . $logPath . '" 2>> "' . $errorLogPath . '"',
+                '',
+            ]);
+
+            file_put_contents($batPath, $batContent);
+            $steps[] = [
+                'command' => 'write daemon bat',
+                'success' => true,
+                'exit_code' => 0,
+                'output' => $batPath,
+            ];
+
+            $createAttempts = [
+                [
+                    'label' => 'schtasks /Create (SYSTEM ONSTART)',
+                    'command' => '"' . $schtasksBinary . '" /Create /TN "' . $taskName . '" /TR "\\"' . $batPath . '\\"" /SC ONSTART /RU SYSTEM /RL HIGHEST /F',
+                ],
+                [
+                    'label' => 'schtasks /Create (current user ONLOGON)',
+                    'command' => '"' . $schtasksBinary . '" /Create /TN "' . $taskName . '" /TR "\\"' . $batPath . '\\"" /SC ONLOGON /RL LIMITED /F',
+                ],
+            ];
+
+            $create = null;
+            foreach ($createAttempts as $attempt) {
+                $attemptResult = $this->runShellCommand($attempt['command']);
+                $steps[] = array_merge(['command' => $attempt['label']], $attemptResult);
+
+                if ($attemptResult['success'] ?? false) {
+                    $create = $attemptResult;
+                    break;
+                }
+            }
+
+            if ($create === null) {
+                $create = [
+                    'success' => false,
+                    'exit_code' => 1,
+                    'output' => 'Unable to create Windows scheduled task with either SYSTEM or current-user mode.',
+                ];
+            }
+
+            $installMode = 'task_scheduler';
+
+            if (!($create['success'] ?? false)) {
+                $startupDir = $this->resolveWindowsStartupDirectory();
+                if (!$startupDir) {
+                    return response()->json([
+                        'message' => 'Unable to create Windows scheduled task and APPDATA startup folder was not found.',
+                        'step' => 'startup_fallback',
+                        'commands' => $steps,
+                    ], 422);
+                }
+
+                @mkdir($startupDir, 0755, true);
+                if (!is_dir($startupDir) || !is_writable($startupDir)) {
+                    return response()->json([
+                        'message' => 'Unable to create Windows scheduled task, and startup folder is not writable.',
+                        'step' => 'startup_fallback',
+                        'startup_dir' => $startupDir,
+                        'commands' => $steps,
+                    ], 422);
+                }
+
+                $startupLauncherPath = rtrim($startupDir, '\\/') . DIRECTORY_SEPARATOR . self::ATTENDANCE_DAEMON_TASK_NAME . '-startup.bat';
+                $launcherContent = implode(PHP_EOL, [
+                    '@echo off',
+                    'cd /d "' . $workingPath . '"',
+                    'start "" /min cmd /c "\"' . $resolvedPhpBinary . '\" \"' . $artisanPath . '\" attendance:auto-sync:daemon --sleep=' . $sleep . ' >> \"' . $logPath . '\" 2>> \"' . $errorLogPath . '\""',
+                    '',
+                ]);
+
+                file_put_contents($startupLauncherPath, $launcherContent);
+                $steps[] = [
+                    'command' => 'write startup launcher',
+                    'success' => is_file($startupLauncherPath),
+                    'exit_code' => is_file($startupLauncherPath) ? 0 : 1,
+                    'output' => $startupLauncherPath,
+                ];
+
+                if (!is_file($startupLauncherPath)) {
+                    return response()->json([
+                        'message' => 'Unable to create Windows scheduled task and failed to write startup launcher.',
+                        'step' => 'startup_fallback',
+                        'commands' => $steps,
+                    ], 422);
+                }
+
+                // Kick off one daemon instance now so user does not need to log off/on first.
+                $startNow = $this->runShellCommand('cmd /c "start \"\" /min cmd /c \"\"' . $batPath . '\"\""');
+                $steps[] = array_merge(['command' => 'start daemon now (startup fallback)'], $startNow);
+                $installMode = 'startup_folder';
+            }
+
+            $runTask = [
+                'success' => true,
+                'exit_code' => 0,
+                'output' => 'Skipped: startup folder mode',
+            ];
+            if ($installMode === 'task_scheduler') {
+                $runTask = $this->runShellCommand('"' . $schtasksBinary . '" /Run /TN "' . $taskName . '"');
+            }
+            $steps[] = array_merge(['command' => 'schtasks /Run'], $runTask);
+
+            $status = [
+                'success' => true,
+                'exit_code' => 0,
+                'output' => 'Startup folder mode configured',
+            ];
+            if ($installMode === 'task_scheduler') {
+                $status = $this->runShellCommand('"' . $schtasksBinary . '" /Query /TN "' . $taskName . '" /V /FO LIST');
+            }
+            $steps[] = array_merge(['command' => 'schtasks /Query'], $status);
+
+            ActivityLog::create([
+                'user_id' => $request->user()?->id,
+                'action' => 'Installed Attendance Auto Sync Daemon',
+                'model_name' => AppSetting::class,
+                'model_id' => 0,
+                'before' => null,
+                'after' => [
+                    'config_path' => $installMode === 'task_scheduler'
+                        ? ('Task Scheduler: ' . $taskName)
+                        : ('Startup Folder: ' . (isset($startupLauncherPath) ? $startupLauncherPath : 'unknown')),
+                    'sleep' => $sleep,
+                    'user' => 'SYSTEM',
+                    'php_binary' => $resolvedPhpBinary,
+                    'mode' => $installMode,
+                ],
+                'ip_address' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => $installMode === 'task_scheduler'
+                    ? 'Attendance auto-sync daemon installed and started via Windows Task Scheduler.'
+                    : 'Attendance auto-sync daemon installed via Windows Startup folder fallback and started.',
+                'config_path' => $installMode === 'task_scheduler'
+                    ? ('Task Scheduler: ' . $taskName)
+                    : ('Startup Folder: ' . (isset($startupLauncherPath) ? $startupLauncherPath : 'unknown')),
+                'php_binary' => $resolvedPhpBinary,
+                'mode' => $installMode,
+                'commands' => $steps,
+            ]);
+        }
+
         $configPath = '/etc/supervisor/conf.d/attendance-auto-sync.conf';
 
         // Prefer CLI php binary instead of PHP_BINARY from web/FPM context.

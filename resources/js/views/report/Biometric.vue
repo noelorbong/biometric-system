@@ -26,10 +26,10 @@ const {
 
 const biometricDtrSignatoryDisplayName = computed(() => {
   if (!biometricDtrSignatoryUseDefault.value) {
-    return 'In-Charge'
+    return ''
   }
 
-  return biometricDtrSignatoryName.value?.trim() || 'In-Charge'
+  return biometricDtrSignatoryName.value?.trim() || ''
 })
 
 const resolveUserSignatoryName = (user) => {

@@ -38,7 +38,7 @@ const form = ref({
   company_school_name: '',
   company_school_logo: '',
   company_school_logo_print_enabled: false,
-  biometric_dtr_signatory_name: 'In-Charge',
+  biometric_dtr_signatory_name: '',
   biometric_dtr_signatory_signature: '',
   biometric_dtr_signatory_use_default: true,
   biometric_dtr_signatory_signature_enabled: false,
@@ -201,7 +201,7 @@ const loadSettings = async () => {
   form.value.company_school_name = companySchoolName.value || 'Biometric System'
   form.value.company_school_logo = companySchoolLogo.value || ''
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
-  form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value || 'In-Charge'
+  form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value ?? ''
   form.value.biometric_dtr_signatory_signature = biometricDtrSignatorySignature.value || ''
   form.value.biometric_dtr_signatory_use_default = Boolean(biometricDtrSignatoryUseDefault.value)
   form.value.biometric_dtr_signatory_signature_enabled = Boolean(biometricDtrSignatorySignatureEnabled.value)
@@ -248,7 +248,7 @@ const saveSettings = async () => {
   form.value.company_school_name = companySchoolName.value || form.value.company_school_name
   form.value.company_school_logo = companySchoolLogo.value || form.value.company_school_logo
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
-  form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value || form.value.biometric_dtr_signatory_name
+  form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value ?? form.value.biometric_dtr_signatory_name
   form.value.biometric_dtr_signatory_signature = biometricDtrSignatorySignature.value || form.value.biometric_dtr_signatory_signature
   form.value.biometric_dtr_signatory_use_default = Boolean(biometricDtrSignatoryUseDefault.value)
   form.value.biometric_dtr_signatory_signature_enabled = Boolean(biometricDtrSignatorySignatureEnabled.value)
@@ -352,7 +352,7 @@ const loadAttendanceDaemonStatus = async () => {
 const installAttendanceDaemon = async () => {
   const confirmation = await Swal.fire({
     title: 'Install attendance daemon service?',
-    text: 'This creates/updates supervisor config and starts attendance-auto-sync service on Linux.',
+    text: 'This installs or repairs the attendance daemon service (Supervisor on Linux, Task Scheduler on Windows).',
     icon: 'warning',
     showCancelButton: true,
     confirmButtonText: 'Install Service',
@@ -584,11 +584,11 @@ onMounted(async () => {
 
           <div class="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
             <div>
-              <label class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Signatory Name</label>
+              <label class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">Signatory Name (optional)</label>
               <input
                 v-model.trim="form.biometric_dtr_signatory_name"
                 type="text"
-                placeholder="Enter in-charge name"
+                placeholder="Optional"
                 :disabled="!form.biometric_dtr_signatory_use_default"
                 class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
               />
@@ -618,7 +618,7 @@ onMounted(async () => {
             <div>
               <p class="font-semibold text-slate-700 dark:text-slate-300">Print Preview</p>
               <p class="mt-1">
-                {{ form.biometric_dtr_signatory_use_default ? (form.biometric_dtr_signatory_name || 'In-Charge') : 'Manual / default off' }}
+                {{ form.biometric_dtr_signatory_use_default ? (form.biometric_dtr_signatory_name || 'Blank') : 'Manual / default off' }}
               </p>
             </div>
             <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">

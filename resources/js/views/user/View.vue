@@ -45,7 +45,7 @@ const selectedUserSignatoryName = computed(() => {
     }
   }
 
-  return biometricDtrSignatoryName.value || 'In-Charge'
+  return biometricDtrSignatoryName.value || ''
 })
 
 const activeTab = ref('userinfo')

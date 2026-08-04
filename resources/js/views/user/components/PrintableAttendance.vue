@@ -225,7 +225,7 @@ const props = defineProps({
     ,
     signatoryName: {
         type: String,
-        default: 'In-Charge',
+        default: '',
     },
     signatorySignature: {
         type: String,
