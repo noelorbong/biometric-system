@@ -27,7 +27,7 @@ class AutoSyncAttendance extends Command
             ->get();
 
         if ($machines->isEmpty()) {
-            $this->line('No machines with AutoDownload enabled.');
+            // $this->line('No machines with AutoDownload enabled.');
             return self::SUCCESS;
         }
 
