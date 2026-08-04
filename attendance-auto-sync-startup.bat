@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set APP_ROOT=C:\Users\Admin\Documents\Github\biometric-system
+set APP_ROOT=C:xampp\biometric-system
 set LOG_DIR=%APP_ROOT%\storage\logs
 set LOG_FILE=%LOG_DIR%\attendance-auto-sync.log
 set ERR_FILE=%LOG_DIR%\attendance-auto-sync-error.log
@@ -9,9 +9,9 @@ set PHP_EXE=
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
-if exist "%APP_ROOT%\vendor\nativephp\electron\resources\js\resources\php\php.exe" set PHP_EXE=%APP_ROOT%\vendor\nativephp\electron\resources\js\resources\php\php.exe
+if exist "C:\xampp\php\php.exe" set PHP_EXE=C:\xampp\php\php.exe
+if not defined PHP_EXE if exist "%APP_ROOT%\vendor\nativephp\electron\resources\js\resources\php\php.exe" set PHP_EXE=%APP_ROOT%\vendor\nativephp\electron\resources\js\resources\php\php.exe
 if not defined PHP_EXE if exist "C:\php\php.exe" set PHP_EXE=C:\php\php.exe
-if not defined PHP_EXE if exist "C:\xampp\php\php.exe" set PHP_EXE=C:\xampp\php\php.exe
 if not defined PHP_EXE if exist "C:\laragon\bin\php\php.exe" set PHP_EXE=C:\laragon\bin\php\php.exe
 
 if not defined PHP_EXE (
