@@ -91,8 +91,8 @@ const daemonConfigHint = computed(() => {
         </button>
       </div>
 
-      <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-        Checks and installs <span class="font-mono">{{ daemonConfigHint }}</span>.
+      <p class="mt-2 text-xs max-w-[200px] truncate leading-5 text-slate-500 dark:text-slate-400">
+        Checks and installs <span class=" font-mono">{{ daemonConfigHint }}</span>.
       </p>
 
       <div class="mt-3 space-y-2 text-xs">
