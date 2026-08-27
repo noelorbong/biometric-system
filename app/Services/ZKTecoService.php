@@ -258,18 +258,18 @@ class ZKTecoService
      *
      * @return array<int, array{pin: string, check_time: string, check_type: string, verify_code: int}>
      */
-    public function getAttendanceLogs(): array
+    public function getAttendanceLogs(?int $preferredRecordSize = null): array
     {
         $this->sendCommand(self::CMD_DISABLEDEVICE);
 
         // First try the standalone/TCP attendance payload used by FA/iface models.
         $raw = $this->downloadAttendanceLogsStandalone();
-        $logs = $this->parseAttendanceLogs($raw);
+        $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
 
         // Older fingerprint-only models often require buffered CMD_ATTLOG_RRQ.
         if ($logs === []) {
             $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
-            $logs = $this->parseAttendanceLogs($raw);
+            $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
         }
 
         $this->sendCommand(self::CMD_ENABLEDEVICE);
@@ -1109,7 +1109,7 @@ class ZKTecoService
      *
      * @return array<int, array{uid: int, pin: string, check_time: string, check_type: string, verify_code: int}>
      */
-    private function parseAttendanceLogs(string $raw): array
+    private function parseAttendanceLogs(string $raw, ?int $preferredRecordSize = null): array
     {
         if ($raw === '') {
             return [];
@@ -1125,7 +1125,7 @@ class ZKTecoService
             }
         }
 
-        $recordSize = $this->detectAttendanceRecordSize($payload);
+        $recordSize = $this->detectAttendanceRecordSize($payload, $preferredRecordSize);
 
         if ($recordSize === null) {
             return [];
@@ -1168,9 +1168,15 @@ class ZKTecoService
         return $buffer;
     }
 
-    private function detectAttendanceRecordSize(string $payload): ?int
+    private function detectAttendanceRecordSize(string $payload, ?int $preferredRecordSize = null): ?int
     {
         $length = strlen($payload);
+
+        if (in_array($preferredRecordSize, [8, 16, 40], true)
+            && $length >= $preferredRecordSize
+            && $length % $preferredRecordSize === 0) {
+            return $preferredRecordSize;
+        }
 
         // Some DAT exports in this project are large 16-byte record sets and are
         // not compatible with the older 40-byte TCP layout. If the payload cleanly

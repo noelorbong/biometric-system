@@ -889,6 +889,19 @@ const connectMachine = async (machine) => {
 }
 
 const syncAttendance = async (machine) => {
+  const collectDownloadOptions = () => {
+    const scope = document.getElementById('download-scope')?.value || 'today'
+    const date = document.getElementById('download-date')?.value || null
+    const userFilter = document.getElementById('user-filter')?.value || 'existing'
+
+    if (scope === 'date' && !date) {
+      Swal.showValidationMessage('Please select a date.')
+      return false
+    }
+
+    return { download_scope: scope, download_date: scope === 'date' ? date : null, user_filter: userFilter }
+  }
+
   const downloadChoice = await Swal.fire({
     title: `Download Logs from ${machine.MachineAlias || machine.IP}`,
     html: `
@@ -916,7 +929,9 @@ const syncAttendance = async (machine) => {
       </div>
     `,
     showCancelButton: true,
-    confirmButtonText: 'Download',
+    showDenyButton: true,
+    confirmButtonText: 'Download & Import',
+    denyButtonText: 'Download & Preview',
     focusConfirm: false,
     didOpen: () => {
       const scopeSelect = document.getElementById('download-scope')
@@ -930,25 +945,11 @@ const syncAttendance = async (machine) => {
       scopeSelect?.addEventListener('change', syncDateVisibility)
       syncDateVisibility()
     },
-    preConfirm: () => {
-      const scope = document.getElementById('download-scope')?.value || 'today'
-      const date = document.getElementById('download-date')?.value || null
-      const userFilter = document.getElementById('user-filter')?.value || 'existing'
-
-      if (scope === 'date' && !date) {
-        Swal.showValidationMessage('Please select a date.')
-        return false
-      }
-
-      return {
-        download_scope: scope,
-        download_date: scope === 'date' ? date : null,
-        user_filter: userFilter,
-      }
-    },
+    preConfirm: collectDownloadOptions,
+    preDeny: collectDownloadOptions,
   })
 
-  if (!downloadChoice.isConfirmed) {
+  if (!downloadChoice.isConfirmed && !downloadChoice.isDenied) {
     return
   }
 
@@ -957,6 +958,7 @@ const syncAttendance = async (machine) => {
   const resp = await machineStore.syncAttendance({
     ID: machine.ID,
     ...(downloadChoice.value || {}),
+    action: downloadChoice.isDenied ? 'preview' : 'import',
   })
   console.log('Sync response:', resp)
 
@@ -969,6 +971,38 @@ const syncAttendance = async (machine) => {
       title: 'Download Failed',
       text: msg,
       confirmButtonText: 'OK',
+    })
+    return
+  }
+
+  if (downloadChoice.isDenied) {
+    const previewRows = resp.data?.rows || []
+    const tableRows = previewRows.slice(0, 100).map((row) => `
+      <tr class="border-b border-slate-200">
+        <td class="px-2 py-1">${escapeHtml(row.uid)}</td>
+        <td class="px-2 py-1">${escapeHtml(row.pin)}</td>
+        <td class="px-2 py-1">${escapeHtml(row.resolved_user_id || 'Unmapped')}</td>
+        <td class="whitespace-nowrap px-2 py-1">${escapeHtml(row.check_time)}</td>
+        <td class="px-2 py-1">${escapeHtml(row.check_type)}</td>
+        <td class="px-2 py-1">${row.importable ? 'Yes' : 'No'}</td>
+      </tr>`).join('')
+
+    await Swal.fire({
+      icon: resp.data?.unmapped ? 'warning' : 'info',
+      title: `Downloaded Preview — ${escapeHtml(resp.data?.model || 'Device')}`,
+      width: 1050,
+      html: `
+        <div class="mb-3 grid grid-cols-3 gap-2 text-sm">
+          <div>Total: <strong>${Number(resp.data?.total || 0)}</strong></div>
+          <div class="text-green-700">Importable: <strong>${Number(resp.data?.importable || 0)}</strong></div>
+          <div class="text-amber-700">Unmapped: <strong>${Number(resp.data?.unmapped || 0)}</strong></div>
+        </div>
+        <p class="mb-2 text-left text-xs text-gray-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. No records were imported.</p>
+        <div class="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 text-left text-xs">
+          <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2">Check time</th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody>${tableRows}</tbody></table>
+        </div>
+        ${previewRows.length > 100 ? '<p class="mt-2 text-xs text-gray-500">Showing the first 100 decoded records.</p>' : ''}`,
+      confirmButtonText: 'Close',
     })
     return
   }

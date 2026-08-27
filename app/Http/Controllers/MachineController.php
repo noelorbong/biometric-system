@@ -165,6 +165,7 @@ class MachineController extends Controller
             'download_scope' => ['nullable', 'string', Rule::in(['today', 'date', 'all'])],
             'download_date' => ['nullable', 'date'],
             'user_filter' => ['nullable', 'string', Rule::in(['existing', 'all'])],
+            'action' => ['nullable', 'string', Rule::in(['preview', 'import'])],
         ]);
 
         $machine = Machine::findOrFail($validated['ID']);
@@ -182,7 +183,16 @@ class MachineController extends Controller
 
         try {
             $zk->connect();
-            $logs = $zk->getAttendanceLogs();
+            $deviceIdentity = strtoupper(implode(' ', array_filter([
+                $machine->MachineAlias,
+                $machine->ProductType,
+                $machine->FirmwareVersion,
+                $machine->ProduceKind,
+            ])));
+            $isGt800 = str_contains($deviceIdentity, 'GT800')
+                || str_contains($deviceIdentity, 'VER 6.60 APR 27 2017');
+            $preferredRecordSize = $isGt800 ? 40 : null;
+            $logs = $zk->getAttendanceLogs($preferredRecordSize);
             $zk->disconnect();
         } catch (\Throwable $e) {
             return response()->json([
@@ -195,6 +205,7 @@ class MachineController extends Controller
             ? Carbon::parse($validated['download_date'])->toDateString()
             : null;
         $userFilter = $validated['user_filter'] ?? 'existing';
+        $action = $validated['action'] ?? 'import';
 
         $logs = array_values(array_filter($logs, function ($log) use ($downloadScope, $downloadDate) {
             $checkTime = $log['check_time'] ?? null;
@@ -220,6 +231,47 @@ class MachineController extends Controller
 
         // Pre-fetch all valid user IDs to filter out ghost/unmapped entries
         $validUserIds = User::pluck('id')->flip()->all();
+
+        if ($action === 'preview') {
+            $previewRows = [];
+            $importable = 0;
+            $unmapped = 0;
+
+            foreach ($logs as $log) {
+                [$resolvedUserId, $biometric, $pin] = $this->resolveAttendanceUser($log);
+                $isImportable = $resolvedUserId !== null
+                    && $resolvedUserId > 0
+                    && ($userFilter === 'all' || isset($validUserIds[$resolvedUserId]));
+                $isImportable ? $importable++ : $unmapped++;
+
+                if (count($previewRows) < 500) {
+                    $previewRows[] = [
+                        'uid' => $log['uid'] ?? null,
+                        'pin' => $pin,
+                        'resolved_user_id' => $resolvedUserId,
+                        'check_time' => $log['check_time'] ?? null,
+                        'check_type' => $log['check_type'] ?? null,
+                        'verify_code' => $log['verify_code'] ?? null,
+                        'importable' => $isImportable,
+                    ];
+                }
+            }
+
+            return response()->json([
+                'message' => 'Download preview complete',
+                'preview' => true,
+                'model' => $isGt800 ? 'GT800 / Ver 6.60' : ($machine->ProductType ?: 'Auto-detected'),
+                'record_size' => $preferredRecordSize,
+                'total' => count($logs),
+                'importable' => $importable,
+                'unmapped' => $unmapped,
+                'rows' => $previewRows,
+                'preview_limited' => count($logs) > 500,
+                'download_scope' => $downloadScope,
+                'download_date' => $downloadDate,
+                'user_filter' => $userFilter,
+            ]);
+        }
 
         foreach ($logs as $log) {
             [$resolvedUserId, $biometric, $pin] = $this->resolveAttendanceUser($log);
