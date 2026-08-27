@@ -962,7 +962,7 @@ class ZKTecoService
         return $this->receiveChunkedData($expectedSize, $reply['reply_id']);
     }
 
-    private function receiveChunkedData(int $expectedSize, int $replyId): string
+    private function receiveChunkedData(int $expectedSize, int $replyId, bool $freeAfter = true): string
     {
         $raw = '';
         $reachedExpected = $expectedSize <= 0;
@@ -986,7 +986,8 @@ class ZKTecoService
             if ($reply['cmd'] === self::CMD_PREPARE_DATA) {
                 $raw .= $this->receiveChunkedData(
                     $this->unpackUInt32LE($reply['data'] ?? ''),
-                    $reply['reply_id']
+                    $reply['reply_id'],
+                    false
                 );
                 $reachedExpected = true;
                 continue;
@@ -1003,7 +1004,9 @@ class ZKTecoService
             }
         }
 
-        $this->sendCommand(self::CMD_FREE_DATA);
+        if ($freeAfter) {
+            $this->sendCommand(self::CMD_FREE_DATA);
+        }
 
         return $raw;
     }
@@ -1087,7 +1090,8 @@ class ZKTecoService
                 self::CMD_ACK_OK       => '',
                 self::CMD_PREPARE_DATA => $this->receiveChunkedData(
                     $this->unpackUInt32LE($chunkReply['data'] ?? ''),
-                    $chunkReply['reply_id']
+                    $chunkReply['reply_id'],
+                    false
                 ),
                 default                => '',
             };
@@ -1122,7 +1126,8 @@ class ZKTecoService
                         ),
                         self::CMD_PREPARE_DATA => $this->receiveChunkedData(
                             $this->unpackUInt32LE($retryReply['data'] ?? ''),
-                            $retryReply['reply_id']
+                            $retryReply['reply_id'],
+                            false
                         ),
                         default => '',
                     };
