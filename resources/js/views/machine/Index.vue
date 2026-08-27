@@ -1025,6 +1025,7 @@ const syncAttendance = async (machine) => {
           <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
         </div>
         <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
+        ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white">Download Raw Diagnostic (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
         ${resp.data?.preview_limited ? '<p class="mt-2 text-xs text-gray-500">Pagination covers the first 500 downloaded records.</p>' : ''}`,
       confirmButtonText: 'Close',
       didOpen: () => {
@@ -1034,6 +1035,17 @@ const syncAttendance = async (machine) => {
           previewSortDirection = previewSortDirection === 'asc' ? 'desc' : 'asc'
           previewPage = 1
           renderDownloadedPreview()
+        })
+        document.getElementById('download-preview-diagnostic')?.addEventListener('click', () => {
+          const diagnostic = resp.data?.diagnostic
+          if (!diagnostic?.content_base64) return
+          const bytes = Uint8Array.from(atob(diagnostic.content_base64), (character) => character.charCodeAt(0))
+          const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }))
+          const link = document.createElement('a')
+          link.href = url
+          link.download = diagnostic.filename || 'gt800_attendance_raw.bin'
+          link.click()
+          URL.revokeObjectURL(url)
         })
         renderDownloadedPreview()
       },

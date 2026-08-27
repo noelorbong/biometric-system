@@ -195,6 +195,9 @@ class MachineController extends Controller
             // the buffered SDK request, rather than the 40-byte SSR string layout.
             $preferredRecordSize = $isGt800 ? 16 : null;
             $logs = $zk->getAttendanceLogs($preferredRecordSize, $isGt800);
+            $rawAttendancePayload = ($validated['action'] ?? 'import') === 'preview'
+                ? $zk->getLastAttendancePayload()
+                : '';
             $zk->disconnect();
         } catch (\Throwable $e) {
             return response()->json([
@@ -297,6 +300,11 @@ class MachineController extends Controller
                 'preview_limited' => count($logs) > 500,
                 'valid_decoded' => $validDecodedRows,
                 'decoded_quality' => round($decodedQuality * 100, 1),
+                'diagnostic' => $isGt800 && $rawAttendancePayload !== '' ? [
+                    'filename' => 'GT800_' . ($machine->sn ?: $machine->ID) . '_attendance_raw.bin',
+                    'content_base64' => base64_encode($rawAttendancePayload),
+                    'bytes' => strlen($rawAttendancePayload),
+                ] : null,
                 'download_scope' => $downloadScope,
                 'download_date' => $downloadDate,
                 'user_filter' => $userFilter,

@@ -15,6 +15,7 @@ use RuntimeException;
  */
 class ZKTecoService
 {
+    private string $lastAttendancePayload = '';
     private const TCP_HEADER         = "\x50\x50\x82\x7D";
 
     // ─── Command codes ────────────────────────────────────────────────────────
@@ -266,22 +267,47 @@ class ZKTecoService
             // GT800/Ver 6.60 can return its user-data block for the standalone
             // request. Use the SDK-compatible ReadAllGLogData request directly.
             $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
+            $this->lastAttendancePayload = $raw;
             $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
         } else {
             // First try the standalone/TCP attendance payload used by FA/iface models.
             $raw = $this->downloadAttendanceLogsStandalone();
+            $this->lastAttendancePayload = $raw;
             $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
         }
 
         // Older fingerprint-only models often require buffered CMD_ATTLOG_RRQ.
         if ($logs === [] && !$preferBuffered) {
             $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
+            $this->lastAttendancePayload = $raw;
             $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
         }
 
         $this->sendCommand(self::CMD_ENABLEDEVICE);
 
         return $logs;
+    }
+
+    public function getLastAttendancePayload(): string
+    {
+        return $this->lastAttendancePayload;
+    }
+
+    /**
+     * Read the unparsed attendance payload for decoder diagnostics only.
+     * This never clears or changes records on the device.
+     */
+    public function getRawAttendancePayload(bool $buffered = true): string
+    {
+        $this->sendCommand(self::CMD_DISABLEDEVICE);
+
+        try {
+            return $buffered
+                ? $this->readWithBuffer(self::CMD_ATTLOG_RRQ)
+                : $this->downloadAttendanceLogsStandalone();
+        } finally {
+            $this->sendCommand(self::CMD_ENABLEDEVICE);
+        }
     }
 
     /**
