@@ -103,6 +103,12 @@ const routes = [
         meta: { title: `Biometric Report`, roles: [1] }
       },
       {
+        name: "BiometricLogs",
+        path: "biometric/logs",
+        component: () => import('../views/biometric/Logs.vue'),
+        meta: { title: `Biometric Logs`, roles: [1] }
+      },
+      {
         name: "AppSettings",
         path: "settings",
         component: () => import('../views/settings/Index.vue'),

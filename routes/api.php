@@ -15,6 +15,7 @@ use App\Http\Controllers\MediaFileController;
 use App\Http\Controllers\OfficeShiftController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\BiometricReportController;
+use App\Http\Controllers\BiometricLogController;
 use App\Http\Controllers\AppSettingController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\LicenseController;
@@ -43,6 +44,7 @@ Route::post('/user/import-dat', [UserController::class, 'importUserDat'])->middl
 Route::post('/user/import-biotemplate-dat/preview', [UserController::class, 'previewBiometricTemplateDatImport'])->middleware('auth:sanctum');
 Route::post('/user/import-biotemplate-dat', [UserController::class, 'importBiometricTemplateDat'])->middleware('auth:sanctum');
 Route::post('/report/biometric', [BiometricReportController::class, 'generate'])->middleware('auth:sanctum');
+Route::post('/biometric/logs', [BiometricLogController::class, 'index'])->middleware('auth:sanctum');
 Route::post('/user/office-shift/update', [UserController::class, 'updateOfficeShift'])->middleware('auth:sanctum');
 Route::post('/user/affiliation/update', [UserController::class, 'updateAffiliation'])->middleware('auth:sanctum');
 Route::post('/office-shifts', [OfficeShiftController::class, 'index'])->middleware('auth:sanctum');

@@ -223,6 +223,7 @@ import {
   LayoutDashboardIcon,
   PlugInIcon,
   TaskIcon,
+  TableIcon,
   SettingsIcon,
   UserCircleIcon,
   UserGroupIcon,
@@ -247,6 +248,7 @@ const menuAdminGroups = [
     items: [
       { icon: PlugInIcon, name: "Biometric Machines", path: "/main/machines" },
       { icon: TaskIcon, name: "Biometric Report", path: "/main/reports/biometric" },
+      { icon: TableIcon, name: "Biometric Logs", path: "/main/biometric/logs" },
     ],
   },
   {
