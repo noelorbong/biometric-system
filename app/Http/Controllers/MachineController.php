@@ -191,9 +191,8 @@ class MachineController extends Controller
             ])));
             $isGt800 = str_contains($deviceIdentity, 'GT800')
                 || str_contains($deviceIdentity, 'VER 6.60 APR 27 2017');
-            // GT800 Ver 6.60 returns compact numeric-PIN attendance rows through
-            // the buffered SDK request, rather than the 40-byte SSR string layout.
-            $preferredRecordSize = $isGt800 ? 16 : null;
+            // GT800 ZMM220 returns the standard SSR 40-byte attendance layout.
+            $preferredRecordSize = $isGt800 ? 40 : null;
             $logs = $zk->getAttendanceLogs($preferredRecordSize, $isGt800);
             $rawAttendancePayload = ($validated['action'] ?? 'import') === 'preview'
                 ? $zk->getLastAttendancePayload()

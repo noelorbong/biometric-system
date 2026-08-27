@@ -1054,7 +1054,7 @@ class ZKTecoService
             $chunkReply = $this->sendCommand(self::CMD_DATA_RDY, pack('VV', $offset, $chunkSize));
 
             $data .= match ($chunkReply['cmd']) {
-                self::CMD_DATA         => $this->collectDataFrames($chunkReply['data'] ?? '', $chunkReply['reply_id']),
+                self::CMD_DATA         => $chunkReply['data'] ?? '',
                 self::CMD_ACK_OK       => $this->receivePreparedData($chunkReply['reply_id']),
                 self::CMD_PREPARE_DATA => $this->receiveChunkedData(
                     $this->unpackUInt32LE($chunkReply['data'] ?? ''),
@@ -1153,8 +1153,13 @@ class ZKTecoService
         if (strlen($payload) >= 4) {
             $declaredSize = $this->unpackUInt32LE($payload);
 
-            if ($declaredSize > 0 && $declaredSize <= strlen($payload) - 4) {
-                $payload = substr($payload, 4, $declaredSize);
+            $hasValidPreferredHeader = in_array($preferredRecordSize, [8, 16, 40], true)
+                && $declaredSize >= $preferredRecordSize
+                && $declaredSize % $preferredRecordSize === 0;
+
+            if ($declaredSize > 0
+                && ($declaredSize <= strlen($payload) - 4 || $hasValidPreferredHeader)) {
+                $payload = substr($payload, 4, min($declaredSize, strlen($payload) - 4));
             }
         }
 
@@ -1206,8 +1211,7 @@ class ZKTecoService
         $length = strlen($payload);
 
         if (in_array($preferredRecordSize, [8, 16, 40], true)
-            && $length >= $preferredRecordSize
-            && $length % $preferredRecordSize === 0) {
+            && $length >= $preferredRecordSize) {
             return $preferredRecordSize;
         }
 
