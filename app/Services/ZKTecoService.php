@@ -1062,6 +1062,17 @@ class ZKTecoService
                 ),
                 default                => '',
             };
+
+            if ($offset === 0 && strlen($data) >= 4) {
+                // GT800 initially advertises only its first 0xFFC0-byte chunk.
+                // The first four bytes of that chunk contain the complete data
+                // length, so extend the loop to request every remaining offset.
+                $declaredPayloadSize = $this->unpackUInt32LE($data);
+                $framedSize = $declaredPayloadSize + 4;
+                if ($framedSize > $size && $framedSize <= 100 * 1024 * 1024) {
+                    $size = $framedSize;
+                }
+            }
         }
 
         try {
