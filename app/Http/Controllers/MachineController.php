@@ -274,17 +274,15 @@ class MachineController extends Controller
                     && ($userFilter === 'all' || isset($validUserIds[$resolvedUserId]));
                 $isImportable ? $importable++ : $unmapped++;
 
-                if (count($previewRows) < 500) {
-                    $previewRows[] = [
-                        'uid' => $log['uid'] ?? null,
-                        'pin' => $pin,
-                        'resolved_user_id' => $resolvedUserId,
-                        'check_time' => $log['check_time'] ?? null,
-                        'check_type' => $log['check_type'] ?? null,
-                        'verify_code' => $log['verify_code'] ?? null,
-                        'importable' => $isImportable,
-                    ];
-                }
+                $previewRows[] = [
+                    'uid' => $log['uid'] ?? null,
+                    'pin' => $pin,
+                    'resolved_user_id' => $resolvedUserId,
+                    'check_time' => $log['check_time'] ?? null,
+                    'check_type' => $log['check_type'] ?? null,
+                    'verify_code' => $log['verify_code'] ?? null,
+                    'importable' => $isImportable,
+                ];
             }
 
             return response()->json([
@@ -296,7 +294,7 @@ class MachineController extends Controller
                 'importable' => $importable,
                 'unmapped' => $unmapped,
                 'rows' => $previewRows,
-                'preview_limited' => count($logs) > 500,
+                'preview_limited' => false,
                 'valid_decoded' => $validDecodedRows,
                 'decoded_quality' => round($decodedQuality * 100, 1),
                 'diagnostic' => $isGt800 && $rawAttendancePayload !== '' ? [

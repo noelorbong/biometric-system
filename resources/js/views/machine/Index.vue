@@ -1026,7 +1026,7 @@ const syncAttendance = async (machine) => {
         </div>
         <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
         ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white">Download Raw Diagnostic (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
-        ${resp.data?.preview_limited ? '<p class="mt-2 text-xs text-gray-500">Pagination covers the first 500 downloaded records.</p>' : ''}`,
+        <p class="mt-2 text-xs text-gray-500">All ${Number(previewRows.length).toLocaleString()} downloaded records are available in this pagination.</p>`,
       confirmButtonText: 'Close',
       didOpen: () => {
         document.getElementById('download-preview-previous')?.addEventListener('click', () => { previewPage--; renderDownloadedPreview() })
