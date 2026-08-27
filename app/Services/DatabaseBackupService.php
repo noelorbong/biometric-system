@@ -11,9 +11,162 @@ class DatabaseBackupService
     private const CIPHER = 'aes-256-cbc';
     private const PBKDF2_ITERATIONS = 200000;
     private const PAYLOAD_VERSION = 1;
+    private const BACKUP_MEMORY_LIMIT = '1024M';
+
+    public function createEncryptedServerBackup(string $outputPath, string $passphrase): array
+    {
+        if (trim($passphrase) === '') {
+            throw new RuntimeException('Encryption passphrase is required.');
+        }
+
+        if (!in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            $snapshot = $this->buildSnapshot();
+            $encrypted = $this->encryptSnapshot($snapshot, $passphrase);
+            if (file_put_contents($outputPath, $encrypted) === false) {
+                throw new RuntimeException('Unable to write the encrypted backup file.');
+            }
+            return ['format' => 'json-v1', 'size_bytes' => strlen($encrypted)];
+        }
+
+        $mysqldump = $this->firstExistingBinary([
+            env('MYSQLDUMP_PATH'),
+            'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump.exe',
+            'C:\\Program Files\\MySQL\\MySQL Workbench 8.0 CE\\mysqldump.exe',
+            'C:\\xampp\\mysql\\bin\\mysqldump.exe',
+            '/usr/bin/mysqldump',
+            '/usr/local/bin/mysqldump',
+        ]);
+        $openssl = $this->firstExistingBinary([
+            env('OPENSSL_PATH'),
+            'C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe',
+            'C:\\Program Files\\Git\\usr\\bin\\openssl.exe',
+            'C:\\xampp\\apache\\bin\\openssl.exe',
+            'C:\\xampp\\php\\extras\\openssl\\openssl.exe',
+            '/usr/bin/openssl',
+            '/usr/local/bin/openssl',
+        ]);
+
+        if (!$mysqldump || !$openssl) {
+            throw new RuntimeException('mysqldump and OpenSSL are required for large database backups.');
+        }
+
+        $directory = dirname($outputPath);
+        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+            throw new RuntimeException('Unable to create the backup directory.');
+        }
+
+        $dumpPath = tempnam(sys_get_temp_dir(), 'bio_dump_');
+        $defaultsPath = tempnam(sys_get_temp_dir(), 'bio_mysql_');
+        if (!$dumpPath || !$defaultsPath) {
+            throw new RuntimeException('Unable to create temporary backup files.');
+        }
+
+        $connection = config('database.connections.' . config('database.default'));
+        $defaults = "[client]\n"
+            . 'host=' . ($connection['host'] ?? '127.0.0.1') . "\n"
+            . 'port=' . ($connection['port'] ?? 3306) . "\n"
+            . 'user=' . ($connection['username'] ?? '') . "\n"
+            . 'password=' . str_replace(["\\", "\n"], ["\\\\", ""], (string) ($connection['password'] ?? '')) . "\n";
+        file_put_contents($defaultsPath, $defaults);
+
+        try {
+            $this->runProcess([
+                $mysqldump,
+                "--defaults-extra-file={$defaultsPath}",
+                '--single-transaction',
+                '--quick',
+                '--skip-lock-tables',
+                '--routines',
+                '--events',
+                '--hex-blob',
+                "--result-file={$dumpPath}",
+                (string) ($connection['database'] ?? ''),
+            ]);
+
+            $this->runProcess([
+                $openssl,
+                'enc', '-aes-256-cbc', '-pbkdf2', '-iter', (string) self::PBKDF2_ITERATIONS,
+                '-salt', '-in', $dumpPath, '-out', $outputPath,
+                '-pass', 'env:BIO_BACKUP_PASSPHRASE',
+            ], ['BIO_BACKUP_PASSPHRASE' => $passphrase]);
+        } finally {
+            @unlink($dumpPath);
+            @unlink($defaultsPath);
+        }
+
+        if (!is_file($outputPath) || filesize($outputPath) <= 0) {
+            throw new RuntimeException('The encrypted backup file was not created.');
+        }
+
+        return ['format' => 'mysql-dump-aes256-v2', 'size_bytes' => filesize($outputPath)];
+    }
+
+    private function firstExistingBinary(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && $candidate !== '' && is_file($candidate)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
+    private function runProcess(array $command, array $environment = []): void
+    {
+        $pipes = [];
+        $inheritedEnvironment = getenv();
+        $processEnvironment = $environment === []
+            ? null
+            : array_merge(is_array($inheritedEnvironment) ? $inheritedEnvironment : [], $environment);
+        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $processEnvironment);
+        if (!is_resource($process)) {
+            throw new RuntimeException('Unable to start the database backup process.');
+        }
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+        if ($exitCode !== 0) {
+            throw new RuntimeException(trim($stderr ?: $stdout) ?: 'Database backup process failed.');
+        }
+    }
+
+    private function prepareLargeBackupRuntime(): void
+    {
+        @set_time_limit(0);
+
+        $currentLimit = ini_get('memory_limit');
+        if ($currentLimit === '-1') {
+            return;
+        }
+
+        $currentBytes = $this->phpMemoryValueToBytes((string) $currentLimit);
+        $requiredBytes = $this->phpMemoryValueToBytes(self::BACKUP_MEMORY_LIMIT);
+        if ($currentBytes > 0 && $currentBytes < $requiredBytes) {
+            @ini_set('memory_limit', self::BACKUP_MEMORY_LIMIT);
+        }
+    }
+
+    private function phpMemoryValueToBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '' || $value === '-1') {
+            return -1;
+        }
+
+        $number = (int) $value;
+        return match (strtolower(substr($value, -1))) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => $number,
+        };
+    }
 
     public function buildSnapshot(): array
     {
+        $this->prepareLargeBackupRuntime();
         $driver = DB::getDriverName();
         $tables = array_values(array_filter(Schema::getTableListing(), function (string $table): bool {
             return !str_starts_with($table, 'sqlite_');
@@ -42,6 +195,7 @@ class DatabaseBackupService
 
     public function encryptSnapshot(array $snapshot, string $passphrase): string
     {
+        $this->prepareLargeBackupRuntime();
         if (trim($passphrase) === '') {
             throw new RuntimeException('Encryption passphrase is required.');
         }
@@ -74,6 +228,7 @@ class DatabaseBackupService
 
     public function decryptSnapshot(string $encodedBackup, string $passphrase): array
     {
+        $this->prepareLargeBackupRuntime();
         if (trim($passphrase) === '') {
             throw new RuntimeException('Decryption passphrase is required.');
         }

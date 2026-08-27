@@ -8,7 +8,7 @@ const page = ref(1)
 const nextCursor = ref(null)
 const previousCursor = ref(null)
 const filters = reactive({ date_from: '', date_to: '', checktype: '', sensorid: '', sn: '' })
-const sort = reactive({ by: 'CHECKTIME', direction: 'desc' })
+const sort = reactive({ by: 'id', direction: 'desc' })
 const perPage = ref(25)
 
 const loadLogs = async (cursor = null, requestedPage = 1) => {

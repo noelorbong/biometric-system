@@ -46,7 +46,7 @@ class BiometricLogController extends Controller
             }
         }
 
-        $sortBy = $validated['sort_by'] ?? 'CHECKTIME';
+        $sortBy = $validated['sort_by'] ?? 'id';
         $direction = $validated['sort_direction'] ?? 'desc';
         $query->orderBy($sortBy, $direction);
         if ($sortBy !== 'id') {

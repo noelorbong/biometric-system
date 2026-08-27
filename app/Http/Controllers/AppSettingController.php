@@ -951,6 +951,7 @@ class AppSettingController extends Controller
 
     public function backupDatabase(Request $request, DatabaseBackupService $backupService)
     {
+        @set_time_limit(0);
         if (!$this->isSuperAdmin($request)) {
             return $this->forbiddenResponse();
         }
@@ -960,20 +961,20 @@ class AppSettingController extends Controller
         ]);
 
         try {
-            $snapshot = $backupService->buildSnapshot();
-            $encrypted = $backupService->encryptSnapshot($snapshot, (string) $validated['passphrase']);
-
             $timestamp = now()->utc()->format('Ymd_His');
             $filename = "db-backup-{$timestamp}.bkp";
             $path = "backups/{$filename}";
-
-            Storage::disk('local')->put($path, $encrypted);
+            $result = $backupService->createEncryptedServerBackup(
+                Storage::disk('local')->path($path),
+                (string) $validated['passphrase']
+            );
 
             return response()->json([
                 'message' => 'Encrypted database backup created.',
                 'filename' => $filename,
                 'path' => $path,
-                'size_bytes' => strlen($encrypted),
+                'size_bytes' => $result['size_bytes'],
+                'format' => $result['format'],
             ]);
         } catch (\Throwable $exception) {
             return response()->json([
