@@ -16,6 +16,7 @@ use RuntimeException;
 class ZKTecoService
 {
     private string $lastAttendancePayload = '';
+    private array $lastBufferDiagnostics = [];
     private const TCP_HEADER         = "\x50\x50\x82\x7D";
 
     // ─── Command codes ────────────────────────────────────────────────────────
@@ -291,6 +292,11 @@ class ZKTecoService
     public function getLastAttendancePayload(): string
     {
         return $this->lastAttendancePayload;
+    }
+
+    public function getLastBufferDiagnostics(): array
+    {
+        return $this->lastBufferDiagnostics;
     }
 
     /**
@@ -1025,8 +1031,16 @@ class ZKTecoService
      */
     private function readWithBuffer(int $command, int $fct = 0, int $ext = 0): string
     {
+        $this->lastBufferDiagnostics = [];
         $request = pack('cvVV', 1, $command, $fct, $ext);
         $reply = $this->sendCommand(self::CMD_DATA_WRRQ, $request);
+        $this->lastBufferDiagnostics[] = [
+            'stage' => 'prepare',
+            'cmd' => $reply['cmd'],
+            'reply_id' => $reply['reply_id'],
+            'data_bytes' => strlen($reply['data'] ?? ''),
+            'data_hex' => bin2hex(substr($reply['data'] ?? '', 0, 16)),
+        ];
 
         if ($reply['cmd'] === self::CMD_DATA) {
             return $this->collectDataFrames($reply['data'] ?? '', $reply['reply_id']);
@@ -1052,6 +1066,15 @@ class ZKTecoService
         for ($offset = 0; $offset < $size; $offset += $maxChunk) {
             $chunkSize = min($maxChunk, $size - $offset);
             $chunkReply = $this->sendCommand(self::CMD_DATA_RDY, pack('VV', $offset, $chunkSize));
+            $this->lastBufferDiagnostics[] = [
+                'stage' => 'chunk',
+                'offset' => $offset,
+                'requested_bytes' => $chunkSize,
+                'cmd' => $chunkReply['cmd'],
+                'reply_id' => $chunkReply['reply_id'],
+                'data_bytes' => strlen($chunkReply['data'] ?? ''),
+                'data_hex' => bin2hex(substr($chunkReply['data'] ?? '', 0, 16)),
+            ];
 
             $chunkData = match ($chunkReply['cmd']) {
                 // Consume the trailing ACK for this chunk before requesting the
@@ -1083,6 +1106,15 @@ class ZKTecoService
                         self::CMD_DATA_RDY,
                         pack('VV', $dataBytesReceived, $retrySize)
                     );
+                    $this->lastBufferDiagnostics[] = [
+                        'stage' => 'data-relative-retry',
+                        'offset' => $dataBytesReceived,
+                        'requested_bytes' => $retrySize,
+                        'cmd' => $retryReply['cmd'],
+                        'reply_id' => $retryReply['reply_id'],
+                        'data_bytes' => strlen($retryReply['data'] ?? ''),
+                        'data_hex' => bin2hex(substr($retryReply['data'] ?? '', 0, 16)),
+                    ];
                     $chunkData = match ($retryReply['cmd']) {
                         self::CMD_DATA => $this->collectDataFrames(
                             $retryReply['data'] ?? '',

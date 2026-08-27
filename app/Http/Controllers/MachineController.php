@@ -197,6 +197,9 @@ class MachineController extends Controller
             $rawAttendancePayload = ($validated['action'] ?? 'import') === 'preview'
                 ? $zk->getLastAttendancePayload()
                 : '';
+            $bufferDiagnostics = ($validated['action'] ?? 'import') === 'preview'
+                ? $zk->getLastBufferDiagnostics()
+                : [];
             $zk->disconnect();
         } catch (\Throwable $e) {
             return response()->json([
@@ -301,6 +304,7 @@ class MachineController extends Controller
                     'filename' => 'GT800_' . ($machine->sn ?: $machine->ID) . '_attendance_raw.bin',
                     'content_base64' => base64_encode($rawAttendancePayload),
                     'bytes' => strlen($rawAttendancePayload),
+                    'transfer' => $bufferDiagnostics,
                 ] : null,
                 'download_scope' => $downloadScope,
                 'download_date' => $downloadDate,
