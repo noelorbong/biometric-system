@@ -61,12 +61,16 @@ class DatabaseBackupService
             throw new RuntimeException('Unable to create temporary backup files.');
         }
 
-        $connection = config('database.connections.' . config('database.default'));
+        // Use Laravel's active, URL-resolved connection values. Reading the raw
+        // config array can lose credentials supplied through DB_URL in production.
+        $connection = DB::connection()->getConfig();
         $defaults = "[client]\n"
-            . 'host=' . ($connection['host'] ?? '127.0.0.1') . "\n"
-            . 'port=' . ($connection['port'] ?? 3306) . "\n"
-            . 'user=' . ($connection['username'] ?? '') . "\n"
-            . 'password=' . str_replace(["\\", "\n"], ["\\\\", ""], (string) ($connection['password'] ?? '')) . "\n";
+            . 'host=' . $this->quoteMySqlOption((string) ($connection['host'] ?? '127.0.0.1')) . "\n"
+            . 'port=' . (int) ($connection['port'] ?? 3306) . "\n"
+            . 'user=' . $this->quoteMySqlOption((string) ($connection['username'] ?? '')) . "\n";
+        if (!empty($connection['unix_socket'])) {
+            $defaults .= 'socket=' . $this->quoteMySqlOption((string) $connection['unix_socket']) . "\n";
+        }
         file_put_contents($defaultsPath, $defaults);
 
         try {
@@ -81,7 +85,7 @@ class DatabaseBackupService
                 '--hex-blob',
                 "--result-file={$dumpPath}",
                 (string) ($connection['database'] ?? ''),
-            ]);
+            ], ['MYSQL_PWD' => (string) ($connection['password'] ?? '')]);
 
             $this->runProcess([
                 $openssl,
@@ -109,6 +113,12 @@ class DatabaseBackupService
             }
         }
         return null;
+    }
+
+    private function quoteMySqlOption(string $value): string
+    {
+        $value = str_replace(["\\", '"', "\r", "\n"], ["\\\\", '\\"', '', ''], $value);
+        return '"' . $value . '"';
     }
 
     private function runProcess(array $command, array $environment = []): void
