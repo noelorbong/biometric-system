@@ -191,7 +191,9 @@ class MachineController extends Controller
             ])));
             $isGt800 = str_contains($deviceIdentity, 'GT800')
                 || str_contains($deviceIdentity, 'VER 6.60 APR 27 2017');
-            $preferredRecordSize = $isGt800 ? 40 : null;
+            // GT800 Ver 6.60 returns compact numeric-PIN attendance rows through
+            // the buffered SDK request, rather than the 40-byte SSR string layout.
+            $preferredRecordSize = $isGt800 ? 16 : null;
             $logs = $zk->getAttendanceLogs($preferredRecordSize, $isGt800);
             $zk->disconnect();
         } catch (\Throwable $e) {
@@ -232,6 +234,32 @@ class MachineController extends Controller
         // Pre-fetch all valid user IDs to filter out ghost/unmapped entries
         $validUserIds = User::pluck('id')->flip()->all();
 
+        $validDecodedRows = 0;
+        foreach ($logs as $log) {
+            $pin = trim((string) ($log['pin'] ?? ''));
+            $checkTime = $log['check_time'] ?? null;
+            if ($pin === '' || $pin === '0' || !$checkTime) {
+                continue;
+            }
+            try {
+                $year = Carbon::parse($checkTime)->year;
+                if ($year >= 2000 && $year <= now()->year + 1) {
+                    $validDecodedRows++;
+                }
+            } catch (\Throwable) {
+                // Invalid decoded rows are excluded from the quality score.
+            }
+        }
+
+        $decodedQuality = count($logs) > 0 ? $validDecodedRows / count($logs) : 0;
+        if ($action === 'import' && count($logs) > 0 && $decodedQuality < 0.8) {
+            return response()->json([
+                'message' => 'Import blocked: the device response did not decode into reliable user IDs and check times. Use Download & Preview to inspect the records.',
+                'total' => count($logs),
+                'valid_decoded' => $validDecodedRows,
+            ], 422);
+        }
+
         if ($action === 'preview') {
             $previewRows = [];
             $importable = 0;
@@ -267,6 +295,8 @@ class MachineController extends Controller
                 'unmapped' => $unmapped,
                 'rows' => $previewRows,
                 'preview_limited' => count($logs) > 500,
+                'valid_decoded' => $validDecodedRows,
+                'decoded_quality' => round($decodedQuality * 100, 1),
                 'download_scope' => $downloadScope,
                 'download_date' => $downloadDate,
                 'user_filter' => $userFilter,

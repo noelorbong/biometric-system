@@ -1020,7 +1020,7 @@ const syncAttendance = async (machine) => {
           <div class="text-green-700">Importable: <strong>${Number(resp.data?.importable || 0)}</strong></div>
           <div class="text-amber-700">Unmapped: <strong>${Number(resp.data?.unmapped || 0)}</strong></div>
         </div>
-        <p class="mb-2 text-left text-xs text-gray-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. No records were imported.</p>
+        <p class="mb-2 text-left text-xs text-gray-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. Decode quality: ${Number(resp.data?.decoded_quality || 0)}%. No records were imported.</p>
         <div class="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 text-left text-xs">
           <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
         </div>
