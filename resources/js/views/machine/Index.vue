@@ -977,15 +977,38 @@ const syncAttendance = async (machine) => {
 
   if (downloadChoice.isDenied) {
     const previewRows = resp.data?.rows || []
-    const tableRows = previewRows.slice(0, 100).map((row) => `
-      <tr class="border-b border-slate-200">
-        <td class="px-2 py-1">${escapeHtml(row.uid)}</td>
-        <td class="px-2 py-1">${escapeHtml(row.pin)}</td>
-        <td class="px-2 py-1">${escapeHtml(row.resolved_user_id || 'Unmapped')}</td>
-        <td class="whitespace-nowrap px-2 py-1">${escapeHtml(row.check_time)}</td>
-        <td class="px-2 py-1">${escapeHtml(row.check_type)}</td>
-        <td class="px-2 py-1">${row.importable ? 'Yes' : 'No'}</td>
-      </tr>`).join('')
+    let previewPage = 1
+    let previewSortDirection = 'desc'
+    const previewPageSize = 20
+
+    const renderDownloadedPreview = () => {
+      const sorted = [...previewRows].sort((a, b) => {
+        const result = String(a.check_time || '').localeCompare(String(b.check_time || ''))
+        return previewSortDirection === 'asc' ? result : -result
+      })
+      const totalPages = Math.max(1, Math.ceil(sorted.length / previewPageSize))
+      previewPage = Math.min(Math.max(1, previewPage), totalPages)
+      const start = (previewPage - 1) * previewPageSize
+      const rows = sorted.slice(start, start + previewPageSize).map((row) => `
+        <tr class="border-b border-slate-200">
+          <td class="px-2 py-1">${escapeHtml(row.uid)}</td>
+          <td class="px-2 py-1">${escapeHtml(row.pin)}</td>
+          <td class="px-2 py-1">${escapeHtml(row.resolved_user_id || 'Unmapped')}</td>
+          <td class="whitespace-nowrap px-2 py-1">${escapeHtml(row.check_time)}</td>
+          <td class="px-2 py-1">${escapeHtml(row.check_type)}</td>
+          <td class="px-2 py-1">${row.importable ? 'Yes' : 'No'}</td>
+        </tr>`).join('')
+      const body = document.getElementById('download-preview-body')
+      const label = document.getElementById('download-preview-page')
+      const previous = document.getElementById('download-preview-previous')
+      const next = document.getElementById('download-preview-next')
+      const sortButton = document.getElementById('download-preview-sort')
+      if (body) body.innerHTML = rows || '<tr><td colspan="6" class="px-2 py-6 text-center">No decoded records.</td></tr>'
+      if (label) label.textContent = `Page ${previewPage} of ${totalPages}`
+      if (previous) previous.disabled = previewPage <= 1
+      if (next) next.disabled = previewPage >= totalPages
+      if (sortButton) sortButton.textContent = `Check time ${previewSortDirection === 'asc' ? 'â†‘' : 'â†“'}`
+    }
 
     await Swal.fire({
       icon: resp.data?.unmapped ? 'warning' : 'info',
@@ -999,10 +1022,21 @@ const syncAttendance = async (machine) => {
         </div>
         <p class="mb-2 text-left text-xs text-gray-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. No records were imported.</p>
         <div class="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 text-left text-xs">
-          <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2">Check time</th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody>${tableRows}</tbody></table>
+          <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
         </div>
-        ${previewRows.length > 100 ? '<p class="mt-2 text-xs text-gray-500">Showing the first 100 decoded records.</p>' : ''}`,
+        <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
+        ${resp.data?.preview_limited ? '<p class="mt-2 text-xs text-gray-500">Pagination covers the first 500 downloaded records.</p>' : ''}`,
       confirmButtonText: 'Close',
+      didOpen: () => {
+        document.getElementById('download-preview-previous')?.addEventListener('click', () => { previewPage--; renderDownloadedPreview() })
+        document.getElementById('download-preview-next')?.addEventListener('click', () => { previewPage++; renderDownloadedPreview() })
+        document.getElementById('download-preview-sort')?.addEventListener('click', () => {
+          previewSortDirection = previewSortDirection === 'asc' ? 'desc' : 'asc'
+          previewPage = 1
+          renderDownloadedPreview()
+        })
+        renderDownloadedPreview()
+      },
     })
     return
   }

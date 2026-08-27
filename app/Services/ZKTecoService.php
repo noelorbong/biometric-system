@@ -258,16 +258,23 @@ class ZKTecoService
      *
      * @return array<int, array{pin: string, check_time: string, check_type: string, verify_code: int}>
      */
-    public function getAttendanceLogs(?int $preferredRecordSize = null): array
+    public function getAttendanceLogs(?int $preferredRecordSize = null, bool $preferBuffered = false): array
     {
         $this->sendCommand(self::CMD_DISABLEDEVICE);
 
-        // First try the standalone/TCP attendance payload used by FA/iface models.
-        $raw = $this->downloadAttendanceLogsStandalone();
-        $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+        if ($preferBuffered) {
+            // GT800/Ver 6.60 can return its user-data block for the standalone
+            // request. Use the SDK-compatible ReadAllGLogData request directly.
+            $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
+            $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+        } else {
+            // First try the standalone/TCP attendance payload used by FA/iface models.
+            $raw = $this->downloadAttendanceLogsStandalone();
+            $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+        }
 
         // Older fingerprint-only models often require buffered CMD_ATTLOG_RRQ.
-        if ($logs === []) {
+        if ($logs === [] && !$preferBuffered) {
             $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
             $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
         }

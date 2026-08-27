@@ -192,7 +192,7 @@ class MachineController extends Controller
             $isGt800 = str_contains($deviceIdentity, 'GT800')
                 || str_contains($deviceIdentity, 'VER 6.60 APR 27 2017');
             $preferredRecordSize = $isGt800 ? 40 : null;
-            $logs = $zk->getAttendanceLogs($preferredRecordSize);
+            $logs = $zk->getAttendanceLogs($preferredRecordSize, $isGt800);
             $zk->disconnect();
         } catch (\Throwable $e) {
             return response()->json([
