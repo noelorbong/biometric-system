@@ -1024,13 +1024,10 @@ class AppSettingController extends Controller
         ]);
 
         try {
-            $content = file_get_contents($validated['backup_file']->getRealPath());
-            if ($content === false) {
-                throw new \RuntimeException('Unable to read uploaded backup file.');
-            }
-
-            $snapshot = $backupService->decryptSnapshot($content, (string) $validated['passphrase']);
-            $result = $backupService->restoreSnapshot($snapshot);
+            $result = $backupService->restoreEncryptedBackupFile(
+                $validated['backup_file']->getRealPath(),
+                (string) $validated['passphrase']
+            );
 
             return response()->json([
                 'message' => 'Database import completed.',
@@ -1274,9 +1271,10 @@ class AppSettingController extends Controller
                 ], 404);
             }
 
-            $content = Storage::disk('local')->get($path);
-            $snapshot = $backupService->decryptSnapshot($content, (string) $validated['passphrase']);
-            $result = $backupService->restoreSnapshot($snapshot);
+            $result = $backupService->restoreEncryptedBackupFile(
+                Storage::disk('local')->path($path),
+                (string) $validated['passphrase']
+            );
 
             ActivityLog::create([
                 'user_id' => $request->user()?->id,

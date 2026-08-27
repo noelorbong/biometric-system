@@ -105,6 +105,103 @@ class DatabaseBackupService
         return ['format' => 'mysql-dump-aes256-v2', 'size_bytes' => filesize($outputPath)];
     }
 
+    public function restoreEncryptedBackupFile(string $backupPath, string $passphrase): array
+    {
+        if (!is_file($backupPath) || !is_readable($backupPath)) {
+            throw new RuntimeException('Unable to read the backup file.');
+        }
+
+        $handle = fopen($backupPath, 'rb');
+        $signature = $handle ? fread($handle, 8) : false;
+        if (is_resource($handle)) {
+            fclose($handle);
+        }
+
+        // Older exports use the PHP JSON envelope. Keep them restorable.
+        if ($signature !== 'Salted__') {
+            $content = file_get_contents($backupPath);
+            if ($content === false) {
+                throw new RuntimeException('Unable to read the backup file.');
+            }
+
+            return $this->restoreSnapshot($this->decryptSnapshot($content, $passphrase));
+        }
+
+        if (!in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            throw new RuntimeException('This native SQL backup can only be restored to MySQL or MariaDB.');
+        }
+
+        $openssl = $this->findOpenSslBinary();
+        $mysql = $this->firstExistingBinary([
+            env('MYSQL_PATH'),
+            'C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe',
+            'C:\\Program Files\\MySQL\\MySQL Workbench 8.0 CE\\mysql.exe',
+            'C:\\xampp\\mysql\\bin\\mysql.exe',
+            'C:\\xampp\\mysql\\bin\\mariadb.exe',
+            '/usr/bin/mysql',
+            '/usr/bin/mariadb',
+            '/usr/local/bin/mysql',
+            '/usr/local/bin/mariadb',
+        ]);
+
+        if (!$openssl || !$mysql) {
+            throw new RuntimeException('The MySQL client and OpenSSL are required to restore this backup.');
+        }
+
+        $sqlPath = tempnam(sys_get_temp_dir(), 'bio_restore_');
+        $defaultsPath = tempnam(sys_get_temp_dir(), 'bio_mysql_');
+        if (!$sqlPath || !$defaultsPath) {
+            throw new RuntimeException('Unable to create temporary restore files.');
+        }
+
+        $connection = DB::connection()->getConfig();
+        $defaults = "[client]\n"
+            . 'host=' . $this->quoteMySqlOption((string) ($connection['host'] ?? '127.0.0.1')) . "\n"
+            . 'port=' . (int) ($connection['port'] ?? 3306) . "\n"
+            . 'user=' . $this->quoteMySqlOption((string) ($connection['username'] ?? '')) . "\n";
+        if (!empty($connection['unix_socket'])) {
+            $defaults .= 'socket=' . $this->quoteMySqlOption((string) $connection['unix_socket']) . "\n";
+        }
+        file_put_contents($defaultsPath, $defaults);
+
+        try {
+            $this->runProcess([
+                $openssl,
+                'enc', '-d', '-aes-256-cbc', '-pbkdf2', '-iter', (string) self::PBKDF2_ITERATIONS,
+                '-in', $backupPath, '-out', $sqlPath,
+                '-pass', 'env:BIO_BACKUP_PASSPHRASE',
+            ], ['BIO_BACKUP_PASSPHRASE' => $passphrase]);
+
+            $this->runProcess([
+                $mysql,
+                "--defaults-extra-file={$defaultsPath}",
+                (string) ($connection['database'] ?? ''),
+            ], ['MYSQL_PWD' => (string) ($connection['password'] ?? '')], $sqlPath);
+        } finally {
+            @unlink($sqlPath);
+            @unlink($defaultsPath);
+        }
+
+        return [
+            'restored_tables' => null,
+            'missing_tables' => [],
+            'format' => 'mysql-dump-aes256-v2',
+        ];
+    }
+
+    private function findOpenSslBinary(): ?string
+    {
+        return $this->firstExistingBinary([
+            env('OPENSSL_PATH'),
+            'C:\\Program Files\\Git\\mingw64\\bin\\openssl.exe',
+            'C:\\Program Files\\Git\\usr\\bin\\openssl.exe',
+            'C:\\xampp\\apache\\bin\\openssl.exe',
+            'C:\\xampp\\php\\extras\\openssl\\openssl.exe',
+            '/usr/bin/openssl',
+            '/usr/local/bin/openssl',
+        ]);
+    }
+
     private function firstExistingBinary(array $candidates): ?string
     {
         foreach ($candidates as $candidate) {
@@ -121,16 +218,24 @@ class DatabaseBackupService
         return '"' . $value . '"';
     }
 
-    private function runProcess(array $command, array $environment = []): void
+    private function runProcess(array $command, array $environment = [], ?string $inputPath = null): void
     {
         $pipes = [];
         $inheritedEnvironment = getenv();
         $processEnvironment = $environment === []
             ? null
             : array_merge(is_array($inheritedEnvironment) ? $inheritedEnvironment : [], $environment);
-        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $processEnvironment);
+        $descriptorSpec = [
+            0 => $inputPath === null ? ['pipe', 'r'] : ['file', $inputPath, 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open($command, $descriptorSpec, $pipes, null, $processEnvironment);
         if (!is_resource($process)) {
             throw new RuntimeException('Unable to start the database backup process.');
+        }
+        if ($inputPath === null && isset($pipes[0]) && is_resource($pipes[0])) {
+            fclose($pipes[0]);
         }
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);
