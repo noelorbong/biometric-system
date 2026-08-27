@@ -1054,7 +1054,13 @@ class ZKTecoService
             $chunkReply = $this->sendCommand(self::CMD_DATA_RDY, pack('VV', $offset, $chunkSize));
 
             $data .= match ($chunkReply['cmd']) {
-                self::CMD_DATA         => $chunkReply['data'] ?? '',
+                // Consume the trailing ACK for this chunk before requesting the
+                // next offset. Otherwise GT800 returns that stale ACK as if it
+                // were the response to the continuation request.
+                self::CMD_DATA         => $this->collectDataFrames(
+                    $chunkReply['data'] ?? '',
+                    $chunkReply['reply_id']
+                ),
                 self::CMD_ACK_OK       => $this->receivePreparedData($chunkReply['reply_id']),
                 self::CMD_PREPARE_DATA => $this->receiveChunkedData(
                     $this->unpackUInt32LE($chunkReply['data'] ?? ''),
