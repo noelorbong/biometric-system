@@ -1053,7 +1053,7 @@ class ZKTecoService
             $chunkSize = min($maxChunk, $size - $offset);
             $chunkReply = $this->sendCommand(self::CMD_DATA_RDY, pack('VV', $offset, $chunkSize));
 
-            $data .= match ($chunkReply['cmd']) {
+            $chunkData = match ($chunkReply['cmd']) {
                 // Consume the trailing ACK for this chunk before requesting the
                 // next offset. Otherwise GT800 returns that stale ACK as if it
                 // were the response to the continuation request.
@@ -1061,13 +1061,43 @@ class ZKTecoService
                     $chunkReply['data'] ?? '',
                     $chunkReply['reply_id']
                 ),
-                self::CMD_ACK_OK       => $this->receivePreparedData($chunkReply['reply_id']),
+                self::CMD_ACK_OK       => '',
                 self::CMD_PREPARE_DATA => $this->receiveChunkedData(
                     $this->unpackUInt32LE($chunkReply['data'] ?? ''),
                     $chunkReply['reply_id']
                 ),
                 default                => '',
             };
+
+            // Some ZMM220/GT800 firmware addresses continuation chunks relative
+            // to the attendance data after its four-byte size header. If the
+            // framed offset is rejected, retry at the data-relative offset.
+            if ($chunkData === '' && $offset > 0 && strlen($data) >= 4) {
+                $declaredPayloadSize = $this->unpackUInt32LE($data);
+                $dataBytesReceived = max(0, strlen($data) - 4);
+                $remainingDataBytes = max(0, $declaredPayloadSize - $dataBytesReceived);
+
+                if ($remainingDataBytes > 0) {
+                    $retrySize = min($maxChunk, $remainingDataBytes);
+                    $retryReply = $this->sendCommand(
+                        self::CMD_DATA_RDY,
+                        pack('VV', $dataBytesReceived, $retrySize)
+                    );
+                    $chunkData = match ($retryReply['cmd']) {
+                        self::CMD_DATA => $this->collectDataFrames(
+                            $retryReply['data'] ?? '',
+                            $retryReply['reply_id']
+                        ),
+                        self::CMD_PREPARE_DATA => $this->receiveChunkedData(
+                            $this->unpackUInt32LE($retryReply['data'] ?? ''),
+                            $retryReply['reply_id']
+                        ),
+                        default => '',
+                    };
+                }
+            }
+
+            $data .= $chunkData;
 
             if ($offset === 0 && strlen($data) >= 4) {
                 // GT800 initially advertises only its first 0xFFC0-byte chunk.
