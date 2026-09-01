@@ -266,10 +266,10 @@ export const useMachineStore = defineStore('machines', {
       })
     },
 
-    async enrollFingerprint(payload) {
+    async enrollFingerprint(payload, config = {}) {
       const auth = useAuthStore()
 
-      return await axios.post('/api/machine/enroll-fingerprint', payload).then(function (resp) {
+      return await axios.post('/api/machine/enroll-fingerprint', payload, config).then(function (resp) {
         return { success: true, data: resp.data }
       }).catch(function (resp) {
         if (resp.response?.data?.message == 'Unauthenticated.') {
@@ -305,10 +305,10 @@ export const useMachineStore = defineStore('machines', {
       })
     },
 
-    async enrollmentTemplateStatus(payload) {
+    async enrollmentTemplateStatus(payload, config = {}) {
       const auth = useAuthStore()
 
-      return await axios.post('/api/machine/enrollment-template-status', payload).then(function (resp) {
+      return await axios.post('/api/machine/enrollment-template-status', payload, config).then(function (resp) {
         return { success: true, data: resp.data }
       }).catch(function (resp) {
         if (resp.response?.data?.message == 'Unauthenticated.') {

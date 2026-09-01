@@ -53,7 +53,7 @@ export const useUserStore = defineStore('users',{
     async storeUser(user) {
       let app = this;
       const auth = useAuthStore();
-      return await axios.post('/api/user/store', user).then(function (resp) {
+      return await axios.post('/api/user/store', user, { timeout: 30000 }).then(function (resp) {
         if(resp.data.message !='Email Exist'){
         app.users.push(resp.data.user)
         }

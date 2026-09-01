@@ -2495,16 +2495,20 @@ class MachineController extends Controller
             'privilege'   => (int) ($biometric?->privilege ?? 0),
         ];
 
+        $zk = null;
+        $deviceDisabled = false;
+
         try {
             $zk = new ZKTecoService(
                 ip:       $machine->IP,
                 port:     $machine->Port     ?? 4370,
-                timeout:  20,
+                timeout:  8,
                 password: blank($machine->CommPassword) ? '0' : (string) $machine->CommPassword
             );
 
             $zk->connect();
             $zk->disableDevice();
+            $deviceDisabled = true;
 
             // Ensure the user exists on the device before starting enrollment.
             try {
@@ -2516,18 +2520,34 @@ class MachineController extends Controller
 
             // Device must be enabled for the enrollment UI to respond to finger scans.
             $zk->enableDevice();
+            $deviceDisabled = false;
 
             // Some firmwares require event registration before remote enroll trigger.
             $zk->registerEvents(0xFFFF);
 
             $zk->startEnrollment((int) $user->id, (int) $validated['finger_id'], $badgeNumber);
-            $zk->disconnect();
         } catch (\Throwable $e) {
             $status = str_contains($e->getMessage(), 'Device rejected enrollment') ? 422 : 502;
 
             return response()->json([
                 'message' => 'Enrollment trigger failed: ' . $e->getMessage(),
             ], $status);
+        } finally {
+            if ($zk) {
+                if ($deviceDisabled) {
+                    try {
+                        $zk->enableDevice();
+                    } catch (\Throwable) {
+                        // The machine may already be offline; still release the socket.
+                    }
+                }
+
+                try {
+                    $zk->disconnect();
+                } catch (\Throwable) {
+                    // Cleanup must not replace the original enrollment response.
+                }
+            }
         }
 
         $fingerLabel = $fingerLabels[$validated['finger_id']] ?? 'Finger ' . $validated['finger_id'];
@@ -2812,6 +2832,7 @@ class MachineController extends Controller
             'user_id'   => ['required', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
             'machine_id' => ['required', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
             'finger_id' => ['required', 'integer', 'min:0', 'max:9'],
+            'local_only' => ['nullable', 'boolean'],
         ]);
 
         $machine = Machine::query()->findOrFail($validated['machine_id']);

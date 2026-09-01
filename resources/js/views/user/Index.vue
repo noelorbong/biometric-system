@@ -48,6 +48,8 @@ const enrollCompletedFingers = ref([])
 const enrollActiveFinger = ref(null)
 const enrollLastCompletedFinger = ref(null)
 const enrollPollToken = ref(0)
+const enrollRequestToken = ref(0)
+let enrollAbortController = null
 
 const isEditUser = ref(false)
 const search_user = ref('')
@@ -794,7 +796,7 @@ const loadExistingEnrolledFingers = async ({ userId, machineId, token }) => {
   }
 }
 
-const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, timeoutMs = 120000 }) => {
+const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, signal, timeoutMs = 120000 }) => {
   const startedAt = Date.now()
 
   while (Date.now() - startedAt < timeoutMs) {
@@ -806,6 +808,9 @@ const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, timeou
       user_id: userId,
       machine_id: machineId,
       finger_id: fingerId,
+    }, {
+      signal,
+      timeout: 12000,
     })
 
     if (status.success && status?.data?.found) {
@@ -858,6 +863,10 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
 
   enrollPollToken.value += 1
   const pollToken = enrollPollToken.value
+  enrollRequestToken.value += 1
+  const requestToken = enrollRequestToken.value
+  enrollAbortController?.abort()
+  enrollAbortController = new AbortController()
   enrollLoading.value    = true
   enrollActiveFinger.value = fingerId
   enrollStatusText.value = 'Triggering enrollment on the machine...'
@@ -866,7 +875,16 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
     user_id:   user.id,
     machine_id: machineId,
     finger_id:  fingerId,
+  }, {
+    signal: enrollAbortController.signal,
+    timeout: 12000,
   })
+
+  enrollAbortController = null
+
+  if (requestToken !== enrollRequestToken.value || !enrollModal.value.open) {
+    return
+  }
 
   enrollLoading.value = false
 
@@ -885,15 +903,18 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
   const payload = response.data || {}
 
   enrollStatusText.value = 'Enrollment started. Waiting for template to be saved in local database...'
+  enrollAbortController = new AbortController()
 
   const waitResult = await waitForTemplateSaved({
     userId: user.id,
     machineId,
     fingerId,
     token: pollToken,
+    signal: enrollAbortController.signal,
     timeoutMs: 120000,
   })
 
+  enrollAbortController = null
   enrollLoading.value = false
 
   if (waitResult.cancelled) {
@@ -916,6 +937,9 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
 
 const closeEnrollModal = () => {
   enrollPollToken.value += 1
+  enrollRequestToken.value += 1
+  enrollAbortController?.abort()
+  enrollAbortController = null
   enrollLoading.value = false
   enrollActiveFinger.value = null
   enrollLastCompletedFinger.value = null
