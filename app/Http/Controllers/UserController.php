@@ -1378,6 +1378,95 @@ class UserController extends Controller
         ]);
     }
 
+    public function checkinouts(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'user_ids.*' => ['required', 'integer', 'distinct', 'exists:users,id'],
+            'year' => ['required', 'integer', 'min:1970', 'max:2100'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
+        ]);
+
+        $userIds = array_map('intval', $validated['user_ids']);
+        [$start, $end] = $this->monthRange((int) $validated['year'], (int) $validated['month']);
+
+        $baseLogsByUser = Checkinout::query()
+            ->whereIn('USERID', $userIds)
+            ->whereBetween('CHECKTIME', [$start, $end])
+            ->orderByDesc('CHECKTIME')
+            ->get()
+            ->groupBy(fn ($row) => (int) $row->USERID);
+
+        $overridesByUser = BiometricLogOverride::query()
+            ->with(['createdBy:id,name', 'updatedBy:id,name'])
+            ->whereIn('user_id', $userIds)
+            ->where(function ($query) use ($start, $end) {
+                $query->whereBetween('new_checktime', [$start, $end])
+                    ->orWhereBetween('old_checktime', [$start, $end]);
+            })
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn ($row) => (int) $row->user_id);
+
+        $results = [];
+
+        foreach ($userIds as $userId) {
+            $baseLogs = $baseLogsByUser->get($userId, collect());
+            $overrides = $overridesByUser->get($userId, collect());
+            $overrideByCheckinout = $overrides
+                ->where('action_type', 'override')
+                ->whereNotNull('checkinout_id')
+                ->groupBy('checkinout_id')
+                ->map(fn ($rows) => $rows->sortByDesc('id')->first());
+            $effectiveRows = [];
+
+            foreach ($baseLogs as $row) {
+                if ($overrideByCheckinout->has($row->id)) {
+                    continue;
+                }
+
+                $effectiveRows[] = [
+                    'id' => $row->id,
+                    'USERID' => $row->USERID,
+                    'CHECKTIME' => optional($row->CHECKTIME)->format('Y-m-d H:i:s'),
+                    'CHECKTYPE' => $row->CHECKTYPE,
+                    '_override_id' => null,
+                    '_override_action' => null,
+                ];
+            }
+
+            foreach ($overrides as $override) {
+                if (!$override->new_checktime || $override->new_checktime->lt($start) || $override->new_checktime->gt($end)) {
+                    continue;
+                }
+
+                $effectiveRows[] = [
+                    'id' => $override->checkinout_id ? ('override-' . $override->id) : ('add-' . $override->id),
+                    'USERID' => $override->user_id,
+                    'CHECKTIME' => optional($override->new_checktime)->format('Y-m-d H:i:s'),
+                    'CHECKTYPE' => $override->new_checktype,
+                    '_override_id' => $override->id,
+                    '_override_action' => $override->action_type,
+                ];
+            }
+
+            usort($effectiveRows, fn ($a, $b) => strtotime((string) $b['CHECKTIME']) <=> strtotime((string) $a['CHECKTIME']));
+
+            $results[(string) $userId] = [
+                'checkinouts' => $effectiveRows,
+                'overrides' => $overrides
+                    ->map(fn (BiometricLogOverride $override) => $this->mapOverrideForApi($override))
+                    ->values(),
+            ];
+        }
+
+        return response()->json(['users' => $results]);
+    }
+
     public function storeCheckinoutOverride(Request $request)
     {
         if (!$this->isSuperAdmin($request)) {

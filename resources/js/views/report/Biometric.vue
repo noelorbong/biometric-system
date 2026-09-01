@@ -395,34 +395,17 @@ const fetchOverridesForUsers = async (users) => {
     return
   }
 
-  const prepareUser = async (user) => {
-    try {
-      const resp = await axios.post('/api/user/checkinout', {
-        user_id: user.id,
-        ...dateFilterPayload,
-      })
-      user._effective_checkinouts = resp?.data?.checkinouts || []
-      user._overrides = resp?.data?.overrides || []
-      user._printable_attendance_records = buildPrintableAttendanceRecords(user, user._effective_checkinouts)
-    } catch (err) {
-      user._effective_checkinouts = []
-      user._overrides = []
-      user._printable_attendance_records = []
+  const resp = await axios.post('/api/users/checkinouts', {
+    user_ids: users.map((user) => user.id),
+    ...dateFilterPayload,
+  })
+  const resultsByUser = resp?.data?.users || {}
 
-      // Do not continue issuing protected requests after the session has
-      // expired. The global interceptor will handle the sign-in redirect.
-      if (err?.response?.status === 401) {
-        throw err
-      }
-    }
-  }
-
-  // These requests use the same Laravel database-backed session. Running
-  // several of them concurrently can race session persistence and produce
-  // intermittent 401 responses, which the global interceptor treats as a
-  // logout. Keep report preparation sequential and session-safe.
   for (const user of users) {
-    await prepareUser(user)
+    const result = resultsByUser[String(user.id)] || {}
+    user._effective_checkinouts = result.checkinouts || []
+    user._overrides = result.overrides || []
+    user._printable_attendance_records = buildPrintableAttendanceRecords(user, user._effective_checkinouts)
   }
 }
 

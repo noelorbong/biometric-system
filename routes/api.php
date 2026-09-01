@@ -36,6 +36,7 @@ Route::post('/dashboard/data', [DashboardController::class, 'index'])->middlewar
 Route::post('/user', [UserController::class, 'user'])->middleware('auth:sanctum');
 Route::post('/users', [UserController::class, 'index'])->middleware('auth:sanctum');
 Route::post('/user/checkinout', [UserController::class, 'checkinout'])->middleware('auth:sanctum');
+Route::post('/users/checkinouts', [UserController::class, 'checkinouts'])->middleware('auth:sanctum');
 Route::post('/user/checkinout/override/store', [UserController::class, 'storeCheckinoutOverride'])->middleware('auth:sanctum');
 Route::post('/user/checkinout/override/update', [UserController::class, 'updateCheckinoutOverride'])->middleware('auth:sanctum');
 Route::post('/user/checkinout/override/delete', [UserController::class, 'deleteCheckinoutOverride'])->middleware('auth:sanctum');
