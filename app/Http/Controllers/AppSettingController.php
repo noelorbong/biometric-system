@@ -263,6 +263,7 @@ class AppSettingController extends Controller
             'cache:clear',
             'route:clear',
             'view:clear',
+            'optimize:clear',
             'migrate --force',
         ];
 
