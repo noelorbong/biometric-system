@@ -371,9 +371,15 @@ const generateReport = async () => {
 
     if (reportUsers.value.length) {
       preparingPrintData.value = true
-      fetchOverridesForUsers(reportUsers.value).finally(() => {
-        preparingPrintData.value = false
-      })
+      fetchOverridesForUsers(reportUsers.value)
+        .catch((error) => {
+          if (error?.response?.status !== 401) {
+            toastResult('Some print data could not be prepared', 'error')
+          }
+        })
+        .finally(() => {
+          preparingPrintData.value = false
+        })
     }
   } catch (error) {
     reportUsers.value = []
@@ -389,9 +395,6 @@ const fetchOverridesForUsers = async (users) => {
     return
   }
 
-  const concurrency = 8
-  let cursor = 0
-
   const prepareUser = async (user) => {
     try {
       const resp = await axios.post('/api/user/checkinout', {
@@ -405,18 +408,22 @@ const fetchOverridesForUsers = async (users) => {
       user._effective_checkinouts = []
       user._overrides = []
       user._printable_attendance_records = []
+
+      // Do not continue issuing protected requests after the session has
+      // expired. The global interceptor will handle the sign-in redirect.
+      if (err?.response?.status === 401) {
+        throw err
+      }
     }
   }
 
-  const workers = Array.from({ length: Math.min(concurrency, users.length) }, async () => {
-    while (cursor < users.length) {
-      const user = users[cursor]
-      cursor += 1
-      await prepareUser(user)
-    }
-  })
-
-  await Promise.all(workers)
+  // These requests use the same Laravel database-backed session. Running
+  // several of them concurrently can race session persistence and produce
+  // intermittent 401 responses, which the global interceptor treats as a
+  // logout. Keep report preparation sequential and session-safe.
+  for (const user of users) {
+    await prepareUser(user)
+  }
 }
 
 const printReport = async () => {
