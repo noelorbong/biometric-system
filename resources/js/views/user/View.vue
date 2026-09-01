@@ -522,6 +522,39 @@ const resolveGraceCorrectedCheckType = (record, slotMeta) => {
   return candidates.sort((a, b) => a.distance - b.distance)[0].type
 }
 
+const resolveGraceCorrectedPunches = (records, slotMeta) => {
+  const grace = shiftGraceSettings.value
+  if (!grace.enabled || !slotMeta.length) {
+    return records.map((record) => ({ record, type: String(record?.CHECKTYPE || '').toUpperCase() }))
+  }
+
+  const endpoints = slotMeta.flatMap((slot, slotIndex) => [
+    { key: `${slotIndex}-I`, type: 'I', minute: slot.inMinute },
+    { key: `${slotIndex}-O`, type: 'O', minute: slot.outMinute },
+  ]).filter((endpoint) => endpoint.minute !== null)
+  const assignedEndpoints = new Set()
+
+  return records.map((record) => {
+    const minutes = toMinutesFromDateTime(record?.CHECKTIME)
+    if (minutes === null) {
+      return { record, type: String(record?.CHECKTYPE || '').toUpperCase() }
+    }
+
+    const endpoint = endpoints.find((candidate) => (
+      !assignedEndpoints.has(candidate.key)
+      && minutes >= candidate.minute - grace.before
+      && minutes <= candidate.minute + grace.after
+    ))
+
+    if (!endpoint) {
+      return { record, type: resolveGraceCorrectedCheckType(record, slotMeta) }
+    }
+
+    assignedEndpoints.add(endpoint.key)
+    return { record, type: endpoint.type }
+  })
+}
+
 const attendanceRows = computed(() => {
   const grouped = new Map()
 
@@ -549,8 +582,7 @@ const attendanceRows = computed(() => {
       const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
       const normalizedPunches = []
 
-      sorted.forEach((item) => {
-        const type = resolveGraceCorrectedCheckType(item, slotMeta)
+      resolveGraceCorrectedPunches(sorted, slotMeta).forEach(({ record: item, type }) => {
         if (type !== 'I' && type !== 'O') {
           return
         }
