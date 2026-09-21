@@ -23,6 +23,19 @@ class UserObserver
     }
 
     /**
+     * Release the email's unique index before retaining the user as deleted.
+     */
+    public function deleting(User $user): void
+    {
+        if ($user->isForceDeleting()) {
+            return;
+        }
+
+        $user->email = $this->deletedEmail($user->email, $user->id);
+        $user->saveQuietly();
+    }
+
+    /**
      * Handle the User "deleted" event.
      */
      public function deleted(User $user)
@@ -52,5 +65,12 @@ class UserObserver
         $user->profile()->forceDelete();
         $user->contacts()->forceDelete();
         $user->addresses()->forceDelete();
+    }
+
+    private function deletedEmail(string $email, int $userId): string
+    {
+        $suffix = "__deleted_{$userId}";
+
+        return substr($email, 0, 255 - strlen($suffix)) . $suffix;
     }
 }
