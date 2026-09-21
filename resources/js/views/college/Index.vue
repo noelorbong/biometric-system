@@ -146,42 +146,39 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-6 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
-      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 class="text-3xl font-semibold leading-tight">Colleges</h1>
-          <p class="mt-1 text-sm text-slate-200/90">Manage college codes, names, heads, and activation state.</p>
-          <div class="mt-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100 ring-1 ring-inset ring-white/10">
-            College Directory
-          </div>
+  <div class="space-y-3">
+    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Colleges</h1>
+          <span class="text-xs text-slate-500 dark:text-slate-400">College directory</span>
         </div>
-        <Button @click="openCreate" :className="'h-11 whitespace-nowrap text-nowrap border border-sky-300/30 bg-sky-400/20 text-sky-50 hover:bg-sky-400/30'" size="sm" variant="primary" :startIcon="PlusIcon">
+        <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">
           Add College
         </Button>
       </div>
     </section>
 
-    <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Total Colleges</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ totalColleges }}</p>
+    <section class="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-1 text-xs">
+      <article class="flex items-baseline gap-1.5">
+        <p class="font-medium text-slate-500 dark:text-slate-400">Total</p>
+        <p class="font-semibold text-slate-900 dark:text-white">{{ totalColleges }}</p>
       </article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Active</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ activeColleges }}</p>
+      <article class="flex items-baseline gap-1.5">
+        <p class="font-medium text-slate-500 dark:text-slate-400">Active</p>
+        <p class="font-semibold text-emerald-700 dark:text-emerald-300">{{ activeColleges }}</p>
       </article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Inactive</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ inactiveColleges }}</p>
+      <article class="flex items-baseline gap-1.5">
+        <p class="font-medium text-slate-500 dark:text-slate-400">Inactive</p>
+        <p class="font-semibold text-slate-700 dark:text-slate-200">{{ inactiveColleges }}</p>
       </article>
-      <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">With Head</p>
-        <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{{ withHeads }}</p>
+      <article class="flex items-baseline gap-1.5">
+        <p class="font-medium text-slate-500 dark:text-slate-400">With Head</p>
+        <p class="font-semibold text-slate-900 dark:text-white">{{ withHeads }}</p>
       </article>
     </section>
 
-    <section class="rounded-[24px] border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section class="rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="flex flex-col gap-3 md:flex-row md:items-center">
         <div class="relative flex-1">
           <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -191,35 +188,35 @@ onMounted(async () => {
             v-model="search"
             type="text"
             placeholder="Search college..."
-            class="h-11 w-full rounded-lg border border-slate-300 bg-transparent pl-9 pr-4 text-sm text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+            class="h-9 w-full rounded-md border border-slate-300 bg-transparent pl-9 pr-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
           />
         </div>
-        <Button @click="openCreate" :className="'h-11 whitespace-nowrap text-nowrap border border-sky-200 bg-sky-50 px-4 text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'" size="sm" variant="primary" :startIcon="PlusIcon">
+        <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'" size="sm" variant="primary" :startIcon="PlusIcon">
           New College
         </Button>
       </div>
     </section>
 
-    <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="max-w-full overflow-x-auto custom-scrollbar">
         <table class="min-w-full">
           <thead class="bg-slate-50 dark:bg-slate-900/60">
             <tr>
-              <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Short</th>
-              <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Long</th>
-              <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">College Head</th>
-              <th class="px-5 py-3 text-left text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</th>
-              <th class="px-5 py-3 text-right text-theme-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Actions</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Short</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Long</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">College Head</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</th>
+              <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
             <tr v-for="college in filteredColleges" :key="college.id" class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
-              <td class="px-5 py-3 text-sm text-slate-700 dark:text-slate-200">{{ college.college_short || '-' }}</td>
-              <td class="px-5 py-3 text-sm font-medium text-slate-800 dark:text-slate-100">{{ college.college_long || '-' }}</td>
-              <td class="px-5 py-3 text-sm text-slate-700 dark:text-slate-200">{{ college.college_head || '-' }}</td>
-              <td class="px-5 py-3 text-sm">
+              <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ college.college_short || '-' }}</td>
+              <td class="px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-100">{{ college.college_long || '-' }}</td>
+              <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ college.college_head || '-' }}</td>
+              <td class="px-3 py-1.5 text-xs">
                 <span
-                  class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                  class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
                   :class="college.status
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300'"
@@ -227,15 +224,15 @@ onMounted(async () => {
                   {{ college.status ? 'Active' : 'Inactive' }}
                 </span>
               </td>
-              <td class="px-5 py-3">
-                <div class="flex items-center justify-end gap-2">
-                  <button @click="openEdit(college)" type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sky-200 text-sky-600 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"><PencilIcon /></button>
-                  <button @click="openDelete(college)" type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
+              <td class="px-3 py-1.5">
+                <div class="flex items-center justify-end gap-1.5">
+                  <button @click="openEdit(college)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-sky-200 text-sky-600 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"><PencilIcon /></button>
+                  <button @click="openDelete(college)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
                 </div>
               </td>
             </tr>
             <tr v-if="!filteredColleges.length">
-              <td colspan="5" class="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              <td colspan="5" class="px-3 py-5 text-center text-xs text-slate-500 dark:text-slate-400">
                 No colleges found.
               </td>
             </tr>

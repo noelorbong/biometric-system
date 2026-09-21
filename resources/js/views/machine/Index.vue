@@ -1680,176 +1680,69 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
-      <div class="grid grid-cols-2" >
-        <h1 class=" text-3xl font-semibold tracking-tight text-white lg:text-4xl">Biometric Machines</h1>
-        <div>
-              <p class="text-right text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Device Control Deck</p>
-              <div class=" mt-1 mb-1 lg:flex items-right justify-end gap-2 text-sm font-medium text-white/80">
-                 <span
-                  class="float-right inline-flex rounded-full px-3 py-1 font-medium ring-1 ring-inset"
-                  :class="autoSyncDaemonStatus.running
-                    ? 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30'
-                    : 'bg-rose-400/15 text-rose-100 ring-rose-300/30'"
-                >
-                  {{ autoSyncDaemonStatus.running ? 'Daemon Running' : 'Daemon Stopped' }}
-                </span>
-                <span class="float-right inline-flex rounded-full bg-white/10 px-3 py-1 font-medium text-slate-100 ring-1 ring-inset ring-white/10">
-                  Heartbeat: {{ formatLastAutoSync(autoSyncDaemonStatus.last_heartbeat) }}
-                </span>
-              </div>
-        </div>
-        
-          
-          <p class="hidden mt-3 max-w-2xl text-sm leading-6 text-slate-200/90">
-            Monitor machine health, run downloads, control background sync, and manage template operations from one screen.
-          </p>
-
-      </div>
-
-      <div class="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-        <div class="max-w-3xl">
-          
-
-          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs">
-           
-            <button
-              type="button"
-              @click="toggleWebAutoFallback"
-              class="inline-flex min-h-11 items-center gap-3 rounded-2xl border px-4 py-2 text-left font-medium shadow-sm backdrop-blur-sm transition focus:outline-none focus:ring-2 focus:ring-white/30"
-              :class="webAutoFallbackEnabled
-                ? 'border-sky-300/30 bg-sky-400/20 text-sky-50 hover:bg-sky-400/30'
-                : 'border-white/10 bg-slate-900/20 text-slate-100 hover:bg-white/15'"
-              :title="'Enable browser fallback auto-download when daemon is stopped'"
-            >
-              <span
-                class="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-semibold"
-                :class="webAutoFallbackEnabled
-                  ? 'bg-sky-200/20 text-sky-50'
-                  : 'bg-white/10 text-slate-200'"
-              >
-                {{ webAutoFallbackEnabled ? 'ON' : 'OFF' }}
-              </span>
-              <span class="flex flex-col leading-tight">
-                <span class="text-sm font-semibold">Web Fallback</span>
-                <span class="text-[11px] font-medium text-slate-200/80">{{ webAutoFallbackEnabled ? 'Browser backup sync active' : 'Use browser sync when daemon stops' }}</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              @click="openMachineTimerSettings"
-              class="inline-flex min-h-11 items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/20 px-4 py-2 text-left font-medium text-slate-100 shadow-sm backdrop-blur-sm transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/30"
-              title="Configure machine page timer intervals"
-            >
-              <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-sm font-semibold text-slate-100">
-                ms
-              </span>
-              <span class="flex flex-col leading-tight">
-                <span class="text-sm font-semibold">Timer Settings</span>
-                <span class="text-[11px] font-medium text-slate-200/80">Adjust polling and fallback intervals</span>
-              </span>
-            </button>
+  <div class="space-y-4">
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex flex-col gap-4 min-[1024px]:flex-row min-[1024px]:items-center min-[1024px]:justify-between">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 class="text-xl font-semibold text-slate-900 dark:text-white">Biometric Machines</h1>
+            <span class="text-sm text-slate-500 dark:text-slate-400">{{ filteredMachines.length }} of {{ machineStats.total }} shown</span>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <span><strong class="font-semibold text-emerald-600 dark:text-emerald-400">{{ machineStats.enabled }}</strong> enabled</span>
+            <span><strong class="font-semibold text-cyan-600 dark:text-cyan-400">{{ machineStats.autoEnabled }}</strong> auto sync</span>
+            <span><strong class="font-semibold text-slate-700 dark:text-slate-200">{{ machineStats.activeAuto }}</strong> active</span>
+            <span class="inline-flex rounded px-1.5 py-0.5 font-semibold" :class="autoSyncDaemonStatus.running ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'">
+              {{ autoSyncDaemonStatus.running ? 'Daemon Running' : 'Daemon Stopped' }}
+            </span>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[660px]">
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Total</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ machineStats.total }}</p>
-            <p class="mt-1 text-xs text-slate-300">Registered devices</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Enabled</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ machineStats.enabled }}</p>
-            <p class="mt-1 text-xs text-slate-300">Ready to connect</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Auto Sync</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ machineStats.autoEnabled }}</p>
-            <p class="mt-1 text-xs text-slate-300">Machines with auto mode</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Active</p>
-            <p class="mt-2 text-3xl font-semibold text-white">{{ machineStats.activeAuto }}</p>
-            <p class="mt-1 text-xs text-slate-300">Auto sync healthy</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_640px]">
-      <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Machine Directory</h2>
-          </div>
-          <div class="text-sm text-slate-500 dark:text-slate-400">
-            Showing <span class="font-semibold text-slate-900 dark:text-white">{{ filteredMachines.length }}</span> of {{ machineStats.total }} machines
-          </div>
-        </div>
-
-        <div class="mt-4">
+        <div class="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:flex-wrap sm:items-center min-[1024px]:justify-end">
           <input
             v-model="search"
             type="text"
-            placeholder="Search machine, firmware, IP, or serial number"
-            class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
+            placeholder="Search machine, IP, or serial"
+            class="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-56 sm:flex-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
           />
-        </div>
-      </div>
-
-      <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick Actions</h2>
-
-        <div class="mt-4 grid grid-cols-3 gap-3">
-          <button
-            @click="openAttendanceDatImport"
-            type="button"
-            class="flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-medium transition bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
-          >
-            <RefreshIcon class="h-4 w-4" />
-            <span>Import Attendance</span>
+          <button @click="toggleWebAutoFallback" type="button" class="h-9 rounded-lg border px-2.5 text-xs font-semibold transition" :class="webAutoFallbackEnabled ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'" :title="'Enable browser fallback auto-download when daemon is stopped'">
+            Web Fallback: {{ webAutoFallbackEnabled ? 'On' : 'Off' }}
           </button>
-
-          <button
-            @click="pushUsersToAllMachines"
-            type="button"
-            :disabled="pushingUsers"
-            class="flex h-12 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-medium transition"
-            :class="pushingUsers
-              ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-              : 'bg-cyan-600 text-white hover:bg-cyan-500'"
-          >
-            <span v-if="pushingUsers" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-            <RefreshIcon v-else class="h-4 w-4" />
-            <span>{{ pushingUsers ? 'Pushing Users…' : 'Push Users to All Devices' }}</span>
+          <button @click="openMachineTimerSettings" type="button" class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="Configure machine page timer intervals">
+            Timer Settings
           </button>
-
-          <Button @click="openCreate" :className="'h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary" :startIcon="PlusIcon">
-            Add Machine
-          </Button>
+          <button @click="openAttendanceDatImport" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30">
+            <RefreshIcon class="h-3.5 w-3.5" />
+            Import Attendance
+          </button>
+          <button @click="pushUsersToAllMachines" type="button" :disabled="pushingUsers" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition" :class="pushingUsers ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-cyan-600 text-white hover:bg-cyan-500'">
+            <span v-if="pushingUsers" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+            <RefreshIcon v-else class="h-3.5 w-3.5" />
+            {{ pushingUsers ? 'Pushing…' : 'Push Users' }}
+          </button>
+          <Button @click="openCreate" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary" :startIcon="PlusIcon">Add Machine</Button>
         </div>
       </div>
     </section>
 
     <section>
-      <div v-if="filteredMachines.length" class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+      <div v-if="filteredMachines.length" class="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         <article
           v-for="machine in filteredMachines"
           :key="machine.ID"
-          class="group overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-white/[0.03]"
+          class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-white/[0.03]"
         >
-          <div class="border-b border-slate-200 bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(251,191,36,0.08))] p-5 dark:border-slate-800 dark:bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(34,197,94,0.05))]">
-            <div class="flex items-start justify-between gap-4">
+          <div class="border-b border-slate-200 bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(251,191,36,0.08))] p-3 dark:border-slate-800 dark:bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(34,197,94,0.05))]">
+            <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="truncate text-xl font-semibold text-slate-900 dark:text-white">{{ machine.MachineAlias || 'Unnamed Machine' }}</h3>
+                  <h3 class="truncate text-lg font-semibold text-slate-900 dark:text-white">{{ machine.MachineAlias || 'Unnamed Machine' }}</h3>
                   
                 </div>
 
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ machine.IP || 'No IP configured' }}<span v-if="machine.Port"> :{{ machine.Port }}</span>
-                <span
+                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                  <span class="whitespace-nowrap">{{ machine.IP || 'No IP configured' }}<span v-if="machine.Port"> :{{ machine.Port }}</span></span>
+                  <span
                     class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
                     :class="machine.Enabled
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
@@ -1857,9 +1750,6 @@ onUnmounted(() => {
                   >
                     {{ machine.Enabled ? 'Enabled' : 'Disabled' }}
                   </span>
-                </p>
-
-                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
                   <span class="rounded-full bg-white/80 px-2.5 py-1 font-medium text-slate-700 ring-1 ring-inset ring-slate-200 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-slate-700">
                     {{ machine.ConnectType || 'Unknown Type' }}
                   </span>
@@ -1872,11 +1762,11 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5">
                 <button
                   @click="openEdit(machine)"
                   type="button"
-                  class="rounded-full bg-white/80 p-2 text-sky-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-sky-300 dark:ring-slate-700"
+                  class="rounded-lg bg-white/80 p-1.5 text-sky-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-sky-300 dark:ring-slate-700"
                   title="Edit"
                 >
                   <PencilIcon />
@@ -1884,7 +1774,7 @@ onUnmounted(() => {
                 <button
                   @click="openDelete(machine)"
                   type="button"
-                  class="rounded-full bg-white/80 p-2 text-rose-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-rose-300 dark:ring-slate-700"
+                  class="rounded-lg bg-white/80 p-1.5 text-rose-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-rose-300 dark:ring-slate-700"
                   title="Delete"
                 >
                   <TrashIcon />
@@ -1893,29 +1783,29 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="space-y-5 p-5">
-            <div class="grid grid-cols-2 gap-3 text-sm lg:grid-cols-3">
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+          <div class="space-y-3 p-3">
+            <div class="grid grid-cols-2 gap-2 text-xs lg:grid-cols-3">
+              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Machine No</p>
                 <p class="mt-1 font-medium text-slate-800 dark:text-slate-100">{{ machine.MachineNumber ?? '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Serial</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.sn || '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Product</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProductType || '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Firmware</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.FirmwareVersion || '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Produce Kind</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProduceKind || '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60">
+              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
                 <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.pushver || '-' }}</p>
               </div>
@@ -1944,7 +1834,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+            <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Last Auto Sync</p>
@@ -1963,7 +1853,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="connectingIds.has(machine.ID) || syncingIds.has(machine.ID)"
                 :title="connectingIds.has(machine.ID) ? 'Connecting…' : 'Test Connection'"
-                class=" flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
                 :class="connectingIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30'"
@@ -1977,7 +1867,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)"
                 :title="machine.AutoDownload ? 'Disable automatic background download' : 'Enable automatic background download'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
                 :class="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : machine.AutoDownload
@@ -1994,7 +1884,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="downloadingUserIds.has(machine.ID) || connectingIds.has(machine.ID) || pushingUserIds.has(machine.ID)"
                 :title="downloadingUserIds.has(machine.ID) ? 'Downloading users…' : 'Download Users from Device'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
                 :class="downloadingUserIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30'"
@@ -2009,7 +1899,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="pushingUserIds.has(machine.ID) || syncingIds.has(machine.ID) || connectingIds.has(machine.ID)"
                 :title="pushingUserIds.has(machine.ID) ? 'Pushing users…' : 'Push Users to Device'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
                 :class="pushingUserIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-900/20 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/30'"
@@ -2024,7 +1914,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="syncingIds.has(machine.ID) || clearingLogIds.has(machine.ID) || connectingIds.has(machine.ID)"
                 :title="syncingIds.has(machine.ID) ? 'Downloading…' : 'Download Attendance'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
                 :class="syncingIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'"
@@ -2039,7 +1929,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="clearingLogIds.has(machine.ID) || syncingIds.has(machine.ID) || connectingIds.has(machine.ID)"
                 :title="clearingLogIds.has(machine.ID) ? 'Clearing logs…' : 'Clear Device Attendance Logs'"
-                class="flex h-11 items-center justify-center gap-2 rounded-2xl px-3 text-sm font-medium transition"
+                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
                 :class="clearingLogIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30'"

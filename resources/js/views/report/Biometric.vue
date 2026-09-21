@@ -1044,7 +1044,103 @@ const getPrintableRecords = (user) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-3">
+    <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex flex-col gap-3 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Report</h1>
+          <span class="text-xs text-slate-500 dark:text-slate-400">{{ periodLabel }}</span>
+          <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ reportUsers.length }} users</span>
+          <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{{ selectedCount }} selected</span>
+          <span v-if="loading || preparingPrintData" class="text-xs font-medium text-amber-600 dark:text-amber-300">
+            {{ loading ? 'Generating...' : 'Preparing print data...' }}
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 min-[800px]:justify-end">
+          <label class="flex h-8 items-center gap-2 rounded-md border border-slate-200 px-2 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
+            <input v-model="calculateUndertime" type="checkbox" class="h-3.5 w-3.5" />
+            Calculate Undertime
+          </label>
+          <label class="flex h-8 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+            Copies
+            <select v-model.number="copiesPerUser" class="h-8 rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option v-for="n in 10" :key="`copies-${n}`" :value="n">{{ n }}</option>
+            </select>
+          </label>
+          <button @click="printReport" type="button"
+            class="inline-flex h-8 items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30">
+            {{ preparingPrintData ? 'Preparing...' : 'Print Selected' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <section
+      class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-end">
+        <div class="shrink-0">
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mode</label>
+          <div class="inline-flex h-8 rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
+            <button type="button" @click="filterMode = 'monthly'"
+              class="rounded px-2 text-xs font-medium transition"
+              :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
+              Month
+            </button>
+            <button type="button" @click="filterMode = 'custom'"
+              class="rounded px-2 text-xs font-medium transition"
+              :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
+              Custom
+            </button>
+          </div>
+        </div>
+
+        <div class="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div v-if="filterMode === 'monthly'">
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
+            <select v-model.number="filters.year" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
+            </select>
+          </div>
+          <div v-if="filterMode === 'monthly'">
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
+            <select v-model.number="filters.month" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
+            </select>
+          </div>
+          <div v-if="filterMode === 'custom'" class="sm:col-span-2 lg:col-span-2">
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
+            <flat-pickr v-model="customDateRange" :config="customRangePickerConfig"
+              class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700"
+              placeholder="Select date range" />
+          </div>
+          <div>
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
+            <select v-model="filters.office_shift_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option value="">All</option>
+              <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{ shift.name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
+            <select v-model="filters.department_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option value="">All</option>
+              <option v-for="department in departments" :key="`report-department-${department.id}`" :value="String(department.id)">{{ department.department_name }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
+            <select v-model="filters.college_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+              <option value="">All</option>
+              <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{ college.college_long || college.college_short || `College #${college.id}` }}</option>
+            </select>
+          </div>
+        </div>
+        <Button @click="generateReport" size="sm" variant="primary"
+          :className="'h-8 bg-sky-500 px-2.5 text-xs hover:bg-sky-600 text-white'">Generate</Button>
+      </div>
+    </section>
+
+    <template v-if="false">
     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section
         class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
@@ -1217,11 +1313,12 @@ const getPrintableRecords = (user) => {
 
 
     </section>
+    </template>
 
     <section
-      class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <div class="text-sm text-slate-600 dark:text-slate-300">
+      class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+        <div class="text-xs text-slate-600 dark:text-slate-300">
           <span class="font-semibold text-slate-900 dark:text-white">{{ loading ? 'Generating...' : reportUsers.length
             }}</span> user(s) matched for {{ periodLabel }}
           <span v-if="!loading" class="ml-2">({{ selectedCount }} selected)</span>
@@ -1232,38 +1329,38 @@ const getPrintableRecords = (user) => {
         <table class="min-w-full">
           <thead class="bg-slate-50 dark:bg-slate-900/60">
             <tr>
-              <th class="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <input type="checkbox" :checked="allSelected" @change="toggleSelectAll" class="h-4 w-4" />
+              <th class="px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <input type="checkbox" :checked="allSelected" @change="toggleSelectAll" class="h-3.5 w-3.5" />
               </th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Office Shift
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Name</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Office Shift
               </th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Department
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Department
               </th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">College</th>
-              <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Biometrics
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">College</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Biometrics
               </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
             <tr v-for="user in reportUsers" :key="`report-user-${user.id}`"
               class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
-              <td class="px-4 py-2 text-center text-sm">
-                <input v-model="selectedUserIds" type="checkbox" :value="user.id" class="h-4 w-4" />
+              <td class="px-3 py-1.5 text-center text-xs">
+                <input v-model="selectedUserIds" type="checkbox" :value="user.id" class="h-3.5 w-3.5" />
               </td>
-              <td class="px-4 py-2 text-sm font-medium text-slate-800 dark:text-slate-100">{{ user.name }}</td>
-              <td class="px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{{ user.office_shift?.name || '-' }}</td>
-              <td class="px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{{ user.department || '-' }}</td>
-              <td class="px-4 py-2 text-sm text-slate-700 dark:text-slate-200">{{ user.college || '-' }}</td>
-              <td class="px-4 py-2 text-sm">
+              <td class="px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-100">{{ user.name }}</td>
+              <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ user.office_shift?.name || '-' }}</td>
+              <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ user.department || '-' }}</td>
+              <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ user.college || '-' }}</td>
+              <td class="px-3 py-1.5 text-xs">
                 <button @click="openBiometricLogs(user)" type="button"
-                  class="rounded-md border border-sky-200 px-2.5 py-1 text-xs font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20">
+                  class="h-7 rounded-md border border-sky-200 px-2 text-[11px] font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20">
                   View All Logs
                 </button>
               </td>
             </tr>
             <tr v-if="!reportUsers.length && !loading">
-              <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">No report data yet. Apply filters and
+              <td colspan="6" class="px-3 py-5 text-center text-xs text-slate-500">No report data yet. Apply filters and
                 click Generate.</td>
             </tr>
           </tbody>
@@ -1274,80 +1371,80 @@ const getPrintableRecords = (user) => {
     <Modal v-if="biometricModalOpen" @close="closeBiometricLogs">
       <template #body>
         <div
-          class="relative m-2 w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950 lg:p-6">
+          class="relative m-2 w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-xl dark:border-slate-800 dark:bg-slate-950 lg:p-4">
           <section
-            class="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800">
-            <div class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            class="overflow-hidden rounded-lg border border-slate-200 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0f766e_100%)] p-3 text-white shadow-sm dark:border-slate-800">
+            <div class="flex flex-col gap-3 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
               <div class="max-w-3xl">
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Audit</p>
-                <h4 class="mt-3 text-2xl font-semibold tracking-tight text-white">Raw Biometric Logs</h4>
-                <p class="mt-2 text-sm text-slate-200/90">
+                <p class="text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80">Attendance Audit</p>
+                <h4 class="mt-1 text-lg font-semibold text-white">Raw Biometric Logs</h4>
+                <p class="mt-1 text-xs text-slate-200/90">
                   {{ biometricLogUser?.name || '-' }} - {{ periodLabel }}
                 </p>
-                <p class="mt-2 text-xs text-slate-300/90">All entries are shown as-is, including duplicate IN/OUT
+                <p class="mt-1 text-[11px] text-slate-300/90">All entries are shown as-is, including duplicate IN/OUT
                   punches.</p>
               </div>
 
-              <div class="grid grid-cols-3 gap-3 sm:min-w-[340px]">
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
-                  <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Total</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{ mergedBiometricLogs.length }}</p>
+              <div class="grid grid-cols-3 gap-1.5 min-[800px]:min-w-[270px]">
+                <div class="rounded-md border border-white/10 bg-white/10 px-2 py-1.5 backdrop-blur-sm">
+                  <p class="text-[10px] uppercase tracking-wide text-slate-300">Total</p>
+                  <p class="text-lg font-semibold text-white">{{ mergedBiometricLogs.length }}</p>
                 </div>
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
-                  <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Check In</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{mergedBiometricLogs.filter(log =>
+                <div class="rounded-md border border-white/10 bg-white/10 px-2 py-1.5 backdrop-blur-sm">
+                  <p class="text-[10px] uppercase tracking-wide text-slate-300">Check In</p>
+                  <p class="text-lg font-semibold text-white">{{mergedBiometricLogs.filter(log =>
                     normalizeCheckType(log?.CHECKTYPE) === 'I').length }}</p>
                 </div>
-                <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-sm">
-                  <p class="text-[10px] uppercase tracking-[0.24em] text-slate-300">Check Out</p>
-                  <p class="mt-1 text-2xl font-semibold text-white">{{mergedBiometricLogs.filter(log =>
+                <div class="rounded-md border border-white/10 bg-white/10 px-2 py-1.5 backdrop-blur-sm">
+                  <p class="text-[10px] uppercase tracking-wide text-slate-300">Check Out</p>
+                  <p class="text-lg font-semibold text-white">{{mergedBiometricLogs.filter(log =>
                     normalizeCheckType(log?.CHECKTYPE) === 'O').length }}</p>
                 </div>
               </div>
             </div>
           </section>
 
-          <div class="mt-4 flex items-center justify-between gap-2">
-            <p class="text-xs uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Chronological Event Stream
+          <div class="mt-3 flex items-center justify-between gap-2">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Chronological Event Stream
             </p>
             <button @click="closeBiometricLogs" type="button"
-              class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+              class="h-7 rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
               Close
             </button>
           </div>
 
-          <div class="mt-3 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+          <div class="mt-2 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
             <div class="max-h-[60vh] overflow-auto">
               <table class="min-w-full">
                 <thead class="bg-slate-50 dark:bg-slate-900/70">
                   <tr>
                     <th
-                      class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       #</th>
                     <th
-                      class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Type</th>
                     <th
-                      class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                       Date/Time</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                   <tr v-if="biometricModalLoading">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">Loading
+                    <td colspan="3" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">Loading
                       biometric logs...</td>
                   </tr>
                   <tr v-else-if="!mergedBiometricLogs.length">
-                    <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">No
+                    <td colspan="3" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">No
                       biometric logs for selected user and period.</td>
                   </tr>
                   <tr v-else v-for="(log, index) in mergedBiometricLogs" :key="`log-${index}-${log.CHECKTIME}`"
                     class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td class="px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-200">{{ index + 1 }}</td>
-                    <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                      <div class="flex items-center gap-2">
+                    <td class="px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200">{{ index + 1 }}</td>
+                    <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">
+                      <div class="flex items-center gap-1.5">
                         <span
-                          class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
+                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                           :class="checkTypeBadgeClass(log.CHECKTYPE)">
                           {{ formatCheckTypeLabel(log.CHECKTYPE) }}
                         </span>
@@ -1357,7 +1454,7 @@ const getPrintableRecords = (user) => {
                         </span>
                       </div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME)
+                    <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME)
                       }}</td>
                   </tr>
                 </tbody>

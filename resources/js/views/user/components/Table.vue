@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div class=" rounded-[26px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <!-- <div class="border-b border-slate-200 bg-[linear-gradient(135deg,_rgba(16,185,129,0.08),_rgba(14,165,233,0.07))] px-5 py-4 dark:border-slate-800 dark:bg-[linear-gradient(135deg,_rgba(16,185,129,0.08),_rgba(59,130,246,0.05))]">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -13,11 +13,11 @@
         </div>
       </div> -->
 
-      <div class="border-b border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/50">
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto]">
+      <div class="border-b border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+        <div class="grid gap-2 sm:grid-cols-2 min-[800px]:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto]">
           <div>
-            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Role</label>
-            <select v-model="filters.role" class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <label class="sr-only" for="user-role-filter">Role</label>
+            <select id="user-role-filter" v-model="filters.role" class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <option value="">All Roles</option>
               <option v-for="role in roleOptions" :key="`role-filter-${role.value}`" :value="String(role.value)">
                 {{ role.label }}
@@ -25,8 +25,8 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
-            <select v-model="filters.office_shift_id" class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <label class="sr-only" for="user-shift-filter">Office Shift</label>
+            <select id="user-shift-filter" v-model="filters.office_shift_id" class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <option value="">All Shifts</option>
               <option value="none">No Shift</option>
               <option v-for="shift in officeShifts" :key="`shift-filter-${shift.id}`" :value="String(shift.id)">
@@ -35,8 +35,8 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
-            <select v-model="filters.department_id" class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <label class="sr-only" for="user-department-filter">Department</label>
+            <select id="user-department-filter" v-model="filters.department_id" class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <option value="">All Departments</option>
               <option value="none">No Department</option>
               <option v-for="department in departments" :key="`department-filter-${department.id}`" :value="String(department.id)">
@@ -45,8 +45,8 @@
             </select>
           </div>
           <div>
-            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
-            <select v-model="filters.college_id" class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <label class="sr-only" for="user-college-filter">College</label>
+            <select id="user-college-filter" v-model="filters.college_id" class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <option value="">All Colleges</option>
               <option value="none">No College</option>
               <option v-for="college in colleges" :key="`college-filter-${college.id}`" :value="String(college.id)">
@@ -59,7 +59,7 @@
               type="button"
               @click="resetFilters"
               :disabled="!hasActiveFilters"
-              class="h-10 w-full rounded-xl border px-4 text-sm font-semibold transition sm:w-auto"
+              class="h-8 w-full rounded-md border px-2.5 text-xs font-semibold transition sm:w-auto"
               :class="hasActiveFilters
                 ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
                 : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900'"
@@ -68,7 +68,7 @@
             </button>
           </div>
         </div>
-        <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Showing <span class="font-semibold text-slate-700 dark:text-slate-200">{{ sortedUsers.length }}</span> of <span class="font-semibold text-slate-700 dark:text-slate-200">{{ users.length }}</span> users after filters.
         </p>
       </div>
@@ -77,54 +77,54 @@
         <table class="min-w-full border-collapse">
           <thead>
             <tr class="border-b border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-900/80">
-              <th class="px-4 py-3 text-left">
-                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 dark:text-slate-300">Actions</p>
+              <th class="px-3 py-2 text-left">
+                <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Actions</p>
               </th>
-              <th class="px-4 py-3 text-left">
-                <button type="button" @click="toggleSort('user')" class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-3 py-2 text-left">
+                <button type="button" @click="toggleSort('user')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   User
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('user')" />
                   <span v-if="sortBy === 'user'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
 
-              <th class="px-4 py-3 text-left">
-                <button type="button" @click="toggleSort('role')" class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-3 py-2 text-left">
+                <button type="button" @click="toggleSort('role')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   Role
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('role')" />
                   <span v-if="sortBy === 'role'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
-              <th class="px-4 py-3 text-left ">
-                <button type="button" @click="toggleSort('office_shift')" class="inline-flex min-w-[140px] items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-3 py-2 text-left ">
+                <button type="button" @click="toggleSort('office_shift')" class="inline-flex min-w-[120px] items-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   Office Shift
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('office_shift')" />
                   <span v-if="sortBy === 'office_shift'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
-              <th class="px-4 py-3 text-left">
-                <button type="button" @click="toggleSort('department')" class="inline-flex min-w-[110px] items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-3 py-2 text-left">
+                <button type="button" @click="toggleSort('department')" class="inline-flex min-w-[100px] items-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   Department
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('department')" />
                   <span v-if="sortBy === 'department'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
-              <th class="px-4 py-3 text-left">
-                <button type="button" @click="toggleSort('college')" class="inline-flex min-w-[110px] items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-3 py-2 text-left">
+                <button type="button" @click="toggleSort('college')" class="inline-flex min-w-[100px] items-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   College
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('college')" />
                   <span v-if="sortBy === 'college'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
-               <th class="px-4 py-3 text-center">
-                <button type="button" @click="toggleSort('status')" class="inline-flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+               <th class="px-3 py-2 text-center">
+                <button type="button" @click="toggleSort('status')" class="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   Status
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('status')" />
                   <span v-if="sortBy === 'status'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
                 </button>
               </th>
-              <th class="px-4 py-3 text-left">
-                <button type="button" @click="toggleSort('last_login')" class="inline-flex min-w-[120px] items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
+              <th class="px-3 py-2 text-left">
+                <button type="button" @click="toggleSort('last_login')" class="inline-flex min-w-[110px] items-center gap-1 text-[11px] font-semibold text-slate-600 transition-colors hover:text-emerald-600 dark:text-slate-300 dark:hover:text-emerald-400">
                   Last Login
                   <SortIcon class="h-3.5 w-3.5" :class="sortIconClass('last_login')" />
                   <span v-if="sortBy === 'last_login'" class="text-[10px] leading-none">{{ sortDirectionLabel }}</span>
@@ -144,12 +144,12 @@
             <tr v-for="(_user, index) in virtualUsers" :key="index"
               class="odd:bg-white even:bg-slate-50/60 transition-colors duration-150 hover:bg-emerald-50/50 dark:odd:bg-transparent dark:even:bg-slate-900/30 dark:hover:bg-slate-800/70">
             <template v-if="authUser.id != _user.id">
-               <td class="px-4 py-3 text-center">
-                <div class="flex items-center justify-center gap-1.5">
+               <td class="px-3 py-2 text-center">
+                <div class="flex items-center justify-center gap-1">
                   <button
                     @click="$emit('viewUser', _user)"
                     title="View"
-                    class="rounded-xl border border-slate-300 p-2 text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                    class="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -169,7 +169,7 @@
                     <button
                       @click.stop="toggleActionMenu(_user.id)"
                       title="More Actions"
-                      class="rounded-xl border border-slate-300 p-2 text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                      class="rounded-lg border border-slate-300 p-1.5 text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                     >
                       <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <circle cx="12" cy="5" r="2" />
@@ -214,10 +214,10 @@
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3 h-14">
-                <div class="flex min-w-[180px] items-center gap-3">
+              <td class="h-11 px-3 py-2">
+                <div class="flex min-w-[165px] items-center gap-2">
                   <div class="shrink-0">
-                    <img class="h-10 w-10 rounded-2xl object-cover ring-2 ring-slate-200 dark:ring-slate-700"
+                    <img class="h-8 w-8 rounded-lg object-cover ring-2 ring-slate-200 dark:ring-slate-700"
                       :src="_user.thumbnail ? _user.thumbnail : '/images/extras/add-image.png'"
                       :alt="$capitalizeWords(displayName(_user))" />
                   </div>
@@ -225,26 +225,24 @@
                     <span @click="$emit('viewUser', _user)" class="block cursor-pointer text-sm font-semibold text-slate-900 hover:text-emerald-600 dark:text-slate-100 dark:hover:text-emerald-400">
                       {{ $capitalizeWords(displayName(_user)) }}
                     </span>
-                    <span class="block truncate text-xs text-slate-500 dark:text-slate-400">
-                      {{ _user.email }}
-                    </span>
-                    <span class="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      ID {{ _user.id }}
-                    </span>
+                    <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <span class="min-w-0 truncate">{{ _user.email }}</span>
+                      <span class="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">ID {{ _user.id }}</span>
+                    </div>
                   </div>
                 </div>
               </td>
 
-              <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
-                <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              <td class="px-3 py-2 text-xs text-slate-700 dark:text-slate-200">
+                <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {{ roleDescription(_user.role) }}
                 </span>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-3 py-2">
                 <select
                   :value="_user.office_shift_id ?? ''"
                   @change="onOfficeShiftChange($event, _user)"
-                  class="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">No Shift</option>
                   <option v-for="shift in officeShifts" :key="`shift-${shift.id}`" :value="String(shift.id)">
@@ -252,11 +250,11 @@
                   </option>
                 </select>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-3 py-2">
                 <select
                   :value="_user.department_id ?? ''"
                   @change="onDepartmentChange($event, _user)"
-                  class="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">No Department</option>
                   <option v-for="department in departments" :key="`department-${department.id}`" :value="String(department.id)">
@@ -264,11 +262,11 @@
                   </option>
                 </select>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-3 py-2">
                 <select
                   :value="_user.college_id ?? ''"
                   @change="onCollegeChange($event, _user)"
-                  class="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">No College</option>
                   <option v-for="college in colleges" :key="`college-${college.id}`" :value="String(college.id)">
@@ -277,12 +275,12 @@
                 </select>
               </td>
 
-              <td class="px-4 py-3 text-center">
+              <td class="px-3 py-2 text-center">
                 <Badge :color="_user.status ? 'success' : 'error'">
                   {{ _user.status ? 'Active' : 'Inactive' }}
                 </Badge>
               </td>
-              <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+              <td class="px-3 py-2 text-xs text-slate-700 dark:text-slate-200">
                 {{ formatDateTime(_user.last_login) }}
               </td>
               <!-- <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
@@ -345,7 +343,7 @@
                 <select
                   :value="_user.department_id ?? ''"
                   @change="onDepartmentChange($event, _user)"
-                  class="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">No Department</option>
                   <option v-for="department in departments" :key="`mobile-department-${department.id}`" :value="String(department.id)">
@@ -358,7 +356,7 @@
                 <select
                   :value="_user.college_id ?? ''"
                   @change="onCollegeChange($event, _user)"
-                  class="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">No College</option>
                   <option v-for="college in colleges" :key="`mobile-college-${college.id}`" :value="String(college.id)">
@@ -371,7 +369,7 @@
                 <select
                   :value="_user.office_shift_id ?? ''"
                   @change="onOfficeShiftChange($event, _user)"
-                  class="h-9 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
                 >
                   <option value="">No Shift</option>
                   <option v-for="shift in officeShifts" :key="`mobile-shift-${shift.id}`" :value="String(shift.id)">
@@ -432,32 +430,47 @@
       </div>
     </div>
 
-    <div class="flex flex-col items-center justify-between gap-4 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] sm:flex-row">
-      <div class="flex items-center gap-2">
-        <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">Show</label>
+    <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex items-center gap-1.5">
+        <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Show</label>
         <select v-model="items_per_page" id="items_per_page"
-          class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+          class="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
           <option value="5">5</option>
           <option value="10">10</option>
           <option value="20">20</option>
           <option value="50">50</option>
           <option value="100">100</option>
         </select>
-        <span class="text-sm text-slate-500 dark:text-slate-400">entries</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">entries</span>
       </div>
-      <div class="text-sm text-slate-500 dark:text-slate-400">
+      <div class="text-xs text-slate-500 dark:text-slate-400">
         Page <span class="font-semibold text-slate-900 dark:text-white">{{ currentPage }}</span>
       </div>
-      <vue-awesome-paginate 
-        :total-items="sortedUsers.length"
-        :items-per-page="parseInt(items_per_page)" 
-        :max-pages-shown="5"
-        v-model="currentPage"
-        :on-click="() => window.scrollTo({ top: 0, behavior: 'smooth' })"
-      />
+      <div class="user-pagination">
+        <vue-awesome-paginate 
+          :total-items="sortedUsers.length"
+          :items-per-page="parseInt(items_per_page)" 
+          :max-pages-shown="5"
+          v-model="currentPage"
+          :on-click="() => window.scrollTo({ top: 0, behavior: 'smooth' })"
+        />
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+:deep(.user-pagination .pagination-container) {
+  column-gap: 2px;
+}
+
+:deep(.user-pagination .paginate-buttons) {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+</style>
 
 <script setup>
 import { ref, computed, watch } from 'vue'

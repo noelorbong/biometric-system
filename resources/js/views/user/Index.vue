@@ -1028,49 +1028,24 @@ const closeEnrollModal = () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.18),_transparent_28%),linear-gradient(135deg,_#111827_0%,_#1f2937_38%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(74,222,128,0.18),_transparent_28%),linear-gradient(135deg,_rgba(17,24,39,0.96)_0%,_rgba(31,41,55,0.98)_38%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
-      <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-        <div class="max-w-3xl">
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-200/80">People Directory</p>
-          <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Users</h1>
-
+  <div class="space-y-2">
+    <section class=" ">
+      <div class="flex flex-col gap-4 min-[1024px]:flex-row min-[1024px]:items-center min-[1024px]:justify-between">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 class="text-xl font-semibold text-slate-900 dark:text-white">Users</h1>
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <span><strong class="font-semibold text-emerald-600 dark:text-emerald-400">{{ userStats.active }}</strong> active</span>
+            <span><strong class="font-semibold text-slate-700 dark:text-slate-200">{{ userStats.withShift }}</strong> with shift</span>
+            <!-- <span><strong class="font-semibold text-slate-700 dark:text-slate-200">{{ userStats.withAffiliation }}</strong> affiliated</span> -->
+          </div>
+            <!-- <span class="text-sm text-slate-500 dark:text-slate-400">{{ filteredUsers.length }} of {{ userStats.total }} shown</span> -->
+          </div>
+          
         </div>
 
-        <div class="grid grid-cols-3 gap-3 sm:grid-cols-4 ml-auto xl:min-w-[460px]">
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Total</p>
-            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.total }}</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Active</p>
-            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.active }}</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">With Shift</p>
-            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.withShift }}</p>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Affiliated</p>
-            <p class="mt-2 text-2xl font-semibold text-white">{{ userStats.withAffiliation }}</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_480px]">
-      <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-white">User Directory</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Search by name, email, or primary contact number.</p>
-          </div>
-          <div class="text-sm text-slate-500 dark:text-slate-400">
-            Showing <span class="font-semibold text-slate-900 dark:text-white">{{ filteredUsers.length }}</span> of {{ userStats.total }} users
-          </div>
-        </div>
-
-        <div class="relative mt-4">
+        <div class="flex flex-col gap-3 sm:ml-auto sm:flex-row sm:items-center xl:justify-end">
+          <div class="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
           <button class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 pb-0.5">
             <svg class="fill-slate-500 dark:fill-slate-400" width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path fill-rule="evenodd" clip-rule="evenodd"
@@ -1079,23 +1054,18 @@ const closeEnrollModal = () => {
             </svg>
           </button>
           <input id="search_button" type="text" v-model="search_user" placeholder="Search name, email, or contact"
-            class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500" />
-        </div>
-      </div>
-
-      <div class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Quick Action</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Create a new user record.</p>
-
-        <div class="mt-4 grid grid-cols-7 gap-3">
-          <Button @click="addUser" :className="'col-span-2 h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary"
-            :startIcon="PlusIcon">User</Button>
-          <Button @click="openImportUserDatModal" :className="'col-span-2 h-12 justify-center rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
-            Import Users
-          </Button>
-          <Button @click="openImportBiometricTemplateDatModal" :className="'col-span-3 h-12 justify-center text-sm rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="outline">
-            Import biotemplate.dat
-          </Button>
+            class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500" />
+          </div>
+          <div class="grid grid-cols-3 gap-2 sm:flex sm:items-center">
+            <Button @click="addUser" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary"
+              :startIcon="PlusIcon">User</Button>
+            <Button @click="openImportUserDatModal" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="outline">
+              Import Users
+            </Button>
+            <Button @click="openImportBiometricTemplateDatModal" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="outline">
+              Import Templates
+            </Button>
+          </div>
         </div>
       </div>
     </section>
