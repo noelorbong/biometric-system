@@ -50,6 +50,9 @@ const enrollLastCompletedFinger = ref(null)
 const enrollPollToken = ref(0)
 const enrollRequestToken = ref(0)
 let enrollAbortController = null
+let enrollmentStartRequest = null
+const enrollmentMayBeActive = ref(false)
+const enrollmentClosing = ref(false)
 
 const isEditUser = ref(false)
 const search_user = ref('')
@@ -796,8 +799,13 @@ const loadExistingEnrolledFingers = async ({ userId, machineId, token }) => {
   }
 }
 
-const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, signal, timeoutMs = 120000 }) => {
+const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, signal, timeoutMs = 60000 }) => {
   const startedAt = Date.now()
+  let lastPullError = null
+
+  // Give the device time to finish its three-scan workflow and leave capture
+  // mode before opening a second connection to download the template.
+  await sleep(10000)
 
   while (Date.now() - startedAt < timeoutMs) {
     if (token !== enrollPollToken.value || !enrollModal.value.open) {
@@ -817,10 +825,23 @@ const waitForTemplateSaved = async ({ userId, machineId, fingerId, token, signal
       return { found: true, data: status.data }
     }
 
-    await sleep(2000)
+    if (status.success && status?.data?.pull_error) {
+      lastPullError = status.data.pull_error
+    }
+
+    // Keep the message from looking frozen if the scan actually failed or
+    // was dismissed on the device instead of completing.
+    const elapsedMs = Date.now() - startedAt
+    if (token === enrollPollToken.value && enrollModal.value.open) {
+      enrollStatusText.value = elapsedMs > 20000
+        ? 'Still waiting for the template to appear. If the scan failed or was cancelled on the device, press Cancel and try this finger again.'
+        : 'Enrollment started. Waiting for template to be saved in local database...'
+    }
+
+    await sleep(5000)
   }
 
-  return { found: false }
+  return { found: false, pullError: lastPullError }
 }
 
 const waitForFaceTemplateSaved = async ({
@@ -866,12 +887,16 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
   enrollRequestToken.value += 1
   const requestToken = enrollRequestToken.value
   enrollAbortController?.abort()
-  enrollAbortController = new AbortController()
   enrollLoading.value    = true
   enrollActiveFinger.value = fingerId
   enrollStatusText.value = 'Triggering enrollment on the machine...'
+  // Clear any stale "Registration Finished" banner from a previous attempt
+  // (e.g. re-enrolling the same finger without re-selecting it first).
+  enrollLastCompletedFinger.value = null
 
-  const response = await machineStore.enrollFingerprint({
+  enrollmentMayBeActive.value = true
+  enrollAbortController = new AbortController()
+  enrollmentStartRequest = machineStore.enrollFingerprint({
     user_id:   user.id,
     machine_id: machineId,
     finger_id:  fingerId,
@@ -879,16 +904,18 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
     signal: enrollAbortController.signal,
     timeout: 12000,
   })
-
+  const response = await enrollmentStartRequest
+  enrollmentStartRequest = null
   enrollAbortController = null
+  enrollLoading.value = false
 
   if (requestToken !== enrollRequestToken.value || !enrollModal.value.open) {
     return
   }
 
-  enrollLoading.value = false
-
   if (!response.success) {
+    enrollmentMayBeActive.value = false
+    enrollLoading.value = false
     enrollActiveFinger.value = null
     enrollStatusText.value = 'Failed to start enrollment. You can select another finger and try again.'
     await Swal.fire({
@@ -911,11 +938,13 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
     fingerId,
     token: pollToken,
     signal: enrollAbortController.signal,
-    timeoutMs: 120000,
+    timeoutMs: 60000,
   })
 
+  if (requestToken !== enrollRequestToken.value || !enrollModal.value.open) return
   enrollAbortController = null
   enrollLoading.value = false
+  enrollmentMayBeActive.value = false
 
   if (waitResult.cancelled) {
     return
@@ -932,14 +961,63 @@ const handleEnrollConfirm = async ({ fingerId, duress }) => {
   }
 
   enrollActiveFinger.value = null
-  enrollStatusText.value = 'Enrollment triggered, but template was not detected in local table yet. You can wait a bit and try this finger again.'
+  enrollStatusText.value = waitResult.pullError
+    ? `Enrollment did not complete: the template could not be pulled from the device (${waitResult.pullError}). Check that the scan finished on the device, then try this finger again.`
+    : 'Enrollment did not complete: no template was detected. The scan may have failed or been cancelled on the device. You can try this finger again.'
 }
 
-const closeEnrollModal = () => {
+const resetEnrollmentSelection = () => {
+  enrollmentMayBeActive.value = false
+  enrollmentClosing.value = false
+  enrollLoading.value = false
+  enrollActiveFinger.value = null
+  enrollLastCompletedFinger.value = null
+  enrollStatusText.value = ''
+}
+
+const cancelEnrollment = async () => {
+  if (enrollmentClosing.value) return
+
+  if (!enrollmentMayBeActive.value) {
+    closeEnrollModal()
+    return
+  }
+
+  enrollmentClosing.value = true
   enrollPollToken.value += 1
   enrollRequestToken.value += 1
   enrollAbortController?.abort()
   enrollAbortController = null
+  enrollLoading.value = false
+  enrollActiveFinger.value = null
+  enrollStatusText.value = 'Cancelling enrollment on the machine...'
+
+  if (enrollmentStartRequest) {
+    await enrollmentStartRequest
+    enrollmentStartRequest = null
+  }
+
+  const result = await machineStore.cancelEnrollment(
+    { machine_id: enrollModal.value.machineId },
+    { timeout: 15000 },
+  )
+
+  if (!result.success) {
+    enrollmentClosing.value = false
+    enrollStatusText.value = result?.data?.response?.data?.message || 'Unable to cancel enrollment on the machine.'
+    return
+  }
+
+  resetEnrollmentSelection()
+}
+
+const closeEnrollModal = () => {
+  enrollmentMayBeActive.value = false
+  enrollPollToken.value += 1
+  enrollRequestToken.value += 1
+  enrollAbortController?.abort()
+  enrollAbortController = null
+  enrollmentStartRequest = null
   enrollLoading.value = false
   enrollActiveFinger.value = null
   enrollLastCompletedFinger.value = null
@@ -1045,11 +1123,13 @@ const closeEnrollModal = () => {
       :machine-id="enrollModal.machineId"
       :machine-name="enrollModal.machineName"
       :loading="enrollLoading"
+      :enrollment-active="enrollmentMayBeActive"
       :status-text="enrollStatusText"
       :completed-finger-ids="enrollCompletedFingers"
       :active-finger-id="enrollActiveFinger"
       :last-completed-finger-id="enrollLastCompletedFinger"
       @close="closeEnrollModal"
+      @cancel-enrollment="cancelEnrollment"
       @confirm="handleEnrollConfirm"
     />
     <ImportUserDatModal

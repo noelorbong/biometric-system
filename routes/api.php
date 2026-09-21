@@ -77,6 +77,7 @@ Route::post('/machine/sync-user-templates', [MachineController::class, 'syncUser
 Route::post('/machine/push-users', [MachineController::class, 'pushUsersToMachine'])->middleware('auth:sanctum');
 Route::post('/machine/push-user', [MachineController::class, 'pushSingleUserToMachine'])->middleware('auth:sanctum');
 Route::post('/machine/enroll-fingerprint', [MachineController::class, 'enrollFingerprint'])->middleware('auth:sanctum');
+Route::post('/machine/cancel-enrollment', [MachineController::class, 'cancelEnrollment'])->middleware('auth:sanctum');
 Route::post('/machine/enroll-face', [MachineController::class, 'enrollFace'])->middleware('auth:sanctum');
 Route::post('/machine/enrollment-face-status', [MachineController::class, 'enrollmentFaceStatus'])->middleware('auth:sanctum');
 Route::post('/machine/enrollment-template-status', [MachineController::class, 'enrollmentTemplateStatus'])->middleware('auth:sanctum');

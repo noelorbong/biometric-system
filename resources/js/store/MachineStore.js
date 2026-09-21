@@ -279,6 +279,19 @@ export const useMachineStore = defineStore('machines', {
       })
     },
 
+    async cancelEnrollment(payload, config = {}) {
+      const auth = useAuthStore()
+
+      return await axios.post('/api/machine/cancel-enrollment', payload, config).then(function (resp) {
+        return { success: true, data: resp.data }
+      }).catch(function (resp) {
+        if (resp.response?.data?.message == 'Unauthenticated.') {
+          auth.clearAccount()
+        }
+        return { success: false, data: resp }
+      })
+    },
+
     async enrollFace(payload) {
       const auth = useAuthStore()
 

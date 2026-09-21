@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Modal from '@/components/common/Modal.vue'
 
 const props = defineProps({
@@ -7,13 +7,14 @@ const props = defineProps({
   machineId:   { type: Number,  required: true },
   machineName: { type: String,  default: 'Machine' },
   loading:     { type: Boolean, default: false },
+  enrollmentActive: { type: Boolean, default: false },
   statusText:  { type: String,  default: '' },
   completedFingerIds: { type: Array, default: () => [] },
   activeFingerId: { type: Number, default: null },
   lastCompletedFingerId: { type: Number, default: null },
 })
 
-const emit = defineEmits(['close', 'confirm'])
+const emit = defineEmits(['close', 'confirm', 'cancel-enrollment'])
 
 // ── Finger definitions ────────────────────────────────────────────────────────
 // Heights give realistic anatomical proportions (px).
@@ -40,6 +41,12 @@ const unsupportedFingerIds = []
 
 const selected  = ref(null)
 const isDuress  = ref(false)
+// Tracks which "last completed" finger the user has already seen/dismissed
+// by picking a different finger, so the banner doesn't linger stale.
+const acknowledgedFinishedFingerId = ref(null)
+watch(() => props.lastCompletedFingerId, (fingerId) => {
+  if (fingerId === null) acknowledgedFinishedFingerId.value = null
+})
 
 const selectedLabel = computed(() =>
   selected.value !== null
@@ -134,8 +141,9 @@ function fingerStyle(id, heightPx) {
 
 function selectFinger(id) {
   if (unsupportedFingerIds.includes(id)) return
-  if (props.loading) return
+  if (props.loading || props.enrollmentActive) return
   selected.value = id
+  acknowledgedFinishedFingerId.value = props.lastCompletedFingerId
 }
 
 function palmClass() {
@@ -154,13 +162,21 @@ function palmStyle() {
 }
 
 function confirm() {
-  if (selected.value === null || props.loading) return
+  if (selected.value === null || props.loading || props.enrollmentActive) return
   emit('confirm', { fingerId: selected.value, duress: isDuress.value })
+}
+
+function handleCancelClick() {
+  if (props.enrollmentActive) {
+    emit('cancel-enrollment')
+    return
+  }
+  emit('close')
 }
 </script>
 
 <template>
-  <Modal @close="$emit('close')">
+  <Modal @close="handleCancelClick">
     <template #body>
       <div class="relative z-[101] mx-4 my-6 w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900 space-y-5">
 
@@ -276,7 +292,7 @@ function confirm() {
         </div>
 
         <div
-          v-if="lastCompletedFingerLabel"
+          v-if="lastCompletedFingerLabel && acknowledgedFinishedFingerId !== lastCompletedFingerId"
           class="rounded-xl border-2 border-emerald-300 bg-emerald-50 px-4 py-3 text-center shadow-sm dark:border-emerald-700 dark:bg-emerald-900/20"
         >
           <p class="text-sm font-extrabold text-emerald-700 dark:text-emerald-300 tracking-wide">
@@ -318,25 +334,22 @@ function confirm() {
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
-            @click="$emit('close')"
+            @click="handleCancelClick"
           >
-            Cancel
+            {{ enrollmentActive ? 'Cancel Enrollment' : 'Close' }}
           </button>
           <button
+            v-if="!loading && !enrollmentActive"
             type="button"
-            :disabled="selected === null || loading"
+            :disabled="selected === null"
             :class="[
               'px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2',
-              selected !== null && !loading
+              selected !== null
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : 'bg-emerald-200 text-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-600 cursor-not-allowed'
             ]"
             @click="confirm"
           >
-            <svg v-if="loading" class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
             Start Enrollment
           </button>
         </div>

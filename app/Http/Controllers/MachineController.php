@@ -12,6 +12,7 @@ use App\Services\ZKTecoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -202,6 +203,12 @@ class MachineController extends Controller
                 : [];
             $zk->disconnect();
         } catch (\Throwable $e) {
+            try {
+                $zk->disconnect();
+            } catch (\Throwable) {
+                // Preserve the original failure if the device already went offline.
+            }
+
             return response()->json([
                 'message' => 'Sync failed: ' . $e->getMessage(),
             ], 502);
@@ -2496,7 +2503,6 @@ class MachineController extends Controller
         ];
 
         $zk = null;
-        $deviceDisabled = false;
 
         try {
             $zk = new ZKTecoService(
@@ -2507,25 +2513,7 @@ class MachineController extends Controller
             );
 
             $zk->connect();
-            $zk->disableDevice();
-            $deviceDisabled = true;
-
-            // Ensure the user exists on the device before starting enrollment.
-            try {
-                $zk->setUserInfo($userPayload);
-            } catch (\Throwable) {
-                $zk->deleteUserInfo((int) $user->id);
-                $zk->setUserInfo($userPayload);
-            }
-
-            // Device must be enabled for the enrollment UI to respond to finger scans.
-            $zk->enableDevice();
-            $deviceDisabled = false;
-
-            // Some firmwares require event registration before remote enroll trigger.
-            $zk->registerEvents(0xFFFF);
-
-            $zk->startEnrollment((int) $user->id, (int) $validated['finger_id'], $badgeNumber);
+            $zk->enrollFingerprint($userPayload, (int) $validated['finger_id']);
         } catch (\Throwable $e) {
             $status = str_contains($e->getMessage(), 'Device rejected enrollment') ? 422 : 502;
 
@@ -2534,14 +2522,6 @@ class MachineController extends Controller
             ], $status);
         } finally {
             if ($zk) {
-                if ($deviceDisabled) {
-                    try {
-                        $zk->enableDevice();
-                    } catch (\Throwable) {
-                        // The machine may already be offline; still release the socket.
-                    }
-                }
-
                 try {
                     $zk->disconnect();
                 } catch (\Throwable) {
@@ -2569,6 +2549,45 @@ class MachineController extends Controller
             'finger_label' => $fingerLabel,
             'instructions' => "The device is now ready. Ask {$displayName} to place their {$fingerLabel} on the scanner when the device prompts. The scan will repeat 3 times.",
         ]);
+    }
+
+    /** Cancel an active fingerprint capture on the biometric machine. */
+    public function cancelEnrollment(Request $request)
+    {
+        $validated = $request->validate([
+            'machine_id' => ['required', 'integer', Rule::exists('machines', 'ID')->whereNull('deleted_at')],
+        ]);
+
+        $machine = Machine::findOrFail($validated['machine_id']);
+        if (!$machine->IP) {
+            return response()->json(['message' => 'Selected machine has no IP address configured.'], 422);
+        }
+
+        $zk = new ZKTecoService(
+            ip: $machine->IP,
+            port: $machine->Port ?? 4370,
+            timeout: 8,
+            password: blank($machine->CommPassword) ? '0' : (string) $machine->CommPassword,
+        );
+        $lock = Cache::lock('machine:enrollment:' . $machine->ID, 60);
+
+        try {
+            $lock->block(35);
+            $zk->connect();
+            $zk->cancelCapture();
+
+            return response()->json(['message' => 'Enrollment cancelled on the device.']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Unable to cancel enrollment: ' . $e->getMessage(),
+            ], 502);
+        } finally {
+            try {
+                $zk->disconnect();
+            } finally {
+                $lock->release();
+            }
+        }
     }
 
     /**
@@ -2620,18 +2639,7 @@ class MachineController extends Controller
             );
 
             $zk->connect();
-            $zk->disableDevice();
-
-            try {
-                $zk->setUserInfo($userPayload);
-            } catch (\Throwable) {
-                $zk->deleteUserInfo((int) $user->id);
-                $zk->setUserInfo($userPayload);
-            }
-
-            $zk->enableDevice();
-            $zk->registerEvents(0xFFFF);
-            $zk->startFaceEnrollment((int) $user->id, $badgeNumber);
+            $zk->enrollFace($userPayload, $badgeNumber);
             $zk->disconnect();
         } catch (\Throwable $e) {
             $status = str_contains($e->getMessage(), 'rejected face enrollment') ? 422 : 502;
@@ -2858,8 +2866,19 @@ class MachineController extends Controller
             }
 
             // Try pulling the freshly enrolled template directly from the machine.
+            $pullError = null;
             if ($machine->Enabled && $machine->IP) {
+                $templatePullLock = Cache::lock('machine:template-pull:' . $machine->ID, 45);
                 try {
+                    if (!$templatePullLock->get()) {
+                        return response()->json([
+                            'found' => false,
+                            'saved' => false,
+                            'target_marker' => $targetMarker,
+                            'message' => 'Another template read is still using the machine. Continue waiting.',
+                        ]);
+                    }
+
                     $zk = new ZKTecoService(
                         ip:       $machine->IP,
                         port:     $machine->Port     ?? 4370,
@@ -2868,8 +2887,9 @@ class MachineController extends Controller
                     );
 
                     $zk->connect();
-                    $templateRaw = $zk->getUserTemplate((int) $validated['user_id'], (int) $validated['finger_id']);
-                    $zk->disconnect();
+                    $enrolledUser = User::with('biometricInfo')->findOrFail($validated['user_id']);
+                    $badgeNumber = (string) ($enrolledUser->biometricInfo?->Badgenumber ?: $enrolledUser->id);
+                    $templateRaw = $zk->getUserTemplate((int) $validated['user_id'], (int) $validated['finger_id'], $badgeNumber);
 
                     if ($templateRaw !== null) {
                         if ($targetMarker !== null) {
@@ -2916,8 +2936,27 @@ class MachineController extends Controller
                             ->orderByDesc('TEMPLATEID')
                             ->get();
                     }
-                } catch (\Throwable) {
-                    // Keep polling behavior resilient; if pull fails, caller can retry.
+                } catch (\Throwable $e) {
+                    // Keep polling behavior resilient, but surface the reason
+                    // so a persistent pull failure (e.g. unsupported command
+                    // on this firmware) can actually be diagnosed.
+                    $pullError = $e->getMessage();
+                    Log::warning('Fingerprint template pull failed during enrollment polling', [
+                        'machine_id' => $machine->ID,
+                        'ip' => $machine->IP,
+                        'user_id' => $validated['user_id'],
+                        'finger_id' => $validated['finger_id'],
+                        'error' => $pullError,
+                    ]);
+                } finally {
+                    if (isset($zk)) {
+                        try {
+                            $zk->disconnect();
+                        } catch (\Throwable) {
+                            // Preserve the original pull result if cleanup fails.
+                        }
+                    }
+                    $templatePullLock->release();
                 }
             }
 
@@ -2927,6 +2966,7 @@ class MachineController extends Controller
                     'saved' => false,
                     'target_marker' => $targetMarker,
                     'message' => 'Template not found yet. Continue scanning on the device.',
+                    'pull_error' => $pullError,
                 ]);
             }
 

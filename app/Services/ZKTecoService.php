@@ -16,6 +16,8 @@ use RuntimeException;
 class ZKTecoService
 {
     private string $lastAttendancePayload = '';
+    private ?ZKTecoSdkService $sdk = null;
+    private array $sdkDeviceInfo = [];
     private array $lastBufferDiagnostics = [];
     private const TCP_HEADER         = "\x50\x50\x82\x7D";
 
@@ -36,6 +38,8 @@ class ZKTecoService
     private const CMD_DATA_RDY       = 1504;
     private const CMD_USER_WRQ       = 8;
     private const CMD_USERTEMP_RRQ   = 9;
+    private const CMD_DB_RRQ         = 7;
+    private const FCT_FINGERTMP      = 2;
     private const CMD_ATTLOG_RRQ     = 13;
     private const CMD_CLEAR_ATTLOG   = 15;
     private const CMD_DELETE_USER    = 18;
@@ -71,6 +75,7 @@ class ZKTecoService
      */
     public function connect(): void
     {
+        $this->disconnect();
         $socket = @fsockopen('tcp://' . $this->ip, $this->port, $errno, $errstr, $this->timeout);
 
         if ($socket === false) {
@@ -86,6 +91,18 @@ class ZKTecoService
         $this->replyId   = 0;
 
         $reply = $this->sendCommand(self::CMD_CONNECT);
+
+        // New standalone firmware requests the vendor's secure handshake.
+        // The installed SDK negotiates it; 6001 must never be treated as ACK_OK.
+        if ($reply['cmd'] === 6001) {
+            $this->closeTransport();
+            $sdk = new ZKTecoSdkService($this->ip, $this->port, $this->timeout, $this->password);
+            $info = $sdk->request('info');
+            $this->sdk = $sdk;
+            $this->sdkDeviceInfo = $info;
+
+            return;
+        }
 
         if ($reply['cmd'] === self::CMD_ACK_UNAUTH) {
             $this->sessionId = $reply['session_id'];
@@ -104,7 +121,15 @@ class ZKTecoService
         if ($reply['cmd'] !== self::CMD_ACK_OK) {
             fclose($this->socket);
             $this->socket = null;
-            throw new RuntimeException('Device rejected connection handshake (expected CMD_ACK_OK)');
+            throw new RuntimeException(sprintf(
+                'Device at %s:%d rejected connection handshake: received response %d (0x%04X), expected CMD_ACK_OK (2000). '
+                . 'The device is reachable, but its response is not supported by this connection handshake. '
+                . 'Check the device firmware and PC communication/SDK settings.',
+                $this->ip,
+                $this->port,
+                $reply['cmd'],
+                $reply['cmd']
+            ));
         }
 
         $this->sessionId = $reply['session_id'];
@@ -122,6 +147,8 @@ class ZKTecoService
      */
     public function disconnect(): void
     {
+        $this->sdk = null;
+        $this->sdkDeviceInfo = [];
         if ($this->socket) {
             try {
                 $this->sendCommand(self::CMD_EXIT);
@@ -196,6 +223,8 @@ class ZKTecoService
      */
     public function closeTransport(): void
     {
+        $this->sdk = null;
+        $this->sdkDeviceInfo = [];
         if ($this->socket) {
             fclose($this->socket);
             $this->socket = null;
@@ -209,6 +238,10 @@ class ZKTecoService
      */
     public function getDeviceInfo(): array
     {
+        if ($this->sdk !== null) {
+            return $this->sdkDeviceInfo;
+        }
+
         $fields = [
             ['option' => '~SerialNumber', 'key' => 'SerialNumber'],
             // Some firmware variants expose device name under different option keys.
@@ -262,29 +295,44 @@ class ZKTecoService
      */
     public function getAttendanceLogs(?int $preferredRecordSize = null, bool $preferBuffered = false): array
     {
+        if ($this->sdk !== null) {
+            $this->lastAttendancePayload = '';
+            $this->lastBufferDiagnostics = ['transport' => 'vendor-sdk', 'encrypted' => true];
+
+            return $this->sdk->request('attendance');
+        }
+
         $this->sendCommand(self::CMD_DISABLEDEVICE);
 
-        if ($preferBuffered) {
-            // GT800/Ver 6.60 can return its user-data block for the standalone
-            // request. Use the SDK-compatible ReadAllGLogData request directly.
-            $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
-            $this->lastAttendancePayload = $raw;
-            $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
-        } else {
-            // First try the standalone/TCP attendance payload used by FA/iface models.
-            $raw = $this->downloadAttendanceLogsStandalone();
-            $this->lastAttendancePayload = $raw;
-            $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
-        }
+        try {
+            if ($preferBuffered) {
+                // GT800/Ver 6.60 can return its user-data block for the standalone
+                // request. Use the SDK-compatible ReadAllGLogData request directly.
+                $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
+                $this->lastAttendancePayload = $raw;
+                $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+            } else {
+                // First try the standalone/TCP attendance payload used by FA/iface models.
+                $raw = $this->downloadAttendanceLogsStandalone();
+                $this->lastAttendancePayload = $raw;
+                $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+            }
 
-        // Older fingerprint-only models often require buffered CMD_ATTLOG_RRQ.
-        if ($logs === [] && !$preferBuffered) {
-            $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
-            $this->lastAttendancePayload = $raw;
-            $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+            // Older fingerprint-only models often require buffered CMD_ATTLOG_RRQ.
+            if ($logs === [] && !$preferBuffered) {
+                $raw = $this->readWithBuffer(self::CMD_ATTLOG_RRQ);
+                $this->lastAttendancePayload = $raw;
+                $logs = $this->parseAttendanceLogs($raw, $preferredRecordSize);
+            }
+        } finally {
+            // Leaving the device disabled would block every later connection
+            // attempt (including cancel/reconnect) until it is re-enabled.
+            try {
+                $this->sendCommand(self::CMD_ENABLEDEVICE);
+            } catch (\Throwable) {
+                // Preserve the original failure if the device went offline.
+            }
         }
-
-        $this->sendCommand(self::CMD_ENABLEDEVICE);
 
         return $logs;
     }
@@ -695,6 +743,49 @@ class ZKTecoService
      */
     public function startEnrollment(int $uid, int $fingerId, string $userId = ''): void
     {
+        $this->startLegacyEnrollment($uid, $fingerId, $userId);
+    }
+
+    /** Prepare the device user and trigger fingerprint enrollment in one session. */
+    public function enrollFingerprint(array $user, int $fingerId): void
+    {
+        if ($fingerId < 0 || $fingerId > 9) {
+            throw new RuntimeException('Fingerprint slot must be between 0 and 9.');
+        }
+
+        if ($this->sdk !== null) {
+            // Setup, enable, event registration and trigger must share one
+            // SDK connection; individual bridge calls would lose that state.
+            $this->sdk->request('enroll_fingerprint', ['user' => $user, 'finger_id' => $fingerId]);
+
+            return;
+        }
+
+        $disabled = false;
+        try {
+            $this->disableDevice();
+            $disabled = true;
+            $this->setUserInfo($user);
+            $this->enableDevice();
+            $disabled = false;
+            $this->registerEvents(0xFFFF);
+            // ZK's reference flow clears any stale capture state before
+            // issuing CMD_STARTENROLL, especially after a failed prior scan.
+            $this->cancelCapture();
+            $this->startEnrollment((int) $user['uid'], $fingerId, (string) ($user['badgenumber'] ?? $user['uid']));
+        } finally {
+            if ($disabled) {
+                try {
+                    $this->enableDevice();
+                } catch (\Throwable) {
+                    // Preserve the original failure if the device went offline.
+                }
+            }
+        }
+    }
+
+    private function startLegacyEnrollment(int $uid, int $fingerId, string $userId = ''): void
+    {
         $fingerId = max(0, min(9, $fingerId));
         $userId = (string) ($userId !== '' ? $userId : $uid);
 
@@ -719,9 +810,18 @@ class ZKTecoService
 
         $lastCmd = null;
 
-        foreach ($variants as $payload) {
+        foreach ($variants as $variantIndex => $payload) {
             $reply = $this->sendCommand(self::CMD_STARTENROLL, $payload);
             $lastCmd = $reply['cmd'] ?? null;
+
+            Log::debug('ZKTeco fingerprint enrollment trigger response', [
+                'ip' => $this->ip,
+                'uid' => $uid,
+                'finger_id' => $fingerId,
+                'variant' => $variantIndex,
+                'response_command' => $lastCmd,
+                'response_data_hex' => bin2hex($reply['data'] ?? ''),
+            ]);
 
             if ($lastCmd === self::CMD_ACK_OK) {
                 return;
@@ -775,18 +875,64 @@ class ZKTecoService
         );
     }
 
+    /** Prepare the device user and trigger face enrollment in one session. */
+    public function enrollFace(array $user, string $userId = ''): void
+    {
+        if ($this->sdk !== null) {
+            // Setup, enable, event registration and trigger must share one
+            // SDK connection; individual bridge calls would lose that state.
+            $this->sdk->request('enroll_face', ['user' => $user]);
+
+            return;
+        }
+
+        $disabled = false;
+        try {
+            $this->disableDevice();
+            $disabled = true;
+
+            try {
+                $this->setUserInfo($user);
+            } catch (\Throwable) {
+                $this->deleteUserInfo((int) $user['uid']);
+                $this->setUserInfo($user);
+            }
+
+            $this->enableDevice();
+            $disabled = false;
+            $this->registerEvents(0xFFFF);
+            $this->startFaceEnrollment((int) $user['uid'], $userId !== '' ? $userId : (string) ($user['badgenumber'] ?? $user['uid']));
+        } finally {
+            if ($disabled) {
+                try {
+                    $this->enableDevice();
+                } catch (\Throwable) {
+                    // Preserve the original failure if the device went offline.
+                }
+            }
+        }
+    }
+
     /**
      * Cancel any ongoing capture/enrollment session on the device.
      */
     public function cancelCapture(): void
     {
-        try {
-            $this->sendCommand(self::CMD_CANCELCAPTURE);
-        } catch (\Throwable) {
-            // best-effort
+        if ($this->sdk !== null) {
+            $this->sdk->request('cancel_enrollment');
+
+            return;
+        }
+
+        foreach ([self::CMD_CANCELCAPTURE, 60, self::CMD_ENABLEDEVICE] as $command) {
+            $reply = $this->sendCommand($command);
+            if (($reply['cmd'] ?? null) !== self::CMD_ACK_OK) {
+                throw new RuntimeException(
+                    "Device rejected enrollment cancellation (command {$command}, response " . ($reply['cmd'] ?? 'unknown') . ').'
+                );
+            }
         }
     }
-
     /**
      * Register real-time event flags for the current session.
      */
@@ -824,11 +970,100 @@ class ZKTecoService
      *
      * Returns raw template bytes or null when not found.
      */
-    public function getUserTemplate(int $uid, int $fingerId): ?string
+    public function getUserTemplate(int $uid, int $fingerId, string $userId = ''): ?string
     {
         $fingerId = max(0, min(9, $fingerId));
 
+        if ($this->sdk !== null) {
+            $result = $this->sdk->request('fingerprint_template', [
+                'user_id' => $userId !== '' ? $userId : (string) $uid,
+                'finger_id' => $fingerId,
+            ]);
+            if (($result['found'] ?? false) !== true) {
+                return null;
+            }
+            $template = base64_decode($result['template'] ?? '', true);
+            if ($template === false || $template === '') {
+                throw new RuntimeException('The SDK returned an invalid fingerprint template.');
+            }
+
+            return $template;
+        }
+
+        // Prefer the standard bulk template buffer. CMD_GET_USERTEMP (88) is
+        // undocumented and can leave T9/ID busy when called during enrollment.
+        foreach ($this->getAllUserTemplates() as $entry) {
+            if ($entry['uid'] === $uid && $entry['finger_id'] === $fingerId) {
+                return $entry['template'];
+            }
+        }
+
+        // Keep the undocumented single-template command as a compatibility
+        // fallback for older models whose bulk template buffer is unavailable.
         return $this->getUserTemplateByBackupNumber($uid, $fingerId);
+
+    }
+
+    /**
+     * Bulk-download every fingerprint template stored on the device.
+     *
+     * @return array<int, array{uid:int, finger_id:int, valid:int, template:string}>
+     */
+    public function getAllUserTemplates(): array
+    {
+        $attempts = [
+            fn (): string => $this->readWithBuffer(self::CMD_DB_RRQ, self::FCT_FINGERTMP, 0),
+            fn (): string => $this->readWithBuffer(self::CMD_USERTEMP_RRQ, self::FCT_FINGERTMP, 0),
+        ];
+
+        foreach ($attempts as $reader) {
+            $raw = $reader();
+            $templates = $this->parseBulkTemplates($raw);
+
+            if ($templates !== []) {
+                return $templates;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Parse the bulk template buffer format: 4-byte total size, then repeating
+     * records of [size:u16][uid:u16][finger_id:u8][valid:u8][template bytes].
+     *
+     * @return array<int, array{uid:int, finger_id:int, valid:int, template:string}>
+     */
+    private function parseBulkTemplates(string $raw): array
+    {
+        if (strlen($raw) < 4) {
+            return [];
+        }
+
+        $totalSize = $this->unpackUInt32LE($raw);
+        $raw = substr($raw, 4);
+        $templates = [];
+
+        while ($totalSize > 0 && strlen($raw) >= 6) {
+            $header = unpack('vsize/vuid/Cfid/Cvalid', substr($raw, 0, 6));
+            $size = $header['size'] ?? 0;
+
+            if ($size < 6 || $size > strlen($raw)) {
+                break;
+            }
+
+            $templates[] = [
+                'uid' => $header['uid'],
+                'finger_id' => $header['fid'],
+                'valid' => $header['valid'],
+                'template' => substr($raw, 6, $size - 6),
+            ];
+
+            $raw = substr($raw, $size);
+            $totalSize -= $size;
+        }
+
+        return $templates;
     }
 
     /**
@@ -2325,6 +2560,10 @@ class ZKTecoService
      */
     private function sendCommand(int $cmd, string $data = '', ?int $replyId = null): array
     {
+        if ($this->sdk !== null) {
+            throw new RuntimeException('This operation is not yet supported through the encrypted SDK connection. Connection checks, device information, attendance downloads, and fingerprint enrollment/template reads are supported.');
+        }
+
         if ($replyId !== null) {
             $this->replyId = $replyId & 0xFFFF;
         } elseif ($cmd === self::CMD_CONNECT) {

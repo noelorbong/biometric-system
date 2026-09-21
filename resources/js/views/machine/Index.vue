@@ -975,6 +975,55 @@ const syncAttendance = async (machine) => {
     return
   }
 
+  const showDownloadCompleteDialog = (data) => {
+    const { total, imported, skipped, download_scope: scope, download_date: date, user_filter: filter } = data
+    const scopeLabel = scope === 'all'
+      ? 'All Logs'
+      : scope === 'date'
+        ? `Date: ${date}`
+        : 'Today'
+
+    const userFilterLabel = filter === 'all'
+      ? 'All Logs (Include Unknown Users)'
+      : 'Only Existing Local Users'
+
+    return Swal.fire({
+      icon: 'success',
+      title: 'Download Complete',
+      html: `<p class="text-sm text-gray-600">Downloaded scope: <strong>${scopeLabel}</strong></p>
+             <p class="text-sm text-gray-600">User filter: <strong>${userFilterLabel}</strong></p>
+             <p class="text-sm text-gray-600">Total records from device: <strong>${total}</strong></p>
+             <p class="text-sm text-gray-600">Imported: <strong class="text-green-600">${imported}</strong></p>
+             <p class="text-sm text-gray-600">Skipped (duplicates / unmatched): <strong>${skipped}</strong></p>`,
+      confirmButtonText: 'OK',
+    })
+  }
+
+  const importFromPreview = async () => {
+    Swal.close()
+    syncingIds.value = new Set([...syncingIds.value, machine.ID])
+
+    const importResp = await machineStore.syncAttendance({
+      ID: machine.ID,
+      ...(downloadChoice.value || {}),
+      action: 'import',
+    })
+
+    syncingIds.value = new Set([...syncingIds.value].filter((id) => id !== machine.ID))
+
+    if (!importResp.success) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Import Failed',
+        text: importResp?.data?.response?.data?.message || 'Import failed',
+        confirmButtonText: 'OK',
+      })
+      return
+    }
+
+    await showDownloadCompleteDialog(importResp.data)
+  }
+
   if (downloadChoice.isDenied) {
     const previewRows = resp.data?.rows || []
     let previewPage = 1
@@ -1007,7 +1056,7 @@ const syncAttendance = async (machine) => {
       if (label) label.textContent = `Page ${previewPage} of ${totalPages}`
       if (previous) previous.disabled = previewPage <= 1
       if (next) next.disabled = previewPage >= totalPages
-      if (sortButton) sortButton.textContent = `Check time ${previewSortDirection === 'asc' ? 'â†‘' : 'â†“'}`
+      if (sortButton) sortButton.textContent = `Check time ${previewSortDirection === 'asc' ? 'at' : 'at'}`
     }
 
     await Swal.fire({
@@ -1025,6 +1074,7 @@ const syncAttendance = async (machine) => {
           <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
         </div>
         <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
+        <button id="download-preview-import" type="button" class="mt-3 mr-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">Import ${Number(resp.data?.importable || 0)} Importable Record(s)</button>
         ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white">Download Raw Diagnostic (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
         ${resp.data?.diagnostic?.transfer ? `<details class="mt-3 text-left text-xs"><summary class="cursor-pointer font-semibold">Transfer diagnostics</summary><pre class="mt-2 max-h-40 overflow-auto rounded bg-slate-900 p-3 text-[10px] text-white">${escapeHtml(JSON.stringify(resp.data.diagnostic.transfer, null, 2))}</pre></details>` : ''}
         <p class="mt-2 text-xs text-gray-500">All ${Number(previewRows.length).toLocaleString()} downloaded records are available in this pagination.</p>`,
@@ -1037,6 +1087,7 @@ const syncAttendance = async (machine) => {
           previewPage = 1
           renderDownloadedPreview()
         })
+        document.getElementById('download-preview-import')?.addEventListener('click', importFromPreview)
         document.getElementById('download-preview-diagnostic')?.addEventListener('click', () => {
           const diagnostic = resp.data?.diagnostic
           if (!diagnostic?.content_base64) return
@@ -1055,26 +1106,7 @@ const syncAttendance = async (machine) => {
   }
 
   const { total, imported, skipped, download_scope, download_date, user_filter } = resp.data
-  const scopeLabel = download_scope === 'all'
-    ? 'All Logs'
-    : download_scope === 'date'
-      ? `Date: ${download_date}`
-      : 'Today'
-
-  const userFilterLabel = user_filter === 'all'
-    ? 'All Logs (Include Unknown Users)'
-    : 'Only Existing Local Users'
-
-  await Swal.fire({
-    icon: 'success',
-    title: 'Download Complete',
-    html: `<p class="text-sm text-gray-600">Downloaded scope: <strong>${scopeLabel}</strong></p>
-           <p class="text-sm text-gray-600">User filter: <strong>${userFilterLabel}</strong></p>
-           <p class="text-sm text-gray-600">Total records from device: <strong>${total}</strong></p>
-           <p class="text-sm text-gray-600">Imported: <strong class="text-green-600">${imported}</strong></p>
-           <p class="text-sm text-gray-600">Skipped (duplicates / unmatched): <strong>${skipped}</strong></p>`,
-    confirmButtonText: 'OK',
-  })
+  await showDownloadCompleteDialog({ total, imported, skipped, download_scope, download_date, user_filter })
 }
 
 const clearAttendanceLogs = async (machine) => {
