@@ -19,6 +19,10 @@ use App\Http\Controllers\BiometricLogController;
 use App\Http\Controllers\AppSettingController;
 use App\Http\Controllers\MachineController;
 use App\Http\Controllers\LicenseController;
+use App\Http\Controllers\HolidayController;
+use App\Http\Controllers\AttendanceAbsenceController;
+use App\Http\Controllers\DailyAttendanceController;
+use App\Http\Controllers\MonthlyAttendanceController;
 
 
 // License routes — public so they can gate the app before login
@@ -45,6 +49,10 @@ Route::post('/user/import-dat', [UserController::class, 'importUserDat'])->middl
 Route::post('/user/import-biotemplate-dat/preview', [UserController::class, 'previewBiometricTemplateDatImport'])->middleware('auth:sanctum');
 Route::post('/user/import-biotemplate-dat', [UserController::class, 'importBiometricTemplateDat'])->middleware('auth:sanctum');
 Route::post('/report/biometric', [BiometricReportController::class, 'generate'])->middleware('auth:sanctum');
+Route::post('/report/daily-attendance', [DailyAttendanceController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/report/monthly-attendance', [MonthlyAttendanceController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/attendance/absence/store', [AttendanceAbsenceController::class, 'store'])->middleware('auth:sanctum');
+Route::post('/attendance/absence/delete', [AttendanceAbsenceController::class, 'delete'])->middleware('auth:sanctum');
 Route::post('/biometric/logs', [BiometricLogController::class, 'index'])->middleware('auth:sanctum');
 Route::post('/user/office-shift/update', [UserController::class, 'updateOfficeShift'])->middleware('auth:sanctum');
 Route::post('/user/affiliation/update', [UserController::class, 'updateAffiliation'])->middleware('auth:sanctum');
@@ -60,6 +68,10 @@ Route::post('/colleges', [CollegeController::class, 'index'])->middleware('auth:
 Route::post('/college/store', [CollegeController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/college/update', [CollegeController::class, 'update'])->middleware('auth:sanctum');
 Route::post('/college/delete', [CollegeController::class, 'delete'])->middleware('auth:sanctum');
+Route::post('/holidays', [HolidayController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/holiday/store', [HolidayController::class, 'store'])->middleware('auth:sanctum');
+Route::post('/holiday/update', [HolidayController::class, 'update'])->middleware('auth:sanctum');
+Route::post('/holiday/delete', [HolidayController::class, 'delete'])->middleware('auth:sanctum');
 Route::post('/machines', [MachineController::class, 'index'])->middleware('auth:sanctum');
 Route::post('/machine/store', [MachineController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/machine/update', [MachineController::class, 'update'])->middleware('auth:sanctum');
@@ -99,3 +111,11 @@ Route::post('/settings/database/restore', [AppSettingController::class, 'restore
 Route::post('/user/update', [UserController::class, 'update'])->middleware('auth:sanctum');
 Route::post('/user/store', [UserController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/user/delete', [UserController::class, 'delete'])->middleware('auth:sanctum');
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/work-schedules', [\App\Http\Controllers\WorkScheduleController::class, 'index']);
+    Route::post('/work-schedule/store', [\App\Http\Controllers\WorkScheduleController::class, 'store']);
+    Route::post('/work-schedule/delete', [\App\Http\Controllers\WorkScheduleController::class, 'delete']);
+    Route::post('/work-suspension/store', [\App\Http\Controllers\WorkScheduleController::class, 'storeSuspension']);
+    Route::post('/work-suspension/delete', [\App\Http\Controllers\WorkScheduleController::class, 'deleteSuspension']);
+});

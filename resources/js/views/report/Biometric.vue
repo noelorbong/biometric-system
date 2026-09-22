@@ -403,6 +403,7 @@ const fetchOverridesForUsers = async (users) => {
 
   for (const user of users) {
     const result = resultsByUser[String(user.id)] || {}
+    user.schedule_by_date = result.schedule_by_date || user.schedule_by_date || {}
     user._effective_checkinouts = result.checkinouts || []
     user._overrides = result.overrides || []
     user._printable_attendance_records = buildPrintableAttendanceRecords(user, user._effective_checkinouts)
@@ -845,7 +846,16 @@ const getScheduledMinutes = (user) => {
     return null
   }
 
-  return Math.max(0, endMinute - startMinute)
+  const profile = user.office_shift || user.officeShift
+  if (profile?._is_working_day === false) return 0
+  return slots.reduce((total, slot) => {
+    const start = toMinutesFromScheduleTime(slot.time_in)
+    let end = toMinutesFromScheduleTime(slot.time_out)
+    if (start === null || end === null) return total
+    if (slot.is_next_day || end <= start) end += 1440
+    const exempt = (profile?._holidays || []).some(h => !h.is_working_day && (h.duration === 'full_day' || (h.duration === 'morning' && start < 720) || (h.duration === 'afternoon' && start >= 720)))
+    return total + (exempt ? 0 : end - start)
+  }, 0)
 }
 
 const getActualWorkedMinutes = (row) => {
@@ -884,7 +894,9 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
     grouped.get(dateKey).push(record)
   })
 
-  const scheduleSlots = getScheduleSlots(user)
+  const buildAttendanceRow = (date, recordsInDay = []) => {
+    const dateUser = { ...user, office_shift: user.schedule_by_date?.[date] || user.office_shift }
+  const scheduleSlots = getScheduleSlots(dateUser)
   const slotMeta = scheduleSlots.map((slot) => ({
     inMinute: toMinutesFromScheduleTime(slot?.time_in),
     outMinute: toMinutesFromScheduleTime(slot?.time_out),
@@ -892,11 +904,11 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
   }))
   const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
 
-  const buildAttendanceRow = (date, recordsInDay = []) => {
+
     const sorted = recordsInDay.sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
     const normalizedPunches = []
 
-    resolveGraceCorrectedPunches(user, sorted, slotMeta).forEach(({ record: item, type }) => {
+    resolveGraceCorrectedPunches(dateUser, sorted, slotMeta).forEach(({ record: item, type }) => {
       if (type !== 'I' && type !== 'O') {
         return
       }
@@ -954,7 +966,7 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
     if (hasScheduleBoundaries) {
       normalizedPunches.forEach((punch) => {
         const minutes = toMinutesFromDateTime(punch.time)
-        const grace = getShiftGraceSettings(user)
+        const grace = getShiftGraceSettings(dateUser)
         const graceAfter = grace.enabled ? grace.after : 0
         const slotIndex = punch.type === 'I'
           ? resolveCheckInSlotIndex(minutes, slotMeta)
@@ -998,9 +1010,10 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
 }
 
 const buildPrintableAttendanceRecords = (user, checkinouts = []) => {
-  const scheduledMinutes = getScheduledMinutes(user)
 
   return buildAttendanceRowsFromCheckinouts(user, checkinouts).map((row) => {
+    const profile = user.schedule_by_date?.[row.date] || user.office_shift
+    const scheduledMinutes = getScheduledMinutes({ ...user, office_shift: profile })
     const [year, month, day] = String(row.date).split('-').map(Number)
     const dateObj = new Date(year, month - 1, day)
     const amIn = row.slots[0]?.check_in ? formatTimeOnly(row.slots[0].check_in) : ''

@@ -14,6 +14,7 @@ use App\Models\UserContact;
 use App\Models\UserProfile;
 use App\Models\BiometricLogOverride;
 use App\Models\BiometricTemplate;
+use App\Models\AttendanceAbsence;
 use App\Models\Department;
 use App\Models\College;
 use Illuminate\Validation\Rule;
@@ -1369,10 +1370,25 @@ class UserController extends Controller
         $month = (int) ($validated['month'] ?? now()->month);
 
         $result = $this->buildEffectiveCheckinouts((int) $validated['user_id'], $year, $month);
+        [$start, $end] = $this->monthRange($year, $month);
+        $absences = AttendanceAbsence::query()
+            ->where('user_id', $validated['user_id'])
+            ->whereBetween('absence_date', [$start->toDateString(), $end->toDateString()])
+            ->orderBy('absence_date')
+            ->get(['absence_date', 'status', 'duration', 'leave_type', 'remarks'])
+            ->map(fn (AttendanceAbsence $absence) => [
+                'absence_date' => $absence->absence_date->format('Y-m-d'),
+                'status' => $absence->status,
+                'duration' => $absence->duration,
+                'leave_type' => $absence->leave_type,
+                'remarks' => $absence->remarks,
+            ])->values();
 
         return response()->json([
             'checkinouts' => $result['checkinouts'],
             'overrides' => $result['overrides'],
+            'absences' => $absences,
+            'schedule_by_date' => $this->resolvedSchedulesFor((int) $validated['user_id'], $year, $month),
             'year' => $year,
             'month' => $month,
         ]);
@@ -1412,6 +1428,10 @@ class UserController extends Controller
             ->get()
             ->groupBy(fn ($row) => (int) $row->user_id);
 
+        $calendarMonth = \Carbon\CarbonImmutable::create((int) $validated['year'], (int) $validated['month'], 1)->startOfDay();
+        $scheduleResolver = app(\App\Services\WorkScheduleResolver::class)->load($calendarMonth, $calendarMonth->endOfMonth());
+        $resolvedCalendars = User::with('officeShift.schedules')->whereIn('id', $userIds)->get()
+            ->mapWithKeys(fn ($user) => [$user->id => $scheduleResolver->forMonth($user, $calendarMonth)])->all();
         $results = [];
 
         foreach ($userIds as $userId) {
@@ -1458,6 +1478,7 @@ class UserController extends Controller
 
             $results[(string) $userId] = [
                 'checkinouts' => $effectiveRows,
+                'schedule_by_date' => $resolvedCalendars[$userId] ?? [],
                 'overrides' => $overrides
                     ->map(fn (BiometricLogOverride $override) => $this->mapOverrideForApi($override))
                     ->values(),
@@ -2008,5 +2029,11 @@ class UserController extends Controller
 
 
         return compact('user');
+    }
+    private function resolvedSchedulesFor(int $userId, int $year, int $month): array
+    {
+        $start = \Carbon\CarbonImmutable::create($year, $month, 1)->startOfDay();
+        $user = User::with('officeShift.schedules')->findOrFail($userId);
+        return app(\App\Services\WorkScheduleResolver::class)->load($start, $start->endOfMonth())->forMonth($user, $start);
     }
 }

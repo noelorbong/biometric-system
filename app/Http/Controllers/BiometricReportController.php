@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class BiometricReportController extends Controller
 {
-    public function generate(Request $request)
+    public function generate(Request $request, \App\Services\WorkScheduleResolver $resolver)
     {
         if ((int) ($request->user()?->role ?? -1) !== 1) {
             return response()->json([
@@ -291,14 +291,24 @@ class BiometricReportController extends Controller
             ];
         };
 
-        $reportUsers = $users->map(function ($user) use ($year, $month, $daysInMonth, $recordsByUserDate, $buildDayRecord, $getScheduledMinutes) {
+        $reportMonth = \Carbon\CarbonImmutable::create($year, $month, 1)->startOfDay();
+        $resolver->load($reportMonth, $reportMonth->endOfMonth());
+        $reportUsers = $users->map(function ($user) use ($year, $month, $daysInMonth, $recordsByUserDate, $buildDayRecord, $getScheduledMinutes, $resolver, $reportMonth) {
             $attendanceRecords = [];
-            $scheduledMinutes = $getScheduledMinutes($user->officeShift);
+            $calendar = $resolver->forMonth($user, $reportMonth);
 
             for ($day = 1; $day <= $daysInMonth; $day += 1) {
                 $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
                 $punches = $recordsByUserDate[$user->id][$date] ?? [];
-                $dayRecord = $buildDayRecord($punches, $scheduledMinutes, $user->officeShift);
+
+                $profileForDate = $calendar[$date];
+                $dateShift = $profileForDate ? new \App\Models\OfficeShift($profileForDate) : null;
+                $dateShift?->setRelation('schedules', collect($profileForDate['schedules'] ?? [])->map(fn ($slot) => new \App\Models\OfficeShiftSchedule($slot)));
+                $scheduledMinutes = ($profileForDate['_is_working_day'] ?? null) === false ? 0 : $getScheduledMinutes($dateShift);
+                if ($scheduledMinutes !== null) {
+                    $scheduledMinutes = max(0, $scheduledMinutes - ($profileForDate['_holiday_credit_minutes'] ?? 0));
+                }
+                $dayRecord = $buildDayRecord($punches, $scheduledMinutes, $dateShift);
                 $attendanceRecords[] = array_merge(['date' => $date], $dayRecord);
             }
 
@@ -322,6 +332,7 @@ class BiometricReportController extends Controller
                 'display_name' => $profile?->display_name,
                 'email' => $user->email,
                 'office_shift' => $user->officeShift,
+                'schedule_by_date' => $calendar,
                 'in_charge_enabled' => (bool) ($user->in_charge_enabled ?? false),
                 'in_charge_user_id' => $user->in_charge_user_id,
                 'in_charge_user' => $inChargeUser,

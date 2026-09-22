@@ -248,6 +248,8 @@ const menuAdminGroups = [
     items: [
       { icon: PlugInIcon, name: "Biometric Machines", path: "/main/machines" },
       { icon: TaskIcon, name: "Biometric Report", path: "/main/reports/biometric" },
+      { icon: TableIcon, name: "Daily Attendance Monitoring", path: "/main/reports/daily-attendance" },
+      { icon: TableIcon, name: "Monthly Tardiness Report", path: "/main/reports/monthly-attendance" },
       { icon: TableIcon, name: "Biometric Logs", path: "/main/biometric/logs" },
     ],
   },
@@ -256,6 +258,8 @@ const menuAdminGroups = [
     items: [
       { icon: UserGroupIcon, name: "Users", path: "/main/users" },
       { icon: WorkIcon, name: "Office Shift", path: "/main/office-shifts" },
+      { icon: WorkIcon, name: "Weekly Schedule Exceptions", path: "/main/weekly-schedules" },
+      { icon: WorkIcon, name: "Holidays", path: "/main/holidays" },
       { icon: BuildingIcon, name: "Departments", path: "/main/departments" },
       { icon: BuildingIcon, name: "Colleges", path: "/main/colleges" },
     ],

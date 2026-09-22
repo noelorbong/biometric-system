@@ -96,7 +96,9 @@ const customDateFrom = ref(formatDateInput(monthStart))
 const customDateTo = ref(formatDateInput(monthEnd))
 const customDateRange = ref('')
 const checkinouts = ref([])
+const resolvedSchedules = ref({})
 const checkinoutOverrides = ref([])
+const attendanceAbsences = ref([])
 const checkinoutLoading = ref(false)
 const rawLogModalOpen = ref(false)
 const rawLogModalDate = ref('')
@@ -293,6 +295,11 @@ const shiftSchedules = computed(() => {
   return officeShift?.schedules || []
 })
 
+const graceForDate = date => {
+  const shift = resolvedSchedules.value[date]
+  return shift ? { enabled: Boolean(shift.grace_enabled), before: Number(shift.grace_before_minutes || 0), after: Number(shift.grace_after_minutes || 0) } : shiftGraceSettings.value
+}
+const slotsForDate = date => resolvedSchedules.value[date]?.schedules || scheduleSlots.value
 const shiftGraceSettings = computed(() => {
   const officeShift = selectedUser.value?.office_shift || selectedUser.value?.officeShift
 
@@ -358,6 +365,8 @@ const rawLogsByDate = computed(() => {
   return grouped
 })
 
+const absencesByDate = computed(() => new Map(attendanceAbsences.value.map((absence) => [absence.absence_date, absence])))
+
 const toMinutesFromScheduleTime = (value) => {
   if (!value) {
     return null
@@ -409,8 +418,8 @@ const formatUndertimeParts = (minutesValue) => {
   }
 }
 
-const getScheduledMinutes = () => {
-  const slots = scheduleSlots.value
+const getScheduledMinutes = (row) => {
+  const slots = row?.resolved_schedule?.schedules || scheduleSlots.value
   if (!Array.isArray(slots) || !slots.length) {
     return null
   }
@@ -424,7 +433,16 @@ const getScheduledMinutes = () => {
     return null
   }
 
-  return Math.max(0, endMinute - startMinute)
+  if (row?.resolved_schedule?._is_working_day === false) return 0
+  return slots.reduce((total, slot) => {
+    const start = toMinutesFromScheduleTime(slot.time_in)
+    let end = toMinutesFromScheduleTime(slot.time_out)
+    if (start === null || end === null) return total
+    if (slot.is_next_day || end <= start) end += 1440
+    const events = row?.resolved_schedule?._holidays || []
+    const exempt = events.some(h => !h.is_working_day && (h.duration === 'full_day' || (h.duration === 'morning' && start < 720) || (h.duration === 'afternoon' && start >= 720)))
+    return total + (exempt ? 0 : end - start)
+  }, 0)
 }
 
 const getActualWorkedMinutes = (row) => {
@@ -494,10 +512,9 @@ const resolveCheckOutSlotIndex = (minutes, slotMeta, graceAfter = 0) => {
   return slotMeta.length - 1
 }
 
-const resolveGraceCorrectedCheckType = (record, slotMeta) => {
+const resolveGraceCorrectedCheckType = (record, slotMeta, grace = shiftGraceSettings.value) => {
   const rawType = String(record?.CHECKTYPE || '').toUpperCase()
   const minutes = toMinutesFromDateTime(record?.CHECKTIME)
-  const grace = shiftGraceSettings.value
 
   if (!grace.enabled || minutes === null || !slotMeta.length) {
     return rawType
@@ -522,8 +539,7 @@ const resolveGraceCorrectedCheckType = (record, slotMeta) => {
   return candidates.sort((a, b) => a.distance - b.distance)[0].type
 }
 
-const resolveGraceCorrectedPunches = (records, slotMeta) => {
-  const grace = shiftGraceSettings.value
+const resolveGraceCorrectedPunches = (records, slotMeta, grace = shiftGraceSettings.value) => {
   if (!grace.enabled || !slotMeta.length) {
     return records.map((record) => ({ record, type: String(record?.CHECKTYPE || '').toUpperCase() }))
   }
@@ -547,7 +563,7 @@ const resolveGraceCorrectedPunches = (records, slotMeta) => {
     ))
 
     if (!endpoint) {
-      return { record, type: resolveGraceCorrectedCheckType(record, slotMeta) }
+      return { record, type: resolveGraceCorrectedCheckType(record, slotMeta, grace) }
     }
 
     assignedEndpoints.add(endpoint.key)
@@ -574,7 +590,9 @@ const attendanceRows = computed(() => {
   const buildAttendanceRow = (date, recordsInDay = []) => {
       const sorted = recordsInDay
         .sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
-      const slotMeta = scheduleSlots.value.map((slot) => ({
+      const dateSlots = slotsForDate(date)
+      const grace = graceForDate(date)
+      const slotMeta = dateSlots.map((slot) => ({
         inMinute: toMinutesFromScheduleTime(slot?.time_in),
         outMinute: toMinutesFromScheduleTime(slot?.time_out),
         isNextDay: Boolean(slot?.is_next_day),
@@ -582,7 +600,7 @@ const attendanceRows = computed(() => {
       const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
       const normalizedPunches = []
 
-      resolveGraceCorrectedPunches(sorted, slotMeta).forEach(({ record: item, type }) => {
+      resolveGraceCorrectedPunches(sorted, slotMeta, grace).forEach(({ record: item, type }) => {
         if (type !== 'I' && type !== 'O') {
           return
         }
@@ -669,12 +687,12 @@ const attendanceRows = computed(() => {
         sessions.push(currentSession)
       }
 
-      const slots = scheduleSlots.value.map(() => ({ check_in: null, check_out: null, check_in_action: null, check_out_action: null }))
+      const slots = dateSlots.map(() => ({ check_in: null, check_out: null, check_in_action: null, check_out_action: null }))
 
       if (hasScheduleBoundaries) {
         normalizedPunches.forEach((punch) => {
           const minutes = toMinutesFromDateTime(punch.time)
-          const graceAfter = shiftGraceSettings.value.enabled ? shiftGraceSettings.value.after : 0
+          const graceAfter = grace.enabled ? grace.after : 0
           const slotIndex = punch.type === 'I'
             ? resolveCheckInSlotIndex(minutes, slotMeta)
             : resolveCheckOutSlotIndex(minutes, slotMeta, graceAfter)
@@ -710,6 +728,8 @@ const attendanceRows = computed(() => {
       return {
         date,
         slots,
+        absence: absencesByDate.value.get(date) || null,
+        resolved_schedule: resolvedSchedules.value[date],
       }
     }
 
@@ -779,6 +799,7 @@ const loadCheckinouts = async () => {
   if (!userId.value) {
     checkinouts.value = []
     checkinoutOverrides.value = []
+    attendanceAbsences.value = []
     return
   }
 
@@ -792,7 +813,9 @@ const loadCheckinouts = async () => {
       })
 
       checkinouts.value = resp?.data?.checkinouts || []
+      resolvedSchedules.value = resp?.data?.schedule_by_date || {}
       checkinoutOverrides.value = resp?.data?.overrides || []
+      attendanceAbsences.value = resp?.data?.absences || []
       return
     }
 
@@ -800,6 +823,7 @@ const loadCheckinouts = async () => {
     if (bounds.error) {
       checkinouts.value = []
       checkinoutOverrides.value = []
+      attendanceAbsences.value = []
       return
     }
 
@@ -824,9 +848,12 @@ const loadCheckinouts = async () => {
     )
 
     const logsById = new Map()
+    const schedulesByDate = {}
     const overridesById = new Map()
+    const absencesByDate = new Map()
 
     responses.forEach((resp) => {
+      Object.assign(schedulesByDate, resp?.data?.schedule_by_date || {})
       const logs = resp?.data?.checkinouts || []
       const overrides = resp?.data?.overrides || []
 
@@ -846,14 +873,22 @@ const loadCheckinouts = async () => {
 
         overridesById.set(String(override.id), override)
       })
+      ;(resp?.data?.absences || []).forEach((absence) => {
+        if (absence?.absence_date && isDateWithinCustomRange(absence.absence_date)) {
+          absencesByDate.set(absence.absence_date, absence)
+        }
+      })
     })
 
+    resolvedSchedules.value = schedulesByDate
     checkinouts.value = [...logsById.values()].sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
     checkinoutOverrides.value = [...overridesById.values()]
+    attendanceAbsences.value = [...absencesByDate.values()]
   } catch (error) {
     console.log(error)
     checkinouts.value = []
     checkinoutOverrides.value = []
+    attendanceAbsences.value = []
   } finally {
     checkinoutLoading.value = false
   }
@@ -1007,7 +1042,9 @@ const refreshCheckinoutState = async (payload = {}) => {
       ...payload,
     })
     checkinouts.value = resp?.data?.checkinouts || []
+      resolvedSchedules.value = resp?.data?.schedule_by_date || {}
     checkinoutOverrides.value = resp?.data?.overrides || []
+    attendanceAbsences.value = resp?.data?.absences || []
     if (rawLogModalOpen.value && rawLogModalDate.value) {
       rawLogRows.value = [...(rawLogsByDate.value.get(rawLogModalDate.value) || [])]
     }
@@ -1016,6 +1053,49 @@ const refreshCheckinoutState = async (payload = {}) => {
     console.log(error.response) 
   } finally {
     checkinoutLoading.value = false
+  }
+}
+
+const canManageAbsence = (date) => {
+  const selectedDate = parseDateInputValue(date)
+  const today = parseDateInputValue(formatDateInput(new Date()))
+  return Boolean(selectedDate && today && selectedDate <= today && (resolvedSchedules.value[date]?._is_working_day ?? (selectedDate.getDay() !== 0 && selectedDate.getDay() !== 6)))
+}
+
+const absenceLabel = (absence) => {
+  if (!absence) return ''
+  const duration = { whole_day: 'Whole day', morning: 'Morning', afternoon: 'Afternoon' }[absence.duration] || 'Whole day'
+  const leaveType = { cto: 'CTO', vacation: 'Vacation', sick: 'Sick', spl: 'SPL', without_pay: 'Without pay' }[absence.leave_type] || 'Unclassified'
+  return `${absence.status === 'filed' ? 'Filed' : 'Unfiled'} · ${duration} · ${leaveType}`
+}
+
+const manageAbsence = async (row) => {
+  if (!isSuperAdmin.value || !userId.value || !canManageAbsence(row.date)) return
+  const absence = row.absence
+  const result = await Swal.fire({
+    title: `Absence - ${formatDateOnly(row.date)}`,
+    html: `<div class="grid gap-3 text-left"><label class="text-sm font-medium">Status<select id="absence-status" class="swal2-select"><option value="filed" ${absence?.status !== 'unfiled' ? 'selected' : ''}>Filed</option><option value="unfiled" ${absence?.status === 'unfiled' ? 'selected' : ''}>Unfiled</option></select></label><label class="text-sm font-medium">Duration<select id="absence-duration" class="swal2-select"><option value="whole_day" ${absence?.duration !== 'morning' && absence?.duration !== 'afternoon' ? 'selected' : ''}>Whole day</option><option value="morning" ${absence?.duration === 'morning' ? 'selected' : ''}>Morning</option><option value="afternoon" ${absence?.duration === 'afternoon' ? 'selected' : ''}>Afternoon</option></select></label><label class="text-sm font-medium">Filed type<select id="absence-leave-type" class="swal2-select"><option value="cto" ${absence?.leave_type === 'cto' ? 'selected' : ''}>CTO</option><option value="vacation" ${absence?.leave_type === 'vacation' ? 'selected' : ''}>Vacation</option><option value="sick" ${!absence?.leave_type || absence?.leave_type === 'sick' ? 'selected' : ''}>Sick</option><option value="spl" ${absence?.leave_type === 'spl' ? 'selected' : ''}>SPL</option><option value="without_pay" ${absence?.leave_type === 'without_pay' ? 'selected' : ''}>Without pay</option></select></label></div>`,
+    showDenyButton: Boolean(absence),
+    denyButtonText: 'Clear absence',
+    confirmButtonText: 'Save absence',
+    focusConfirm: false,
+    preConfirm: () => ({
+      status: document.getElementById('absence-status')?.value,
+      duration: document.getElementById('absence-duration')?.value,
+      leave_type: document.getElementById('absence-leave-type')?.value,
+    }),
+  })
+  if (!result.isConfirmed && !result.isDenied) return
+  try {
+    await axios.post(result.isDenied ? '/api/attendance/absence/delete' : '/api/attendance/absence/store', {
+      user_id: userId.value,
+      absence_date: row.date,
+      ...(result.isConfirmed ? result.value : {}),
+    })
+    await refreshCheckinoutState()
+    await Swal.fire({ icon: 'success', title: result.isDenied ? 'Absence cleared' : 'Absence saved', timer: 1400, showConfirmButton: false })
+  } catch (error) {
+    await Swal.fire({ icon: 'error', title: 'Unable to update absence', text: error?.response?.data?.message || 'Please try again.' })
   }
 }
 
@@ -1217,9 +1297,9 @@ const deleteOverrideLog = async (log) => {
 }
 
 const buildPrintableAttendanceRecords = () => {
-  const scheduledMinutes = getScheduledMinutes()
 
   return attendanceRows.value.map((row) => {
+    const scheduledMinutes = getScheduledMinutes(row)
     const [year, month, day] = String(row.date).split('-').map(Number)
     const dateObj = new Date(year, month - 1, day)
 
@@ -1611,17 +1691,18 @@ const saveEditedUser = async (payload) => {
                       Check Out{{ scheduleSlots.length > 1 ? ` ${index + 1}` : '' }}
                     </th>
                   </template>
+                  <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Absence</th>
                   <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Logs</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                 <tr v-if="checkinoutLoading">
-                  <td :colspan="2 + (scheduleSlots.length * 2)" class="px-5 py-10 text-center text-sm text-slate-400">
+                  <td :colspan="3 + (scheduleSlots.length * 2)" class="px-5 py-10 text-center text-sm text-slate-400">
                     Loading attendance data…
                   </td>
                 </tr>
                 <tr v-else-if="!attendanceRows.length">
-                  <td :colspan="2 + (scheduleSlots.length * 2)" class="px-5 py-10 text-center text-sm text-slate-400">
+                  <td :colspan="3 + (scheduleSlots.length * 2)" class="px-5 py-10 text-center text-sm text-slate-400">
                     No attendance records for selected month.
                   </td>
                 </tr>
@@ -1631,7 +1712,7 @@ const saveEditedUser = async (payload) => {
                   class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
                 >
                   <td class="px-5 py-3 text-center">
-                    <span class="text-sm font-semibold text-slate-800 dark:text-white">{{ formatDateOnly(row.date) }}</span>
+                    <span class="text-sm font-semibold text-slate-800 dark:text-white">{{ formatDateOnly(row.date) }}</span><span v-if="row.resolved_schedule" class="block text-[10px] text-slate-500">{{ row.resolved_schedule._is_working_day === false ? 'Rest day' : row.resolved_schedule.name }} ? {{ (row.resolved_schedule.schedules || []).map(s => `${s.time_in.slice(0, 5)}?${s.time_out.slice(0, 5)}`).join(', ') }}</span><span v-if="row.resolved_schedule?._holiday_credit_minutes" class="block text-[10px] text-sky-600">{{ row.resolved_schedule._holiday_credit_minutes / 60 }} hours holiday / suspension credit</span>
                   </td>
                   <template v-for="(slot, index) in row.slots" :key="`slot-${row.date}-${index}`">
                     <td class="px-5 py-3 text-center">
@@ -1667,6 +1748,17 @@ const saveEditedUser = async (payload) => {
                       </div>
                     </td>
                   </template>
+                  <td class="px-5 py-3 text-center">
+                    <button
+                      v-if="isSuperAdmin && canManageAbsence(row.date)"
+                      type="button"
+                      @click="manageAbsence(row)"
+                      :class="row.absence?.status === 'filed' ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/60 dark:text-emerald-300 dark:hover:bg-emerald-900/20' : row.absence?.status === 'unfiled' ? 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'"
+                      class="rounded-lg border px-2.5 py-1 text-xs font-medium transition"
+                    >{{ row.absence ? absenceLabel(row.absence) : 'Mark absence' }}</button>
+                    <span v-else-if="row.absence" :class="row.absence.status === 'filed' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'" class="text-xs font-medium">{{ absenceLabel(row.absence) }}</span>
+                    <span v-else class="text-slate-400">-</span>
+                  </td>
                   <td class="px-5 py-3 text-center">
                     <div class="flex justify-center gap-2">
                       <button

@@ -73,6 +73,12 @@ const routes = [
         meta: { title: `Users`, roles: [1] }
       },
       {
+        name: 'WeeklySchedules',
+        path: 'weekly-schedules',
+        component: () => import('../views/office-shift/WeeklySchedules.vue'),
+        meta: { title: 'Weekly Schedule Exceptions', roles: [1] }
+      },
+      {
         name: "OfficeShift",
         path: "office-shifts",
         component: () => import('../views/office-shift/Index.vue'),
@@ -91,6 +97,12 @@ const routes = [
         meta: { title: `Colleges`, roles: [1] }
       },
       {
+        name: "Holiday",
+        path: "holidays",
+        component: () => import('../views/holiday/Index.vue'),
+        meta: { title: `Holidays`, roles: [1] }
+      },
+      {
         name: "Machine",
         path: "machines",
         component: () => import('../views/machine/Index.vue'),
@@ -101,6 +113,23 @@ const routes = [
         path: "reports/biometric",
         component: () => import('../views/report/Biometric.vue'),
         meta: { title: `Biometric Report`, roles: [1] }
+      },
+      {
+        name: "DailyAttendance",
+        path: "reports/daily-attendance",
+        component: () => import('../views/report/DailyAttendance.vue'),
+        meta: { title: 'Daily Attendance Monitoring', roles: [1] }
+      },
+      {
+        name: 'MonthlyAttendance',
+        path: 'reports/monthly-attendance',
+        component: () => import('../views/report/MonthlyAttendance.vue'),
+        meta: { title: 'Monthly Tardiness and Undertime', roles: [1] }
+      },
+      {
+        name: 'AbsencesSummary',
+        path: 'reports/absences-tardiness',
+        redirect: { name: 'MonthlyAttendance', query: { tab: 'absences' } },
       },
       {
         name: "BiometricLogs",
