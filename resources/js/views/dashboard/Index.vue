@@ -120,7 +120,8 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
+    <div class="-ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border border-slate-200 bg-white pb-4 shadow-sm md:-mr-6 dark:border-slate-800 dark:bg-slate-900">
+      <section class="border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-2 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)]">
       <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
         <div class="max-w-3xl">
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">{{ isSuperAdmin ? 'Operations Overview' : 'My Workspace' }}</p>
@@ -144,6 +145,7 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+    </div>
 
     <section v-if="error" class="rounded-[24px] border border-rose-200 bg-rose-50 p-4 text-rose-700 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

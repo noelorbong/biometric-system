@@ -755,7 +755,7 @@ onMounted(async () => {
   if (Number(authUser.value?.role) === 1) {
     await appSettingStore.loadSettings()
   }
-  
+
 
   if (!authUser.value?.id) {
     await authStore.loadUser()
@@ -1384,7 +1384,8 @@ const saveEditedUser = async (payload) => {
   <div class="space-y-6">
 
     <!-- ── HERO ── -->
-    <div class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-6 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+      <div class="relative p-2 text-white">
       <!-- decorative dots -->
       <div class="pointer-events-none absolute inset-0 opacity-10"
         style="background-image:radial-gradient(circle,white 1px,transparent 1px);background-size:28px 28px"></div>
@@ -1459,18 +1460,7 @@ const saveEditedUser = async (payload) => {
         </div>
       </div>
     </div>
-
-    <!-- User not found -->
-    <div
-      v-if="!selectedUser"
-      class="rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950/20 dark:text-yellow-200"
-    >
-      User not found. Make sure the user list has been loaded.
-    </div>
-
-    <template v-else>
-      <!-- ── TABS ── -->
-      <div class="flex gap-1 rounded-[24px] border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div v-if="selectedUser" class="flex gap-1  border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <button
           type="button"
           @click="activeTab = 'userinfo'"
@@ -1502,16 +1492,7 @@ const saveEditedUser = async (payload) => {
           ]"
         >Print Record</button>
       </div>
-
-      <!-- ── TAB: USER INFO ── -->
-      <div v-if="activeTab === 'userinfo'">
-        <ProfileCard :user="selectedUser" />
-      </div>
-
-      <!-- ── TAB: ATTENDANCE ── -->
-      <div v-if="activeTab === 'biometrics'" class="space-y-4">
-        <!-- Filters -->
-        <div class="flex flex-wrap items-end gap-4 rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div v-if="selectedUser && activeTab === 'biometrics'" class="flex flex-wrap items-end gap-4  border border-slate-200 bg-white pt-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div>
             <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
             <div class="inline-flex rounded-lg border border-slate-300 p-1 dark:border-slate-700">
@@ -1568,6 +1549,29 @@ const saveEditedUser = async (payload) => {
             Loading...
           </div>
         </div>
+    </div>
+
+    <!-- User not found -->
+    <div
+      v-if="!selectedUser"
+      class="rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950/20 dark:text-yellow-200"
+    >
+      User not found. Make sure the user list has been loaded.
+    </div>
+
+    <template v-else>
+      <!-- ── TABS ── -->
+
+
+      <!-- ── TAB: USER INFO ── -->
+      <div v-if="activeTab === 'userinfo'">
+        <ProfileCard :user="selectedUser" />
+      </div>
+
+      <!-- ── TAB: ATTENDANCE ── -->
+      <div v-if="activeTab === 'biometrics'" class="space-y-4">
+        <!-- Filters -->
+
 
         <!-- Sub-tabs: Attendance / Override History -->
         <div class="flex items-center gap-2">
@@ -1728,7 +1732,7 @@ const saveEditedUser = async (payload) => {
                           :class="slot.check_in ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'"
                           class="text-sm"
                         >{{ formatTimeOnly(slot.check_in) }}</span>
-                       
+
                       </div>
                     </td>
                     <td class="px-5 py-3 text-center">
@@ -1744,7 +1748,7 @@ const saveEditedUser = async (payload) => {
                           :class="slot.check_out ? 'font-semibold text-rose-500 dark:text-rose-400' : 'text-slate-300 dark:text-slate-600'"
                           class="text-sm"
                         >{{ formatTimeOnly(slot.check_out) }}</span>
-                        
+
                       </div>
                     </td>
                   </template>

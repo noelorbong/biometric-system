@@ -1,0 +1,47 @@
+﻿{
+    "source":  "Existing working SDK in Windows SysWOW64 on the development computer",
+    "architecture":  "x86",
+    "sdk_file_version":  "6.3.1.55",
+    "files":  [
+                  {
+                      "file":  "commpro.dll",
+                      "version":  null,
+                      "sha256":  "E699E5DAE3A16FAC1F79BBF9EBC665E79718EA7040EE496FFC76E150652FBB1B"
+                  },
+                  {
+                      "file":  "plcommpro.dll",
+                      "version":  "2.2.1.17",
+                      "sha256":  "FED63A4272657341A42F0488600A2CB4DB67B6B01F73D96A9FCDC3FAE081EBD9"
+                  },
+                  {
+                      "file":  "plcommutils.dll",
+                      "version":  "1.0.0.2",
+                      "sha256":  "64944827251A43089DE1C55FB8288AFFC05E58DE83677BD5D367CEEB753E0568"
+                  },
+                  {
+                      "file":  "ZKCommuCryptoClient.dll",
+                      "version":  "1.0.0.9",
+                      "sha256":  "DBEDAEB0B56F59E5DB7BD6309B68F8D3A5CA3EE1F71B56BBACAAEB4C6E7A5587"
+                  },
+                  {
+                      "file":  "ZKEMCrypto.dll",
+                      "version":  null,
+                      "sha256":  "F8E2D4F2F6417321BD953BDEBA06620E6C8AF33E1CE148A255BA2385A9EAF052"
+                  },
+                  {
+                      "file":  "zkemkeeper.dll",
+                      "version":  "6.3.1.55",
+                      "sha256":  "8B7E5BD670C24D367DFE0297E9C2FEB67972D062FB50B830F15873C65C6B34D9"
+                  },
+                  {
+                      "file":  "zkemsdk.dll",
+                      "version":  null,
+                      "sha256":  "8F06C314566654DB0F81C3241EE9923E488FD0E8E1C4D4A9298F8709D60AF4C5"
+                  },
+                  {
+                      "file":  "zkemsdkutils.dll",
+                      "version":  null,
+                      "sha256":  "8E58E433A130DB37EE213FC99C1DAECC80D05DC6EA0CE0DABDFBDFA50CC7C934"
+                  }
+              ]
+}

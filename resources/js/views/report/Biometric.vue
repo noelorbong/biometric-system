@@ -1058,7 +1058,7 @@ const getPrintableRecords = (user) => {
 
 <template>
   <div class="space-y-3">
-    <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
       <div class="flex flex-col gap-3 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Report</h1>
@@ -1086,72 +1086,73 @@ const getPrintableRecords = (user) => {
           </button>
         </div>
       </div>
+
+      <section
+        class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-end">
+          <div class="shrink-0">
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mode</label>
+            <div class="inline-flex h-8 rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
+              <button type="button" @click="filterMode = 'monthly'"
+                class="rounded px-2 text-xs font-medium transition"
+                :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
+                Month
+              </button>
+              <button type="button" @click="filterMode = 'custom'"
+                class="rounded px-2 text-xs font-medium transition"
+                :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
+                Custom
+              </button>
+            </div>
+          </div>
+
+          <div class="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            <div v-if="filterMode === 'monthly'">
+              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
+              <select v-model.number="filters.year" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
+              </select>
+            </div>
+            <div v-if="filterMode === 'monthly'">
+              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
+              <select v-model.number="filters.month" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
+              </select>
+            </div>
+            <div v-if="filterMode === 'custom'" class="sm:col-span-2 lg:col-span-2">
+              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
+              <flat-pickr v-model="customDateRange" :config="customRangePickerConfig"
+                class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700"
+                placeholder="Select date range" />
+            </div>
+            <div>
+              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
+              <select v-model="filters.office_shift_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option value="">All</option>
+                <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{ shift.name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
+              <select v-model="filters.department_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option value="">All</option>
+                <option v-for="department in departments" :key="`report-department-${department.id}`" :value="String(department.id)">{{ department.department_name }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
+              <select v-model="filters.college_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
+                <option value="">All</option>
+                <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{ college.college_long || college.college_short || `College #${college.id}` }}</option>
+              </select>
+            </div>
+          </div>
+          <Button @click="generateReport" size="sm" variant="primary"
+            :className="'h-8 bg-sky-500 px-2.5 text-xs hover:bg-sky-600 text-white'">Generate</Button>
+        </div>
+      </section>
+
     </div>
-
-    <section
-      class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-end">
-        <div class="shrink-0">
-          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mode</label>
-          <div class="inline-flex h-8 rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
-            <button type="button" @click="filterMode = 'monthly'"
-              class="rounded px-2 text-xs font-medium transition"
-              :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
-              Month
-            </button>
-            <button type="button" @click="filterMode = 'custom'"
-              class="rounded px-2 text-xs font-medium transition"
-              :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'">
-              Custom
-            </button>
-          </div>
-        </div>
-
-        <div class="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <div v-if="filterMode === 'monthly'">
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
-            <select v-model.number="filters.year" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
-            </select>
-          </div>
-          <div v-if="filterMode === 'monthly'">
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
-            <select v-model.number="filters.month" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
-            </select>
-          </div>
-          <div v-if="filterMode === 'custom'" class="sm:col-span-2 lg:col-span-2">
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
-            <flat-pickr v-model="customDateRange" :config="customRangePickerConfig"
-              class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700"
-              placeholder="Select date range" />
-          </div>
-          <div>
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
-            <select v-model="filters.office_shift_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option value="">All</option>
-              <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)">{{ shift.name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
-            <select v-model="filters.department_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option value="">All</option>
-              <option v-for="department in departments" :key="`report-department-${department.id}`" :value="String(department.id)">{{ department.department_name }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
-            <select v-model="filters.college_id" class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700">
-              <option value="">All</option>
-              <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)">{{ college.college_long || college.college_short || `College #${college.id}` }}</option>
-            </select>
-          </div>
-        </div>
-        <Button @click="generateReport" size="sm" variant="primary"
-          :className="'h-8 bg-sky-500 px-2.5 text-xs hover:bg-sky-600 text-white'">Generate</Button>
-      </div>
-    </section>
 
     <template v-if="false">
     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">

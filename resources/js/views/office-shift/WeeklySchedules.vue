@@ -104,7 +104,7 @@ onMounted(load)
 
 <template>
   <div class="space-y-4 text-slate-800 dark:text-slate-200">
-    <section class="panel">
+    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
       <div class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-lg font-semibold">Weekly Schedule Exceptions</h1><p class="mt-1 text-xs text-slate-500">Set schedules from an effective date and review exceptions for a particular week.</p></div><button @click="load" :disabled="busy" class="button">Refresh</button></div>
       <label class="mt-3 block text-xs">Review month<flat-pickr v-model="month" :config="monthConfig" :disabled="busy" class="input mt-1" /></label>
       <p class="mt-3 text-xs text-slate-500">Compressed: 7:00–12:00, 13:00–18:00 (10 hours). Standard: 8:00–12:00, 13:00–17:00 (8 hours). Both presets default to Monday–Thursday; Friday is a rest day.</p>

@@ -8,7 +8,7 @@ use Symfony\Component\Process\Process;
 /**
  * SDK adapter for terminals requiring the vendor's encrypted handshake.
  * Each request owns a short-lived SDK connection and disconnects in finally.
- * Uses the locally registered 32-bit SDK; vendor binaries are not redistributed.
+ * Loads the bundled 32-bit SDK directly, without machine-wide COM registration.
  */
 class ZKTecoSdkService
 {
@@ -22,10 +22,10 @@ class ZKTecoSdkService
     public function request(string $operation, array $parameters = []): array
     {
         if (PHP_OS_FAMILY !== 'Windows') {
-            throw new RuntimeException('This device requires an encrypted SDK connection. The fallback requires Windows and the registered ZKTeco SDK.');
+            throw new RuntimeException('This device requires an encrypted SDK connection. The bundled ZKTeco SDK requires Windows.');
         }
 
-        if (!in_array($operation, ['info', 'attendance', 'enroll_fingerprint', 'enroll_face', 'fingerprint_template', 'cancel_enrollment'], true)) {
+        if (!in_array($operation, ['info', 'users', 'write_user', 'attendance', 'enroll_fingerprint', 'enroll_face', 'fingerprint_template', 'cancel_enrollment'], true)) {
             throw new RuntimeException('Unsupported ZKTeco SDK operation.');
         }
 
@@ -55,8 +55,9 @@ class ZKTecoSdkService
             'port' => $this->port,
             'password' => $this->password,
             'parameters' => $parameters,
+            'sdk_directory' => realpath(__DIR__ . '/../../resources/sdk/zkteco/x86'),
         ], JSON_THROW_ON_ERROR));
-        $process->setTimeout($operation === 'attendance' ? max(120, $this->timeout) : max(20, $this->timeout));
+        $process->setTimeout(in_array($operation, ['attendance', 'users'], true) ? max(120, $this->timeout) : max(20, $this->timeout));
         $process->run();
 
         if (!$process->isSuccessful() && trim($process->getOutput()) === '') {
@@ -77,7 +78,7 @@ class ZKTecoSdkService
         try {
             $response = json_decode(trim($process->getOutput()), true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            throw new RuntimeException('The ZKTeco SDK bridge did not return a valid response. Verify that the 32-bit zkemkeeper SDK is installed and registered.', 0, $e);
+            throw new RuntimeException('The ZKTeco SDK bridge did not return a valid response. Verify that resources/sdk/zkteco/x86 contains the bundled SDK files.', 0, $e);
         }
 
         if (!$process->isSuccessful() || !is_array($response) || ($response['ok'] ?? false) !== true) {

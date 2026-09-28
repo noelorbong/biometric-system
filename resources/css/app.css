@@ -11,6 +11,33 @@
 }
 
 @layer components {
+  /* Header controls use their dark variants against the dashboard gradient. */
+  .admin-page-header,
+  .admin-sidebar,
+  .admin-drawer-toggle {
+    color: #e2e8f0;
+    background-color: #0f172a;
+    background-image: radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 30%),
+      linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f766e 100%);
+    border-color: #334155;
+    color-scheme: dark;
+  }
+
+  .dark .admin-page-header,
+  .dark .admin-sidebar,
+  .dark .admin-drawer-toggle {
+    background-image: radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 30%),
+      linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.98) 40%, rgba(15, 118, 110, 0.92) 100%);
+  }
+
+  .admin-page-header :where(h1, h2) {
+    color: #fff;
+  }
+
+  .admin-page-header :where(p, label).text-slate-500 {
+    color: #cbd5e1;
+  }
+
   .menu-item {
     @apply relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm;
   }

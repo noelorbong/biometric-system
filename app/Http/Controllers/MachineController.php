@@ -2122,13 +2122,8 @@ class MachineController extends Controller
                     }
 
                     try {
-                        try {
-                            $zk->setUserInfo($payload);
-                        } catch (\Throwable) {
-                            // slot may be occupied; delete then retry.
-                            $zk->deleteUserInfo((int) $user->USERID);
-                            $zk->setUserInfo($payload);
-                        }
+                        // Report write failures without deleting existing biometrics.
+                        $zk->setUserInfo($payload);
 
                         if ($targetMarker !== null && $fingerTemplates !== []) {
                             $templatesCopied += $this->copyUserTemplatesToMachineMarker((int) $user->USERID, $targetMarker);
@@ -2284,12 +2279,8 @@ class MachineController extends Controller
             $zk->connect();
             $zk->disableDevice();
 
-            try {
-                $zk->setUserInfo($payload);
-            } catch (\Throwable) {
-                $zk->deleteUserInfo((int) $user->id);
-                $zk->setUserInfo($payload);
-            }
+            // Report write failures without deleting existing biometrics.
+            $zk->setUserInfo($payload);
 
             if ($includeTemplates && $templatesForDevice->isNotEmpty()) {
                 $fingerTemplates = [];

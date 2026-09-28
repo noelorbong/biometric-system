@@ -565,7 +565,7 @@ const uploadUserToMachines = async (selectedUser, selectedMachineIds, availableM
     title: failedResults.length ? 'Upload Finished With Issues' : 'User Uploaded',
     html: `
       <div class="space-y-3 text-left text-sm text-gray-600">
-        <p><strong>${selectedUser.name}</strong> upload completed.</p>
+          <p><strong>${selectedUser.name}</strong> ${successResults.length ? 'uploaded to ' + successResults.length + ' machine(s).' : 'was not uploaded to any machine.'}</p>
         ${successResults.length ? `<div><p class="font-semibold text-emerald-700">Successful uploads</p><div class="mt-2 space-y-2">${successHtml}</div></div>` : ''}
         ${failedResults.length ? `<div><p class="font-semibold text-red-700">Failed uploads</p><div class="mt-2 space-y-2">${failedHtml}</div></div>` : ''}
       </div>
@@ -1029,7 +1029,7 @@ const closeEnrollModal = () => {
 
 <template>
   <div class="space-y-2">
-    <section class=" ">
+    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
       <div class="flex flex-col gap-4 min-[1024px]:flex-row min-[1024px]:items-center min-[1024px]:justify-between">
         <div class="min-w-0">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1041,7 +1041,7 @@ const closeEnrollModal = () => {
           </div>
             <!-- <span class="text-sm text-slate-500 dark:text-slate-400">{{ filteredUsers.length }} of {{ userStats.total }} shown</span> -->
           </div>
-          
+
         </div>
 
         <div class="flex flex-col gap-3 sm:ml-auto sm:flex-row sm:items-center xl:justify-end">

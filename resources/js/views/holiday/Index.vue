@@ -64,19 +64,21 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-3">
-    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Holidays</h1>
-          <span class="text-xs text-slate-500 dark:text-slate-400">{{ holidays.length }} configured</span>
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+      <section>
+        <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Holidays</h1>
+            <span class="text-xs text-slate-500 dark:text-slate-400">{{ holidays.length }} configured</span>
+          </div>
+          <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">Add Holiday</Button>
         </div>
-        <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">Add Holiday</Button>
-      </div>
-    </section>
+      </section>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <input v-model="search" type="search" placeholder="Search holiday..." class="h-9 w-full rounded-md border border-slate-300 bg-transparent px-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90" />
-    </section>
+  <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
+        <input v-model="search" type="search" placeholder="Search holiday..." class="h-9 w-full rounded-md border border-slate-300 bg-transparent px-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90" />
+      </section>
+    </div>
 
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="overflow-x-auto">

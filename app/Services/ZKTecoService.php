@@ -487,6 +487,10 @@ class ZKTecoService
      */
     public function getUsers(): array
     {
+        if ($this->sdk !== null) {
+            return $this->sdk->request('users');
+        }
+
         $this->sendCommand(self::CMD_DISABLEDEVICE);
 
         try {
@@ -665,6 +669,12 @@ class ZKTecoService
      */
     public function disableDevice(): void
     {
+        // SDK requests use independent connections. Their write operations own
+        // the disable/enable pair in one process and restore the device finally.
+        if ($this->sdk !== null) {
+            return;
+        }
+
         $this->sendCommand(self::CMD_DISABLEDEVICE);
     }
 
@@ -673,6 +683,10 @@ class ZKTecoService
      */
     public function enableDevice(): void
     {
+        if ($this->sdk !== null) {
+            return;
+        }
+
         $this->sendCommand(self::CMD_ENABLEDEVICE);
     }
 
@@ -693,6 +707,12 @@ class ZKTecoService
      */
     public function setUserInfo(array $user): void
     {
+        if ($this->sdk !== null) {
+            $this->sdk->request('write_user', ['user' => $user]);
+
+            return;
+        }
+
         // ZKTeco 72-byte user record layout used by many TFT devices:
         // uid(2) + privilege(1) + password(8) + name(24) + card(4) +
         // reserved(1) + group(7) + reserved(1) + user_id(24)
@@ -2561,7 +2581,7 @@ class ZKTecoService
     private function sendCommand(int $cmd, string $data = '', ?int $replyId = null): array
     {
         if ($this->sdk !== null) {
-            throw new RuntimeException('This operation is not yet supported through the encrypted SDK connection. Connection checks, device information, attendance downloads, and fingerprint enrollment/template reads are supported.');
+            throw new RuntimeException('This operation is not yet supported through the encrypted SDK connection. Connection checks, device information, user downloads/uploads, attendance downloads, and fingerprint enrollment/template reads are supported.');
         }
 
         if ($replyId !== null) {

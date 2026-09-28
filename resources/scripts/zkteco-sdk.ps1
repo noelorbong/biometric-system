@@ -11,6 +11,97 @@ function Get-SdkError {
     return $code
 }
 
+function Read-DeviceUsers($device) {
+    $userCount = 0
+    if (-not $device.GetDeviceStatus(1, 2, [ref]$userCount)) {
+        throw "Cannot verify device user count (SDK error $(Get-SdkError))."
+    }
+    if ($userCount -lt 0) { throw 'The SDK returned an invalid user count.' }
+    if ($userCount -eq 0) { return }
+    if (-not $device.ReadAllUserID(1)) {
+        throw "Cannot download device users (SDK error $(Get-SdkError))."
+    }
+
+    $rows = [Collections.Generic.List[object]]::new()
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    while ($true) {
+        $pin = ''; $name = ''; $password = ''; $privilege = 0; $enabled = $true
+        if (-not $device.SSR_GetAllUserInfo(1, [ref]$pin, [ref]$name, [ref]$password,
+            [ref]$privilege, [ref]$enabled)) { break }
+        if ([string]::IsNullOrWhiteSpace($pin) -or -not $seen.Add($pin)) {
+            throw 'The SDK returned an empty or duplicate user PIN.'
+        }
+        # Cardnumber refers to the user most recently read; capture it before
+        # advancing the iterator. Never silently replace an unread card with 0.
+        $card = ''
+        if (-not $device.GetStrCardNumber([ref]$card)) {
+            throw "Cannot read a device user's card number (SDK error $(Get-SdkError))."
+        }
+        $cardNumber = [long]0
+        if ($card -ne '' -and (-not [long]::TryParse($card, [ref]$cardNumber) -or $cardNumber -lt 0)) {
+            throw 'The SDK returned an invalid card number.'
+        }
+        # The SSR API exposes PINs, not legacy internal record indexes. Preserve
+        # the exact PIN (including leading zeros); use its numeric value only
+        # as the existing application's local-user lookup hint.
+        $uid = [long]0
+        if ($pin -cmatch '^[0-9]+$') { [void][long]::TryParse($pin, [ref]$uid) }
+        $mappedPrivilege = switch ($privilege) {
+            0 { 0 } 1 { 2 } 2 { 6 } 3 { 14 }
+            default { throw "Unsupported SDK user privilege: $privilege." }
+        }
+        $rows.Add(@{ uid = $uid; pin = $pin; name = $name; password = $password;
+            privilege = $mappedPrivilege; card = $cardNumber; enabled = $enabled })
+    }
+    if ($rows.Count -lt $userCount) {
+        throw "Incomplete user download: expected at least $userCount users, received $($rows.Count)."
+    }
+    return $rows.ToArray()
+}
+
+function Write-DeviceUser($device, $parameters) {
+    $user = $parameters.user
+    $pin = [string]$user.badgenumber
+    if ([string]::IsNullOrWhiteSpace($pin)) { $pin = [string]$user.uid }
+    if ([string]::IsNullOrWhiteSpace($pin)) { throw 'A user PIN is required for upload.' }
+    $privilege = switch ([int]$user.privilege) {
+        0 { 0 } 2 { 1 } 6 { 2 } 14 { 3 }
+        default { throw 'Unsupported user privilege.' }
+    }
+    $card = [string]$user.card
+    if ([string]::IsNullOrWhiteSpace($card)) { $card = '0' }
+    if ($card -cnotmatch '^[0-9]+$') { throw 'The card number must contain digits only.' }
+
+    # Update by exact PIN, preserving enrolled biometrics and an existing user's
+    # disabled state. Upload intentionally applies the supplied local user fields.
+    $name = ''; $password = ''; $existingPrivilege = 0; $enabled = $true
+    $exists = $device.SSR_GetUserInfo(1, $pin, [ref]$name, [ref]$password,
+        [ref]$existingPrivilege, [ref]$enabled)
+    if (-not $exists) {
+        $code = Get-SdkError
+        if ($code -notin @(0, -8, -4991)) { throw "Cannot check device user (SDK error $code)." }
+        $enabled = $true
+    }
+    $disabled = $false
+    try {
+        if (-not $device.EnableDevice(1, $false)) { throw "Cannot prepare device (SDK error $(Get-SdkError))." }
+        $disabled = $true
+        if (-not $device.SetStrCardNumber($card)) { throw "Cannot set user card (SDK error $(Get-SdkError))." }
+        if (-not $device.SSR_SetUserInfo(1, $pin, [string]$user.name,
+            [string]$user.password, $privilege, $enabled)) {
+            throw "Cannot upload device user (SDK error $(Get-SdkError))."
+        }
+        if (-not $device.RefreshData(1)) {
+            throw "User was written, but device refresh failed (SDK error $(Get-SdkError))."
+        }
+        return @{ written = $true }
+    } finally {
+        if ($disabled -and -not $device.EnableDevice(1, $true)) {
+            throw "Could not re-enable the device after user upload (SDK error $(Get-SdkError))."
+        }
+    }
+}
+
 function Invoke-FingerprintEnrollment($device, $parameters) {
     $user = $parameters.user
     $pin = [string]$user.badgenumber
@@ -149,15 +240,23 @@ function Stop-FingerprintEnrollment($device) {
 
 try {
     $request = [Console]::In.ReadToEnd() | ConvertFrom-Json
-    if ($request.operation -notin @('info', 'attendance', 'enroll_fingerprint', 'enroll_face', 'fingerprint_template', 'cancel_enrollment')) {
+    if ($request.operation -notin @('info', 'users', 'write_user', 'attendance', 'enroll_fingerprint', 'enroll_face', 'fingerprint_template', 'cancel_enrollment')) {
         throw 'Unsupported SDK operation.'
     }
 
-    try {
-        $zk = New-Object -ComObject zkemkeeper.ZKEM
-    } catch {
-        throw 'The 32-bit ZKTeco SDK is not registered. Install the vendor attendance application/SDK on this Windows computer.'
+    $sdkDirectory = [string]$request.sdk_directory
+    if ([string]::IsNullOrWhiteSpace($sdkDirectory) -or -not (Test-Path -LiteralPath $sdkDirectory -PathType Container)) {
+        throw 'The bundled SDK directory is missing. Include resources/sdk/zkteco/x86 in the deployment.'
     }
+    $sdkFiles = @('zkemkeeper.dll', 'zkemsdk.dll', 'commpro.dll', 'zkemsdkutils.dll',
+        'plcommpro.dll', 'plcommutils.dll', 'ZKEMCrypto.dll', 'ZKCommuCryptoClient.dll')
+    foreach ($file in $sdkFiles) {
+        if (-not (Test-Path -LiteralPath (Join-Path $sdkDirectory $file) -PathType Leaf)) {
+            throw "Bundled SDK file is missing: $file. Include the complete resources/sdk/zkteco/x86 directory."
+        }
+    }
+    Add-Type -Path (Join-Path $sdkDirectory 'BundledSdk.cs')
+    $zk = [BundledZktecoSdk]::Create($sdkDirectory)
 
     if (-not $zk.SetCommPassword([int]$request.password)) {
         throw 'The SDK could not set the communication key.'
@@ -175,6 +274,10 @@ try {
         $result = @{ ok = $true; data = (Stop-FingerprintEnrollment $zk) }
     } elseif ($request.operation -eq 'fingerprint_template') {
         $result = @{ ok = $true; data = (Read-FingerprintTemplate $zk $request.parameters) }
+    } elseif ($request.operation -eq 'users') {
+        $result = @{ ok = $true; data = @(Read-DeviceUsers $zk) }
+    } elseif ($request.operation -eq 'write_user') {
+        $result = @{ ok = $true; data = (Write-DeviceUser $zk $request.parameters) }
     } elseif ($request.operation -eq 'info') {
         $info = @{}
         $value = ''
@@ -232,6 +335,15 @@ try {
         }
         $result = @{ ok = $true; data = @($rows.ToArray()) }
     }
+    $loadedSdkFiles = @([Diagnostics.Process]::GetCurrentProcess().Modules |
+        Where-Object { $_.ModuleName -in $sdkFiles } | ForEach-Object {
+            $expected = [IO.Path]::GetFullPath((Join-Path $sdkDirectory $_.ModuleName))
+            if (-not [string]::Equals($_.FileName, $expected, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "SDK dependency loaded outside the bundle: $($_.ModuleName)."
+            }
+            $_.FileName
+        })
+    $result.sdk = @{ mode = 'bundled'; modules = $loadedSdkFiles }
 } catch {
     $result = @{ ok = $false; error = $_.Exception.Message }
 } finally {

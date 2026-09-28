@@ -1,9 +1,8 @@
 <script setup>
-import { ref, watch, nextTick, onUnmounted, onBeforeUnmount, onMounted } from "vue";
+import { ref, watch, nextTick, onMounted } from "vue";
 import { storeToRefs } from 'pinia'
 import moment from 'moment'
 import AppSidebar from './AppSidebar.vue'
-import AppHeader from './AppHeader.vue'
 import { useSidebar } from '@/composables/useSidebar'
 import Backdrop from './Backdrop.vue'
 const { isExpanded, isHovered } = useSidebar()
@@ -30,17 +29,14 @@ const web_layout = ref({
 })
 
 let sideBar = ref(null);
-let headerBar = ref(null);
 let siderBarWidth = ref(0);
-let headerHeight = ref(0);
 
 const updateDimensions = () => {
   siderBarWidth.value = sideBar.value?.$el?.offsetWidth ?? 0;
-  headerHeight.value = headerBar.value?.$el?.offsetHeight ?? 0;
   web_layout.value.screenWidth = window.innerWidth;
   web_layout.value.screenHeight = window.innerHeight;
   web_layout.value.bodyWidth = web_layout.value.screenWidth - siderBarWidth.value;
-  web_layout.value.bodyHeight = web_layout.value.screenHeight - headerHeight.value;
+  web_layout.value.bodyHeight = web_layout.value.screenHeight;
 };
 
 onMounted(async() => {
@@ -80,7 +76,6 @@ let myEventHandler = (e) => {
     <Backdrop />
     <div class="flex-1 transition-all duration-300 ease-in-out"
       :class="[isExpanded || isHovered ? 'lg:ml-[290px]' : 'lg:ml-[90px]']">
-      <app-header ref="headerBar" />
       <div class="p-4 mx-auto max-w-screen-2xl md:p-6">
         <!-- <slot></slot> -->
         <router-view v-slot="{ Component }">

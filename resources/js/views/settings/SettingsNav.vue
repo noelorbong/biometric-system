@@ -1,5 +1,5 @@
 <template>
-  <section class="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+  <section class="border-b border-slate-200 bg-white pb-2 dark:border-slate-800 dark:bg-slate-900">
     <div class="flex flex-wrap items-center gap-2">
       <RouterLink
         to="/main/settings"

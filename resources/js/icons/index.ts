@@ -106,7 +106,24 @@ import SafeIcon from "./SafeIcon.vue";
 import DangerIcon from "./DangerIcon.vue";
 import UnknownIcon from "./UnknownIcon.vue";
 import IconArrowSquare from './IconArrowSquare.vue'
+import BookSheIfcon from './BookSheIfcon.vue'
+import ClockIcon  from "./ClockIcon.vue";
+import HierarchicalIcon from "./HierarchicalIcon.vue";
+import FingerprintIcon from "./FingerprintIcon.vue";
+import EmployeesIcon from "./EmployeesIcon.vue";
+import DashboardIcon from "./DashboardIcon.vue";
+import GearIcon from "./GearIcon.vue";
+import UserIcon from "./UserIcon.vue";
+
 export {
+  UserIcon,
+  GearIcon,
+  DashboardIcon,
+  EmployeesIcon,
+  FingerprintIcon,
+  HierarchicalIcon,
+  ClockIcon,
+  BookSheIfcon,
   IconArrowSquare,
   UnknownIcon,
   DangerIcon,

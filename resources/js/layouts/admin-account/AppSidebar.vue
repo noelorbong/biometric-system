@@ -1,7 +1,7 @@
 <template>
   <aside
     :class="[
-      'fixed mt-16 flex flex-col lg:mt-0 top-0 px-4 left-0 bg-[linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] dark:bg-[linear-gradient(180deg,_#0f172a_0%,_#111827_100%)] dark:border-slate-800 text-slate-900 h-screen transition-all duration-300 ease-in-out z-20 border-r border-slate-200',
+      'admin-sidebar fixed flex flex-col top-0 px-4 left-0 text-slate-200 h-screen transition-all duration-300 ease-in-out z-40 border-r',
       {
         'lg:w-[290px]': isExpanded || isMobileOpen || isHovered,
         'lg:w-[90px]': !isExpanded && !isHovered,
@@ -13,6 +13,30 @@
     @mouseenter="!isExpanded && (isHovered = true)"
     @mouseleave="isHovered = false"
   >
+    <button
+      type="button"
+      class="admin-drawer-toggle absolute top-1/2 -right-8 flex items-center justify-center w-8 h-14 -translate-y-1/2 text-white rounded-r-xl shadow-lg shadow-slate-900/25 transition-[filter] duration-200 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 dark:shadow-black/30 dark:focus:ring-offset-slate-900"
+      :title="isExpanded || isMobileOpen ? 'Collapse sidebar' : 'Expand sidebar'"
+      :aria-label="isExpanded || isMobileOpen ? 'Collapse sidebar' : 'Expand sidebar'"
+      @click="handleToggle"
+    >
+      <span class="absolute left-1.5 h-6 border-l border-dotted border-white/60" aria-hidden="true"></span>
+      <svg
+        class="w-4 h-4 ml-0.5 transition-transform duration-300"
+        :class="{ 'rotate-180': !isExpanded && !isMobileOpen }"
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M12.5 4.16667L6.66667 10L12.5 15.8333"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
     <div
       :class="[
         'py-6 flex',
@@ -45,13 +69,13 @@
         />
       </router-link>
     </div>
-    <div class="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+    <div class="flex flex-col flex-1 overflow-y-auto duration-300 ease-linear no-scrollbar">
       <nav class="mb-6">
         <div class="flex flex-col gap-4">
           <div v-for="(menuGroup, groupIndex) in menuGroups" :key="groupIndex">
             <h2
               :class="[
-                'mb-3 text-[11px] font-semibold uppercase flex tracking-[0.2em] leading-[20px] text-slate-400 dark:text-slate-500',
+                'mb-3 text-[11px] font-semibold uppercase flex tracking-[0.2em] leading-[20px] text-slate-300',
                 !isExpanded && !isHovered
                   ? 'lg:justify-center'
                   : 'justify-start',
@@ -70,8 +94,8 @@
                   :class="[
                     'menu-item group w-full ring-1 transition-all',
                     {
-                      'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-800/40': isSubmenuOpen(groupIndex, index),
-                      'text-slate-700 hover:bg-slate-100 ring-transparent dark:text-slate-300 dark:hover:bg-slate-800/50': !isSubmenuOpen(groupIndex, index),
+                      'bg-sky-400/15 text-sky-200 ring-sky-300/30': isSubmenuOpen(groupIndex, index),
+                      'text-slate-200 hover:bg-white/10 hover:text-white ring-transparent': !isSubmenuOpen(groupIndex, index),
                     },
                     !isExpanded && !isHovered
                       ? 'lg:justify-center'
@@ -81,8 +105,8 @@
                   <span
                     :class="[
                       isSubmenuOpen(groupIndex, index)
-                        ? 'text-sky-600 dark:text-sky-300'
-                        : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300',
+                        ? 'text-sky-200'
+                        : item.iconClass || 'text-slate-300 group-hover:text-white',
                     ]"
                   >
                     <component :is="item.icon" />
@@ -97,7 +121,7 @@
                     :class="[
                       'ml-auto w-5 h-5 transition-transform duration-200',
                       {
-                        'rotate-180 text-sky-500 dark:text-sky-300': isSubmenuOpen(
+                        'rotate-180 text-sky-200': isSubmenuOpen(
                           groupIndex,
                           index
                         ),
@@ -111,16 +135,16 @@
                   :class="[
                     'menu-item group ring-1 transition-all',
                     {
-                      'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-800/40': isActive(item.path),
-                      'text-slate-700 hover:bg-slate-100 ring-transparent dark:text-slate-300 dark:hover:bg-slate-800/50': !isActive(item.path),
+                      'bg-sky-400/15 text-sky-200 ring-sky-300/30': isActive(item.path),
+                      'text-slate-200 hover:bg-white/10 hover:text-white ring-transparent': !isActive(item.path),
                     },
                   ]"
                 >
                   <span
                     :class="[
                       isActive(item.path)
-                        ? 'text-sky-600 dark:text-sky-300'
-                        : 'text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300',
+                        ? 'text-sky-200'
+                        : 'text-slate-300 group-hover:text-white',
                     ]"
                   >
                     <component :is="item.icon" />
@@ -150,10 +174,10 @@
                           :class="[
                             'menu-dropdown-item',
                             {
-                              'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300': isActive(
+                              'bg-sky-400/15 text-sky-200': isActive(
                                 subItem.path
                               ),
-                              'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/50': !isActive(
+                              'text-slate-200 hover:bg-white/10 hover:text-white': !isActive(
                                 subItem.path
                               ),
                             },
@@ -204,7 +228,19 @@
           </div>
         </div>
       </nav>
-    
+    </div>
+    <div class="flex items-center gap-2 py-4 border-t border-white/15">
+      <ThemeToggler />
+      <button
+        type="button"
+        class="menu-item group flex-1 text-slate-200 hover:bg-white/10 hover:text-white ring-1 ring-transparent"
+        :class="!isExpanded && !isHovered ? 'lg:justify-center' : 'lg:justify-start'"
+        title="Sign out"
+        @click="signOut"
+      >
+        <LogoutIcon class="text-slate-300 group-hover:text-white" />
+        <span v-if="isExpanded || isHovered || isMobileOpen" class="menu-item-text">Sign out</span>
+      </button>
     </div>
   </aside>
 </template>
@@ -221,6 +257,7 @@ import {
   ChevronDownIcon,
   HorizontalDots,
   LayoutDashboardIcon,
+  DashboardIcon,
   PlugInIcon,
   TaskIcon,
   TableIcon,
@@ -229,46 +266,81 @@ import {
   UserGroupIcon,
   BuildingIcon,
   WorkIcon,
+  LogoutIcon,
+  BookSheIfcon,
+  ClockIcon,
+  HierarchicalIcon,
+  FingerprintIcon,
+  EmployeesIcon,
+  GearIcon,
+  UserIcon,
 } from "@/icons";
 import { useSidebar } from "@/composables/useSidebar";
+import ThemeToggler from '@/components/common/ThemeToggler.vue'
 
 const route = useRoute();
 
-const { isExpanded, isMobileOpen, isHovered, openSubmenu } = useSidebar();
+const { isExpanded, isMobileOpen, isHovered, openSubmenu, toggleSidebar, toggleMobileSidebar } = useSidebar();
+
+const handleToggle = () => {
+  if (window.innerWidth >= 991) {
+    toggleSidebar()
+  } else {
+    toggleMobileSidebar()
+  }
+}
 
 const menuAdminGroups = [
   {
     title: "Overview",
     items: [
-      { icon: LayoutDashboardIcon, name: "Dashboard", path: "/main/dashboard" },
+      { icon: DashboardIcon, name: "Dashboard", path: "/main/dashboard" },
     ],
   },
   {
     title: "Attendance Ops",
     items: [
-      { icon: PlugInIcon, name: "Biometric Machines", path: "/main/machines" },
-      { icon: TaskIcon, name: "Biometric Report", path: "/main/reports/biometric" },
-      { icon: TableIcon, name: "Daily Attendance Monitoring", path: "/main/reports/daily-attendance" },
-      { icon: TableIcon, name: "Monthly Tardiness Report", path: "/main/reports/monthly-attendance" },
-      { icon: TableIcon, name: "Biometric Logs", path: "/main/biometric/logs" },
+      { icon: FingerprintIcon, name: "Biometric Machines", path: "/main/machines" },
+      {
+        icon: BookSheIfcon,
+        name: "Reports",
+        subItems: [
+          { name: "Biometric Report", path: "/main/reports/biometric" },
+          { name: "Daily Attendance Monitoring", path: "/main/reports/daily-attendance" },
+          { name: "Monthly Tardiness Report", path: "/main/reports/monthly-attendance" },
+          { name: "Biometric Logs", path: "/main/biometric/logs" },
+        ],
+      },
     ],
   },
   {
     title: "Workforce Setup",
     items: [
-      { icon: UserGroupIcon, name: "Users", path: "/main/users" },
-      { icon: WorkIcon, name: "Office Shift", path: "/main/office-shifts" },
-      { icon: WorkIcon, name: "Weekly Schedule Exceptions", path: "/main/weekly-schedules" },
-      { icon: WorkIcon, name: "Holidays", path: "/main/holidays" },
-      { icon: BuildingIcon, name: "Departments", path: "/main/departments" },
-      { icon: BuildingIcon, name: "Colleges", path: "/main/colleges" },
+      { icon: EmployeesIcon, name: "Users", path: "/main/users" },
+      {
+        icon: ClockIcon,
+        name: "Attendance Settings",
+        subItems: [
+          { name: "Office Shift", path: "/main/office-shifts" },
+          { name: "Weekly Schedule Exceptions", path: "/main/weekly-schedules" },
+          { name: "Holidays", path: "/main/holidays" },
+        ],
+      },
+      {
+        icon: HierarchicalIcon,
+        name: "Organizational Settings",
+        subItems: [
+          { name: "Departments", path: "/main/departments" },
+          { name: "Colleges", path: "/main/colleges" },
+        ],
+      },
     ],
   },
   {
     title: "Account & System",
     items: [
-      { icon: UserCircleIcon, name: "Profile", path: "/main/user/profile" },
-      { icon: SettingsIcon, name: "Settings", path: "/main/settings" },
+      { icon: UserIcon, name: "Profile", path: "/main/user/profile" },
+      { icon: GearIcon, name: "Settings", path: "/main/settings" },
     ],
   },
 ];
@@ -277,8 +349,8 @@ const menuUserGroups = computed(() => [
   {
     title: "My Workspace",
     items: [
-      { icon: LayoutDashboardIcon, name: "Dashboard", path: "/main/dashboard" },
-      { icon: UserCircleIcon, name: "Profile", path: "/main/user/profile" },
+      { icon: DashboardIcon, name: "Dashboard", path: "/main/dashboard" },
+      { icon: UserIcon, name: "Profile", path: "/main/user/profile" },
       { icon: TaskIcon, name: "My Biometric", path: `/main/users/${Number(user.value?.id || 0)}` },
     ],
   },
@@ -296,30 +368,17 @@ const menuGroups = computed(() => {
 
 const isActive = (path) => route.path === path
 
+const signOut = async () => {
+  await authStore.logout()
+}
+
 const toggleSubmenu = (groupIndex, itemIndex) => {
   const key = `${groupIndex}-${itemIndex}`
   openSubmenu.value = openSubmenu.value === key ? null : key
 }
 
-
-const isAnySubmenuRouteActive = computed(() => {
-  return menuGroups.value.some((group) =>
-    group.items.some(
-      (item) =>
-        item.subItems && item.subItems.some((subItem) => isActive(subItem.path))
-    )
-  );
-});
-
 const isSubmenuOpen = (groupIndex, itemIndex) => {
-  const key = `${groupIndex}-${itemIndex}`;
-  return (
-    openSubmenu.value === key ||
-    (isAnySubmenuRouteActive.value &&
-      menuGroups.value[groupIndex].items[itemIndex].subItems?.some((subItem) =>
-        isActive(subItem.path)
-      ))
-  )
+  return openSubmenu.value === `${groupIndex}-${itemIndex}`
 }
 
 const startTransition = (el) => {

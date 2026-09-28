@@ -64,7 +64,8 @@ function exportCsv() {
 <template>
     <div class="space-y-3 text-slate-800 dark:text-slate-200">
         <section
-            class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+            class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
+            <slot name="navigation" />
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 class="text-lg font-semibold dark:text-white">Absences, Tardiness and Undertimes</h1>
@@ -184,12 +185,12 @@ function exportCsv() {
     color: #64748b;
 }
 
-:global(.dark) .summary-table th {
+.dark .summary-table th {
     background: #172033;
 }
 
-:global(.dark) .summary-table th,
-:global(.dark) .summary-table td {
+.dark .summary-table th,
+.dark .summary-table td {
     border-color: #334155;
 }
 </style>

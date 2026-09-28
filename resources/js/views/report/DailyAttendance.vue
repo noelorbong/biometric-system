@@ -108,7 +108,7 @@ const cards = computed(() => [
 
 <template>
   <div class="space-y-3 text-slate-800 dark:text-slate-200">
-    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-lg font-semibold dark:text-white">Daily Attendance Monitoring</h1>
@@ -135,15 +135,8 @@ const cards = computed(() => [
         </div>
       </div>
       <p class="mt-2 text-xs text-slate-500">Counts are unique employees for the selected date and shift. Minutes include all their work periods.</p>
-    </section>
 
-    <div v-if="error" role="alert" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{ error }} <button type="button" @click="load" class="ml-2 underline">Retry</button></div>
-    <div v-if="report?.holidays.length" class="rounded-lg bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
-      <span v-for="holiday in report.holidays" :key="holiday.id" class="mr-3">{{ holiday.name }} · {{ holiday.duration.replaceAll('_', ' ') }} · {{ holiday.is_working_day ? 'Working' : 'Exempt from late / undertime' }}</span>
-    </div>
-
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]" :aria-busy="loading">
-      <div class="flex flex-wrap items-center gap-3 border-b border-slate-200 p-3 dark:border-slate-800">
+      <div class="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
         <h2 class="text-sm font-semibold">Employees <span v-if="report" class="font-normal text-slate-500">({{ employees.length }} / {{ report.employees.length }})</span></h2>
         <input v-model="search" type="search" aria-label="Search employees" placeholder="Search employee or shift…" class="h-9 rounded-md border border-slate-300 bg-transparent px-3 text-xs dark:border-slate-700" />
         <label class="flex items-center gap-2 text-xs"><input v-model="issuesOnly" type="checkbox" class="rounded border-slate-300" /> Issues only</label>
@@ -153,6 +146,15 @@ const cards = computed(() => [
           </select>
         </label>
       </div>
+    </section>
+
+    <div v-if="error" role="alert" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{ error }} <button type="button" @click="load" class="ml-2 underline">Retry</button></div>
+    <div v-if="report?.holidays.length" class="rounded-lg bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
+      <span v-for="holiday in report.holidays" :key="holiday.id" class="mr-3">{{ holiday.name }} · {{ holiday.duration.replaceAll('_', ' ') }} · {{ holiday.is_working_day ? 'Working' : 'Exempt from late / undertime' }}</span>
+    </div>
+
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]" :aria-busy="loading">
+
       <div class="overflow-x-auto">
         <table class="min-w-full text-left text-xs">
           <thead class="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">

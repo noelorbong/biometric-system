@@ -53,37 +53,39 @@ onMounted(() => loadLogs(null, 1))
 
 <template>
   <div class="space-y-3">
-    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-wrap items-center gap-2.5">
-        <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Logs</h1>
-        <span class="text-xs text-slate-500 dark:text-slate-400">Raw check-in and check-out records</span>
-        <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Server pagination</span>
-      </div>
-    </section>
-
-    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <form class="grid gap-2 sm:grid-cols-2 min-[800px]:grid-cols-5" @submit.prevent="loadLogs(null, 1)">
-        <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">From date
-          <input v-model="filters.date_from" type="date" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
-        </label>
-        <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">To date
-          <input v-model="filters.date_to" type="date" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
-        </label>
-        <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Check type
-          <select v-model="filters.checktype" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700"><option value="">All types</option><option value="I">Check in (I)</option><option value="O">Check out (O)</option></select>
-        </label>
-        <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Sensor ID
-          <input v-model.trim="filters.sensorid" type="text" placeholder="All sensors" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
-        </label>
-        <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Serial number
-          <input v-model.trim="filters.sn" type="text" placeholder="All serial numbers" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
-        </label>
-        <div class="flex gap-2 sm:col-span-2 min-[800px]:col-span-5 min-[800px]:justify-end">
-          <button type="button" class="h-8 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300" @click="resetFilters">Reset</button>
-          <button type="submit" class="h-8 rounded-md bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-500">Apply filters</button>
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+      <section>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Logs</h1>
+          <span class="text-xs text-slate-500 dark:text-slate-400">Raw check-in and check-out records</span>
+          <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Server pagination</span>
         </div>
-      </form>
-    </section>
+      </section>
+
+  <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
+        <form class="grid gap-2 sm:grid-cols-2 min-[800px]:grid-cols-5" @submit.prevent="loadLogs(null, 1)">
+          <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">From date
+            <input v-model="filters.date_from" type="date" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
+          </label>
+          <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">To date
+            <input v-model="filters.date_to" type="date" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
+          </label>
+          <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Check type
+            <select v-model="filters.checktype" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700"><option value="">All types</option><option value="I">Check in (I)</option><option value="O">Check out (O)</option></select>
+          </label>
+          <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Sensor ID
+            <input v-model.trim="filters.sensorid" type="text" placeholder="All sensors" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
+          </label>
+          <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Serial number
+            <input v-model.trim="filters.sn" type="text" placeholder="All serial numbers" class="mt-1 h-8 w-full rounded-md border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
+          </label>
+          <div class="flex gap-2 sm:col-span-2 min-[800px]:col-span-5 min-[800px]:justify-end">
+            <button type="button" class="h-8 rounded-md border border-slate-300 px-2.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300" @click="resetFilters">Reset</button>
+            <button type="submit" class="h-8 rounded-md bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-500">Apply filters</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <p v-if="error" class="m-3 rounded-md bg-rose-50 p-2 text-xs text-rose-700">{{ error }}</p>

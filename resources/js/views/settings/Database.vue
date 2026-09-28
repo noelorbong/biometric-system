@@ -372,9 +372,8 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <SettingsNav />
-
-    <section class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
+      <SettingsNav class="mb-3" />
       <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Database Settings</h2>
@@ -389,12 +388,6 @@ onMounted(async () => {
           {{ runningAutoBackupNow ? 'Running backup now...' : 'Run Auto Backup Now' }}
         </button>
       </div>
-
-      <div v-if="autoRunResult" class="mt-3 rounded-lg border px-3 py-2 text-xs" :class="autoRunResult.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'">
-        <p class="font-semibold">Exit code: {{ autoRunResult.exit_code }}</p>
-        <p v-if="autoRunResult.output" class="mt-1 whitespace-pre-line break-words">{{ autoRunResult.output }}</p>
-      </div>
-
       <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-900/40">
         <div class="grid gap-2 sm:grid-cols-3">
           <button
@@ -423,6 +416,17 @@ onMounted(async () => {
           </button>
         </div>
       </div>
+    </div>
+
+    <section class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
+
+
+      <div v-if="autoRunResult" class="mt-3 rounded-lg border px-3 py-2 text-xs" :class="autoRunResult.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'">
+        <p class="font-semibold">Exit code: {{ autoRunResult.exit_code }}</p>
+        <p v-if="autoRunResult.output" class="mt-1 whitespace-pre-line break-words">{{ autoRunResult.output }}</p>
+      </div>
+
+
 
       <div v-show="activePanel === 'auto'" class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
         <div class="flex items-center justify-between gap-3">

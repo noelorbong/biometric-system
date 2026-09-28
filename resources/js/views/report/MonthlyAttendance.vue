@@ -210,13 +210,14 @@ function printReport() {
 
 <template>
   <div class="monthly-attendance space-y-3 text-slate-800 dark:text-slate-200">
-    <nav class="flex w-fit border-b border-slate-200 text-sm dark:border-slate-700" aria-label="Monthly attendance reports">
+
+    <template v-if="activeTab === 'attendance'">
+    <section
+      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
+      <nav class="mb-3 flex flex-wrap w-fit border-b border-slate-200 text-sm dark:border-slate-700" aria-label="Monthly attendance reports">
       <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
       <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
     </nav>
-    <template v-if="activeTab === 'attendance'">
-    <section
-      class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 class="text-lg font-semibold dark:text-white">Monthly Tardiness and Undertime</h1>
@@ -335,14 +336,21 @@ function printReport() {
     </section>
     <AttendanceLogEditor v-if="editorContext" :context="editorContext" @close="editorContext = null" @saved="logSaved" />
     </template>
-    <AbsencesSummary v-else />
+    <AbsencesSummary v-else>
+      <template #navigation>
+        <nav class="mb-3 flex flex-wrap w-fit border-b border-slate-200 text-sm dark:border-slate-700" aria-label="Monthly attendance reports">
+      <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
+      <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
+    </nav>
+      </template>
+    </AbsencesSummary>
   </div>
 </template>
 
 <style scoped>
 .cell-edit { display: block; width: 100%; min-height: 22px; color: inherit; font: inherit; cursor: pointer; }
 .cell-edit:hover, .cell-edit:focus-visible { background: #e0f2fe; outline: 2px solid #38bdf8; outline-offset: -2px; }
-:global(.dark) .cell-edit:hover, :global(.dark) .cell-edit:focus-visible { background: #0c4a6e; }
+.dark .cell-edit:hover, .dark .cell-edit:focus-visible { background: #0c4a6e; }
 .tab-active { @apply border-b-2 border-sky-600 px-3 py-2 font-semibold text-sky-700 dark:border-sky-400 dark:text-sky-300; }
 .tab-inactive { @apply px-3 py-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200; }
 .action-button {
@@ -480,36 +488,36 @@ function printReport() {
   text-align: left;
 }
 
-:global(.dark) .month-grid th,
-:global(.dark) .month-grid .total-cell {
+.dark .month-grid th,
+.dark .month-grid .total-cell {
   background: #172033;
 }
 
-:global(.dark) .month-grid .employee-name {
+.dark .month-grid .employee-name {
   background: #111827;
 }
 
-:global(.dark) .month-grid th,
-:global(.dark) .month-grid td {
+.dark .month-grid th,
+.dark .month-grid td {
   border-color: #334155;
 }
 
-:global(.dark) .month-grid .weekend-cell,
-:global(.dark) .month-grid .holiday,
-:global(.dark) .month-grid .exempt {
+.dark .month-grid .weekend-cell,
+.dark .month-grid .holiday,
+.dark .month-grid .exempt {
   background: #1e293b;
 }
 
-:global(.dark) .month-grid .has-value,
-:global(.dark) .month-grid .weekend {
+.dark .month-grid .has-value,
+.dark .month-grid .weekend {
   color: #fca5a5;
 }
 
 .month-grid td.missing-record { background: #fef3c7; color: #92400e; font-weight: 600; }
-:global(.dark) .month-grid td.missing-record { background: #451a03; color: #fcd34d; }
+.dark .month-grid td.missing-record { background: #451a03; color: #fcd34d; }
 
 .month-grid td.holiday-cell { background: #e0f2fe; color: #075985; font-weight: 600; }
-:global(.dark) .month-grid td.holiday-cell { background: #0c4a6e; color: #7dd3fc; }
+.dark .month-grid td.holiday-cell { background: #0c4a6e; color: #7dd3fc; }
 
 @media (max-width: 800px) {
   .month-grid .total-cell {

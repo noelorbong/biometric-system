@@ -144,55 +144,57 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-3">
-    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Departments</h1>
-          <span class="text-xs text-slate-500 dark:text-slate-400">Department directory</span>
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+      <section>
+        <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Departments</h1>
+            <span class="text-xs text-slate-500 dark:text-slate-400">Department directory</span>
+          </div>
+          <!-- <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">
+            Add Department
+          </Button> -->
         </div>
-        <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">
-          Add Department
-        </Button>
-      </div>
-    </section>
+      </section>
 
-    <section class="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-1 text-xs">
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">Total</p>
-        <p class="font-semibold text-slate-900 dark:text-white">{{ totalDepartments }}</p>
-      </article>
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">Active</p>
-        <p class="font-semibold text-emerald-700 dark:text-emerald-300">{{ activeDepartments }}</p>
-      </article>
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">Inactive</p>
-        <p class="font-semibold text-slate-700 dark:text-slate-200">{{ inactiveDepartments }}</p>
-      </article>
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">Assigned Users</p>
-        <p class="font-semibold text-slate-900 dark:text-white">{{ assignedUsersTotal }}</p>
-      </article>
-    </section>
+  <section class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+        <article class="flex items-baseline gap-1.5">
+          <p class="font-medium text-slate-500 dark:text-slate-400">Total</p>
+          <p class="font-semibold text-slate-900 dark:text-white">{{ totalDepartments }}</p>
+        </article>
+        <article class="flex items-baseline gap-1.5">
+          <p class="font-medium text-slate-500 dark:text-slate-400">Active</p>
+          <p class="font-semibold text-emerald-700 dark:text-emerald-300">{{ activeDepartments }}</p>
+        </article>
+        <article class="flex items-baseline gap-1.5">
+          <p class="font-medium text-slate-500 dark:text-slate-400">Inactive</p>
+          <p class="font-semibold text-slate-700 dark:text-slate-200">{{ inactiveDepartments }}</p>
+        </article>
+        <article class="flex items-baseline gap-1.5">
+          <p class="font-medium text-slate-500 dark:text-slate-400">Assigned Users</p>
+          <p class="font-semibold text-slate-900 dark:text-white">{{ assignedUsersTotal }}</p>
+        </article>
+      </section>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center">
-        <div class="relative flex-1">
-          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.3 5.3a7.5 7.5 0 0011.35 11.35z" />
-          </svg>
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Search department..."
-            class="h-9 w-full rounded-md border border-slate-300 bg-transparent pl-9 pr-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
-          />
+  <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center">
+          <div class="relative flex-1">
+            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.3 5.3a7.5 7.5 0 0011.35 11.35z" />
+            </svg>
+            <input
+              v-model="search"
+              type="text"
+              placeholder="Search department..."
+              class="h-9 w-full rounded-md border border-slate-300 bg-transparent pl-9 pr-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+            />
+          </div>
+          <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'" size="sm" variant="primary" :startIcon="PlusIcon">
+            New Department
+          </Button>
         </div>
-        <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'" size="sm" variant="primary" :startIcon="PlusIcon">
-          New Department
-        </Button>
-      </div>
-    </section>
+      </section>
+    </div>
 
     <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="max-w-full overflow-x-auto custom-scrollbar">

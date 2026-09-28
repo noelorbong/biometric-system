@@ -390,9 +390,11 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <SettingsNav />
 
-    <section class="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] p-5 text-white shadow-sm dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)] lg:p-7">
+
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
+      <SettingsNav class="mb-3" />
+      <section class="p-2 text-white">
       <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
         <div class="max-w-3xl">
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">System Control Deck</p>
@@ -426,6 +428,7 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+    </div>
 
     <section class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
