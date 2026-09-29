@@ -147,7 +147,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-3">
-    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border p-3 pb-4 shadow-sm md:-mr-6 space-y-3">
       <section>
         <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -189,26 +189,26 @@ onMounted(async () => {
               v-model="search"
               type="text"
               placeholder="Search college..."
-              class="h-9 w-full rounded-md border border-slate-300 bg-transparent pl-9 pr-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+              class="h-9 w-full rounded border border-slate-300 bg-white pl-9 pr-3 text-xs text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white/90"
             />
           </div>
-          <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'" size="sm" variant="primary" :startIcon="PlusIcon">
+          <Button @click="openCreate" :className="'h-9 whitespace-nowrap rounded border border-cyan-600 bg-cyan-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 dark:border-cyan-500 dark:bg-cyan-500 dark:text-white'" size="sm" variant="primary" :startIcon="PlusIcon">
             New College
           </Button>
         </div>
       </section>
     </div>
 
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="max-w-full overflow-x-auto custom-scrollbar">
         <table class="min-w-full">
-          <thead class="bg-slate-50 dark:bg-slate-900/60">
+          <thead class="bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_50%,_#0891b2_100%)]">
             <tr>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Short</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Long</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">College Head</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</th>
-              <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Actions</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Short</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Long</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">College Head</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Status</th>
+              <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-100">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
@@ -218,7 +218,7 @@ onMounted(async () => {
               <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ college.college_head || '-' }}</td>
               <td class="px-3 py-1.5 text-xs">
                 <span
-                  class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  class="inline-flex rounded px-2 py-0.5 text-[10px] font-semibold"
                   :class="college.status
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                     : 'bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300'"
@@ -228,8 +228,8 @@ onMounted(async () => {
               </td>
               <td class="px-3 py-1.5">
                 <div class="flex items-center justify-end gap-1.5">
-                  <button @click="openEdit(college)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-sky-200 text-sky-600 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"><PencilIcon /></button>
-                  <button @click="openDelete(college)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
+                  <button @click="openEdit(college)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded border border-cyan-200 bg-white text-cyan-700 transition hover:bg-cyan-50 dark:border-cyan-800/60 dark:bg-slate-900 dark:text-cyan-300 dark:hover:bg-cyan-900/20"><PencilIcon /></button>
+                  <button @click="openDelete(college)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
                 </div>
               </td>
             </tr>
@@ -245,8 +245,8 @@ onMounted(async () => {
 
     <Modal v-if="isModalOpen" @close="isModalOpen = false">
       <template #body>
-        <div class="no-scrollbar relative w-full max-w-[700px] max-h-[90vh] overflow-y-auto m-2 rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-7">
-          <div class="mb-4 rounded-2xl bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0f766e_100%)] px-4 py-3 text-white">
+        <div class="no-scrollbar relative m-2 w-full max-w-[700px] max-h-[90vh] overflow-y-auto border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-gray-900 lg:p-6">
+          <div class="-m-4 mb-4 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0891b2_100%)] px-4 py-4 text-white lg:-m-6 lg:mb-5 lg:px-6">
             <h4 class="text-xl font-semibold">
             {{ isEdit ? 'Update College' : 'Add College' }}
             </h4>
@@ -260,18 +260,18 @@ onMounted(async () => {
             </div> -->
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">College Short</label>
-              <input v-model="form.college_short" type="text" class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20" />
+              <input v-model="form.college_short" type="text" class="h-11 w-full rounded border border-slate-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950" />
             </div>
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">College Long</label>
-              <input v-model="form.college_long" type="text" class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20" />
+              <input v-model="form.college_long" type="text" class="h-11 w-full rounded border border-slate-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950" />
             </div>
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">College Head</label>
-              <input v-model="form.college_head" type="text" class="h-11 w-full rounded-lg border border-slate-300 bg-transparent px-4 py-2.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20" />
+              <input v-model="form.college_head" type="text" class="h-11 w-full rounded border border-slate-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950" />
             </div>
 
-            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-400/10">
+            <div class="border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-400/10">
               <label class="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
                 <input v-model="form.status" type="checkbox" class="h-4 w-4" />
                 Active
@@ -280,8 +280,8 @@ onMounted(async () => {
           </div>
 
           <div class="mt-5 flex items-center gap-3 lg:justify-end">
-            <button @click="isModalOpen = false" type="button" class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto">Close</button>
-            <button @click="saveCollege" type="button" class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto">Save</button>
+            <button @click="isModalOpen = false" type="button" class="flex w-full justify-center rounded border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto">Close</button>
+            <button @click="saveCollege" type="button" class="flex w-full justify-center rounded bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 sm:w-auto">Save</button>
           </div>
         </div>
       </template>

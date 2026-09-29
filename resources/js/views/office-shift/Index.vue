@@ -195,16 +195,16 @@ const formatScheduleChip = (row) => {
 
 <template>
   <div class="space-y-3">
-    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border p-3 pb-4 shadow-sm md:-mr-6 space-y-3">
       <section>
         <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Office Shift</h1>
             <span class="text-xs text-slate-500 dark:text-slate-400">Shift templates and schedules</span>
           </div>
-          <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">
+          <!-- <Button @click="openCreate" :className="'h-9 whitespace-nowrap rounded border border-cyan-600 bg-cyan-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 dark:border-cyan-500 dark:bg-cyan-500 dark:text-white'" size="sm" variant="primary" :startIcon="PlusIcon">
             Add Office Shift
-          </Button>
+          </Button> -->
         </div>
       </section>
 
@@ -237,27 +237,27 @@ const formatScheduleChip = (row) => {
               v-model="search"
               type="text"
               placeholder="Search office shift..."
-              class="h-9 w-full rounded-md border border-slate-300 bg-transparent pl-9 pr-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+              class="h-9 w-full rounded border border-slate-300 bg-white pl-9 pr-3 text-xs text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white/90"
             />
           </div>
-          <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'" size="sm" variant="primary" :startIcon="PlusIcon">
+          <Button @click="openCreate" :className="'h-9 whitespace-nowrap rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'" size="sm" variant="primary" :startIcon="PlusIcon">
             New Shift
           </Button>
         </div>
       </section>
     </div>
 
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="max-w-full overflow-x-auto custom-scrollbar">
         <table class="min-w-full">
-          <thead class="bg-slate-50 dark:bg-slate-900/60">
+          <thead class="bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_50%,_#0891b2_100%)]">
             <tr>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Name</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Schedule</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Grace</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Type</th>
-              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Assigned Users</th>
-              <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Actions</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Name</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Schedule</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Grace</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Type</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Assigned Users</th>
+              <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-100">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
@@ -269,7 +269,7 @@ const formatScheduleChip = (row) => {
                   <p
 
 
-                    class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:border-sky-900/50 dark:bg-sky-900/20 dark:text-sky-300"
+                    class="inline-flex items-center border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-medium text-cyan-700 dark:border-cyan-900/50 dark:bg-cyan-900/20 dark:text-cyan-300"
                   >
                     {{ formatScheduleChip(row) }} 
                   </p> </br>
@@ -280,7 +280,7 @@ const formatScheduleChip = (row) => {
               <td class="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300">
                 <span
                   v-if="shift.grace_enabled"
-                  class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-400/10 dark:text-violet-300"
+                  class="inline-flex rounded border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-400/10 dark:text-violet-300"
                 >
                   -{{ shift.grace_before_minutes || 0 }} / +{{ shift.grace_after_minutes || 0 }} min
                 </span>
@@ -291,7 +291,7 @@ const formatScheduleChip = (row) => {
                   :class="shift.is_flexible
                     ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-400/10 dark:text-amber-300'
                     : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-400/10 dark:text-emerald-300'"
-                  class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  class="inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold"
                 >
                   {{ shift.is_flexible ? 'Flexible' : 'Fixed' }}
                 </span>
@@ -299,8 +299,8 @@ const formatScheduleChip = (row) => {
               <td class="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">{{ shift.users_count || 0 }}</td>
               <td class="px-3 py-1.5">
                 <div class="flex items-center justify-end gap-1.5">
-                  <button @click="openEdit(shift)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-sky-200 text-sky-600 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"><PencilIcon /></button>
-                  <button @click="openDelete(shift)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
+                  <button @click="openEdit(shift)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded border border-cyan-200 bg-white text-cyan-700 transition hover:bg-cyan-50 dark:border-cyan-800/60 dark:bg-slate-900 dark:text-cyan-300 dark:hover:bg-cyan-900/20"><PencilIcon /></button>
+                  <button @click="openDelete(shift)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
                 </div>
               </td>
             </tr>
@@ -316,8 +316,8 @@ const formatScheduleChip = (row) => {
 
     <Modal v-if="isModalOpen" @close="isModalOpen = false">
       <template #body>
-        <div class="no-scrollbar relative w-full max-w-[700px] max-h-[90vh] overflow-y-auto m-2 rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-7">
-          <div class="mb-4 rounded-2xl bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0f766e_100%)] px-4 py-3 text-white">
+        <div class="no-scrollbar relative m-2 w-full max-w-[760px] max-h-[90vh] overflow-y-auto border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-gray-900 lg:p-6">
+          <div class="-m-4 mb-4 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0891b2_100%)] px-4 py-4 text-white lg:-m-6 lg:mb-5 lg:px-6">
             <h4 class="text-xl font-semibold">
               {{ isEdit ? 'Update Office Shift' : 'Add Office Shift' }}
             </h4>
@@ -327,26 +327,26 @@ const formatScheduleChip = (row) => {
           <div class="space-y-3">
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Name</label>
-              <input v-model="form.name" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+              <input v-model="form.name" type="text" class="h-11 w-full rounded border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-gray-700 dark:bg-gray-950" />
             </div>
 
             <div>
               <div class="mb-1.5 flex items-center justify-between">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-400">Schedule Rows</label>
-                <button type="button" @click="addScheduleRow" :disabled="form.is_flexible" class="rounded-md border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-600 disabled:opacity-50 dark:bg-brand-500/10">
+                <button type="button" @click="addScheduleRow" :disabled="form.is_flexible" class="rounded border border-cyan-200 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300">
                   Add Row
                 </button>
               </div>
 
               <div class="space-y-2">
-                <div v-for="(row, idx) in form.schedules" :key="`schedule-${idx}`" class="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 sm:grid-cols-12 dark:border-gray-700 dark:bg-gray-900/40">
+                <div v-for="(row, idx) in form.schedules" :key="`schedule-${idx}`" class="grid grid-cols-1 gap-2 border border-gray-200 bg-gray-50 p-3 sm:grid-cols-12 dark:border-gray-700 dark:bg-gray-950/60">
                   <div class="sm:col-span-4">
                     <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300">Time In</label>
-                    <input v-model="row.time_in" :disabled="form.is_flexible" type="time" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:opacity-50 dark:bg-gray-950" />
+                    <input v-model="row.time_in" :disabled="form.is_flexible" type="time" class="h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900" />
                   </div>
                   <div class="sm:col-span-4">
                     <label class="mb-1 block text-xs text-gray-600 dark:text-gray-300">Time Out</label>
-                    <input v-model="row.time_out" :disabled="form.is_flexible" type="time" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm disabled:opacity-50 dark:bg-gray-950" />
+                    <input v-model="row.time_out" :disabled="form.is_flexible" type="time" class="h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900" />
                   </div>
                   <div class="sm:col-span-3 flex items-end">
                     <label class="inline-flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
@@ -355,7 +355,7 @@ const formatScheduleChip = (row) => {
                     </label>
                   </div>
                   <div class="sm:col-span-1 flex items-end justify-end">
-                    <button type="button" @click="removeScheduleRow(idx)" :disabled="form.is_flexible" class="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 disabled:opacity-50 dark:bg-red-500/10">
+                    <button type="button" @click="removeScheduleRow(idx)" :disabled="form.is_flexible" class="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
                       Remove
                     </button>
                   </div>
@@ -363,7 +363,7 @@ const formatScheduleChip = (row) => {
               </div>
             </div>
 
-            <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-400/10">
+            <div class="border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-400/10">
               <label class="inline-flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
                 <input v-model="form.is_flexible" type="checkbox" class="h-4 w-4" />
                 Flexible Time
@@ -371,7 +371,7 @@ const formatScheduleChip = (row) => {
               <p class="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">When enabled, schedule rows are ignored and users can clock in/out at any time.</p>
             </div>
 
-            <div class="rounded-xl border border-violet-200 bg-violet-50 px-3 py-3 dark:border-violet-800/40 dark:bg-violet-400/10">
+            <div class="border border-violet-200 bg-violet-50 px-3 py-3 dark:border-violet-800/40 dark:bg-violet-400/10">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <label class="inline-flex items-center gap-2 text-sm font-medium text-violet-700 dark:text-violet-300">
@@ -385,19 +385,19 @@ const formatScheduleChip = (row) => {
               <div class="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
                   <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Grace before scheduled time (minutes)</label>
-                  <input v-model.number="form.grace_before_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                  <input v-model.number="form.grace_before_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
                 </div>
                 <div>
                   <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Grace after scheduled time (minutes)</label>
-                  <input v-model.number="form.grace_after_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                  <input v-model.number="form.grace_after_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
                 </div>
               </div>
             </div>
           </div>
 
           <div class="mt-5 flex items-center gap-3 lg:justify-end">
-            <button @click="isModalOpen = false" type="button" class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto">Close</button>
-            <button @click="saveShift" type="button" class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto">Save</button>
+            <button @click="isModalOpen = false" type="button" class="flex w-full justify-center rounded border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto">Close</button>
+            <button @click="saveShift" type="button" class="flex w-full justify-center rounded bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 sm:w-auto">Save</button>
           </div>
         </div>
       </template>

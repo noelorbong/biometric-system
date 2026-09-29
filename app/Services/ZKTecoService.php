@@ -865,8 +865,8 @@ class ZKTecoService
     {
         $userId = (string) ($userId !== '' ? $userId : $uid);
 
-        // Common backup numbers observed for face capture across firmware variants.
-        $faceBackupCandidates = [111, 50, 12, 15];
+        // FacePro2 uses slot 50 for camera capture; retain legacy slots as fallbacks.
+        $faceBackupCandidates = [50, 111, 12, 15];
 
         $tcpUser = substr(str_pad($userId, 24, "\x00"), 0, 24);
         $numericUser = ctype_digit($userId) ? (int) $userId : $uid;
@@ -901,7 +901,10 @@ class ZKTecoService
         if ($this->sdk !== null) {
             // Setup, enable, event registration and trigger must share one
             // SDK connection; individual bridge calls would lose that state.
-            $this->sdk->request('enroll_face', ['user' => $user]);
+            $this->sdk->request('enroll_face', [
+                'user' => $user,
+                'capture_hold_seconds' => 45,
+            ]);
 
             return;
         }

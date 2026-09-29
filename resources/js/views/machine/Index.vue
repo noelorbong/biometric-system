@@ -15,6 +15,7 @@ const appSettingStore = useAppSettingStore()
 const { machines } = storeToRefs(machineStore)
 const search = ref('')
 const isModalOpen = ref(false)
+const isDiscoveryModalOpen = ref(false)
 const isDeleteModal = ref(false)
 const isEdit = ref(false)
 const selectedMachine = ref(null)
@@ -38,6 +39,12 @@ const clearingLogIds = ref(new Set())
 const pushingUsers = ref(false)
 const pushingUserIds = ref(new Set())
 const autoToggleIds = ref(new Set())
+const discoverySubnet = ref('')
+const discoveryStart = ref(1)
+const discoveryEnd = ref(254)
+const discoveryMachines = ref([])
+const discoveryLoading = ref(false)
+const discoveryMessage = ref('')
 const autoSyncDaemonStatus = ref({
   running: false,
   sleep: 1,
@@ -300,7 +307,7 @@ const defaultForm = () => ({
   ID: null,
   MachineAlias: '',
   ConnectType: 'TCP/IP',
-  IP: '10.210.18.83',
+  IP: '',
   SerialPort: '',
   Port: 4370,
   Baudrate: 115200,
@@ -333,6 +340,48 @@ const defaultForm = () => ({
 })
 
 const form = ref(defaultForm())
+
+const verifiedDiscoveryMachines = computed(() => discoveryMachines.value.filter((machine) => machine.verified))
+const reachableDiscoveryMachines = computed(() => discoveryMachines.value.filter((machine) => !machine.verified))
+
+const subnetFromIp = (ip) => {
+  const parts = String(ip || '').trim().split('.')
+
+  if (parts.length !== 4) {
+    return ''
+  }
+
+  const numbers = parts.map((part) => Number(part))
+
+  if (numbers.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return ''
+  }
+
+  const [first, second] = numbers
+  const isPrivate = first === 10
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+
+  if (!isPrivate) {
+    return ''
+  }
+
+  return numbers.slice(0, 3).join('.')
+}
+
+const defaultDiscoverySubnet = () => {
+  const hostSubnet = subnetFromIp(window.location.hostname)
+
+  if (hostSubnet) {
+    return hostSubnet
+  }
+
+  const savedMachineSubnet = machines.value
+    .map((machine) => subnetFromIp(machine.IP))
+    .find(Boolean)
+
+  return savedMachineSubnet || ''
+}
 
 const Toast = Swal.mixin({
   toast: true,
@@ -664,6 +713,15 @@ const openEdit = (machine) => {
   isModalOpen.value = true
 }
 
+const openDiscoveryScanner = () => {
+  if (!discoverySubnet.value) {
+    discoverySubnet.value = defaultDiscoverySubnet()
+  }
+
+  discoveryMessage.value = ''
+  isDiscoveryModalOpen.value = true
+}
+
 const openDelete = (machine) => {
   selectedMachine.value = machine
   isDeleteModal.value = true
@@ -706,6 +764,72 @@ const normalizePayload = () => ({
     : Number(form.value.AutoDownloadInterval),
   AutoDownloadUserFilter: form.value.AutoDownloadUserFilter === 'all' ? 'all' : 'existing',
 })
+
+const discoverMachines = async () => {
+  discoveryLoading.value = true
+  discoveryMessage.value = ''
+  discoveryMachines.value = []
+
+  const resp = await machineStore.discoverMachines({
+    subnet: discoverySubnet.value || null,
+    start: Number(discoveryStart.value) || 1,
+    end: Number(discoveryEnd.value) || 254,
+    port: Number(form.value.Port) || 4370,
+    timeout_ms: 180,
+    comm_password: form.value.CommPassword || null,
+  })
+
+  discoveryLoading.value = false
+
+  if (!resp.success) {
+    discoveryMessage.value = resp.data?.response?.data?.message || 'Machine discovery failed.'
+    Toast.fire({ icon: 'error', title: discoveryMessage.value })
+    return
+  }
+
+  discoverySubnet.value = resp.data?.subnet || discoverySubnet.value
+  discoveryMachines.value = resp.data?.machines || []
+  discoveryMessage.value = discoveryMachines.value.length
+    ? `Found ${discoveryMachines.value.length} reachable address${discoveryMachines.value.length === 1 ? '' : 'es'} on ${resp.data?.subnet || 'the network'}.`
+    : `No biometric machines were found on ${resp.data?.subnet || 'the selected network'}.`
+
+  Toast.fire({
+    icon: discoveryMachines.value.length ? 'success' : 'info',
+    title: discoveryMessage.value,
+  })
+}
+
+const useDiscoveredMachine = (machine) => {
+  const existingMachine = machines.value.find((item) => item.ID === machine.existing_machine?.ID || item.IP === machine.ip)
+
+  if (existingMachine) {
+    isDiscoveryModalOpen.value = false
+    openEdit(existingMachine)
+    Toast.fire({ icon: 'info', title: `Editing ${existingMachine.MachineAlias || existingMachine.IP}` })
+    return
+  }
+
+  isEdit.value = false
+  form.value = defaultForm()
+  form.value.IP = machine.ip
+  form.value.Port = machine.port || form.value.Port || 4370
+
+  if (!form.value.MachineAlias) {
+    form.value.MachineAlias = machine.device_name || machine.serial || `Machine ${machine.ip}`
+  }
+
+  if (machine.serial) form.value.sn = machine.serial
+  if (machine.firmware) form.value.FirmwareVersion = machine.firmware
+  if (machine.device_name) form.value.ProductType = machine.device_name
+  if (machine.product) form.value.ProduceKind = machine.product
+  if (Number.isFinite(Number(machine.user_count))) form.value.usercount = Number(machine.user_count)
+  if (Number.isFinite(Number(machine.finger_count))) form.value.fingercount = Number(machine.finger_count)
+  if (Number.isFinite(Number(machine.face_count))) form.value.SecretCount = Number(machine.face_count)
+
+  isDiscoveryModalOpen.value = false
+  isModalOpen.value = true
+  Toast.fire({ icon: 'success', title: `Using ${machine.ip}` })
+}
 
 const normalizeMachinePayload = (machine) => ({
   ID: machine.ID,
@@ -1720,6 +1844,10 @@ onUnmounted(() => {
             <RefreshIcon v-else class="h-3.5 w-3.5" />
             {{ pushingUsers ? 'Pushing…' : 'Push Users' }}
           </button>
+          <button @click="openDiscoveryScanner" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30">
+            <RefreshIcon class="h-3.5 w-3.5" />
+            IP Scanner
+          </button>
           <Button @click="openCreate" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary" :startIcon="PlusIcon">Add Machine</Button>
         </div>
       </div>
@@ -1958,23 +2086,123 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <Modal v-if="isAttendanceDatModalOpen" @close="closeAttendanceDatImport">
+    <Modal v-if="isDiscoveryModalOpen" @close="isDiscoveryModalOpen = false">
       <template #body>
-        <div class="no-scrollbar relative m-2 w-full max-w-[1100px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-7">
-          <div class="flex items-start justify-between gap-4">
+        <div class="no-scrollbar relative m-2 w-full max-w-[920px] max-h-[90vh] overflow-y-auto bg-white p-5 shadow-xl dark:bg-gray-900 lg:p-7">
+          <div class="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h4 class="text-2xl font-semibold text-gray-800 dark:text-white/90">Attendance Import</h4>
-              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload the original <strong>AttEncryptLog.dat</strong> or an exported <strong>CHECKINOUT.txt, CHECKINOUT.csv, or CHECKINOUT.xlsx</strong>. The app decodes/maps the rows, shows every record, and lets you export or import the result.</p>
+              <h4 class="text-xl font-semibold text-slate-900 dark:text-white">IP Scanner</h4>
+              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Scan the local network for biometric devices and add the detected IP.</p>
             </div>
-            <button type="button" @click="closeAttendanceDatImport" class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
+            <button type="button" @click="isDiscoveryModalOpen = false" class="h-9 border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Close</button>
           </div>
 
-          <div class="mt-6 grid gap-4 ">
+          <div class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_90px_90px_100px]">
+            <div>
+              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Subnet</label>
+              <input v-model="discoverySubnet" type="text" placeholder="Auto or 192.168.1" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Start</label>
+              <input v-model.number="discoveryStart" type="number" min="1" max="254" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">End</label>
+              <input v-model.number="discoveryEnd" type="number" min="1" max="254" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+            </div>
+            <div class="flex items-end">
+              <button
+                @click="discoverMachines"
+                :disabled="discoveryLoading"
+                type="button"
+                class="inline-flex h-10 w-full items-center justify-center gap-2 bg-cyan-600 px-3 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800"
+              >
+                <span v-if="discoveryLoading" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                {{ discoveryLoading ? 'Scanning' : 'Scan' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <span>Port: {{ form.Port || 4370 }}</span>
+            <span>Leave subnet blank to scan the server's local network.</span>
+          </div>
+
+          <div v-if="discoveryMessage" class="mt-4 border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+            {{ discoveryMessage }}
+          </div>
+
+          <div class="mt-5 overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div class="grid grid-cols-[1fr_110px_90px] border-b border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+              <span>Device</span>
+              <span>Status</span>
+              <span class="text-right">Action</span>
+            </div>
+
+            <div v-if="discoveryLoading" class="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              Scanning network...
+            </div>
+
+            <div v-else-if="verifiedDiscoveryMachines.length || reachableDiscoveryMachines.length" class="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-gray-900">
+              <div
+                v-for="machine in verifiedDiscoveryMachines"
+                :key="`scanner-verified-${machine.ip}`"
+                class="grid grid-cols-[1fr_110px_90px] items-center gap-3 px-3 py-3"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ machine.device_name || machine.serial || machine.ip }}</p>
+                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ machine.ip }}:{{ machine.port }}<span v-if="machine.firmware"> - {{ machine.firmware }}</span></p>
+                </div>
+                <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ machine.already_added ? 'Saved' : 'Verified' }}</span>
+                <button @click="useDiscoveredMachine(machine)" type="button" class="h-8 bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
+                  {{ machine.already_added ? 'Edit' : 'Add' }}
+                </button>
+              </div>
+
+              <div
+                v-for="machine in reachableDiscoveryMachines"
+                :key="`scanner-reachable-${machine.ip}`"
+                class="grid grid-cols-[1fr_110px_90px] items-center gap-3 px-3 py-3"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ machine.ip }}:{{ machine.port }}</p>
+                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">Port open, device info not verified</p>
+                </div>
+                <span class="text-xs font-semibold text-amber-600 dark:text-amber-400">{{ machine.already_added ? 'Saved' : 'Open Port' }}</span>
+                <button @click="useDiscoveredMachine(machine)" type="button" class="h-8 border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  {{ machine.already_added ? 'Edit' : 'Add' }}
+                </button>
+              </div>
+            </div>
+
+            <div v-else class="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              Run a scan to show reachable biometric devices.
+            </div>
+          </div>
+        </div>
+      </template>
+    </Modal>
+
+    <Modal v-if="isAttendanceDatModalOpen" @close="closeAttendanceDatImport">
+      <template #body>
+        <div class="no-scrollbar relative m-2 w-full max-w-[1120px] max-h-[90vh] overflow-y-auto border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-gray-900">
+          <div class="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h4 class="text-lg font-semibold text-slate-900 dark:text-white">Attendance Import</h4>
+                <span class="border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300">File Decoder</span>
+              </div>
+              <p class="mt-1 max-w-4xl text-xs leading-5 text-slate-500 dark:text-slate-400">Upload <strong>AttEncryptLog.dat</strong> or an exported <strong>CHECKINOUT.txt, CHECKINOUT.csv, or CHECKINOUT.xlsx</strong>. The app decodes, maps, previews, exports, and imports the records.</p>
+            </div>
+            <button type="button" @click="closeAttendanceDatImport" class="inline-flex h-9 items-center justify-center border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Close</button>
+          </div>
+
+          <div class="grid gap-4 p-4 lg:p-5">
             <div class="space-y-4">
-              <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-                <div>
-                  <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Attendance Export File</label>
-                  <input type="file" accept=".dat,.bin,.txt,.csv,.tsv,.xlsx" @change="onAttendanceDatFileChange" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <div class="border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                  <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Export File</label>
+                  <input type="file" accept=".dat,.bin,.txt,.csv,.tsv,.xlsx" @change="onAttendanceDatFileChange" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 file:mr-3 file:h-8 file:border-0 file:bg-slate-900 file:px-3 file:text-xs file:font-semibold file:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:file:bg-white dark:file:text-slate-900" />
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ attendanceDatFileName || 'No file selected' }}</p>
                 </div>
                 <div class="hidden">
@@ -1998,15 +2226,15 @@ onUnmounted(() => {
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Optional: paste an already-decoded table. Header names are auto-mapped, even when exported columns are interchanged.</p>
               </div>
 
-              <div class="flex flex-wrap gap-3">
+              <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
                   @click="loadAttendanceDatPreview"
                   :disabled="attendanceDatLoading || !attendanceDatHasInput"
-                  class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-medium transition"
+                  class="inline-flex h-9 items-center gap-2 border px-3 text-xs font-semibold transition"
                   :class="attendanceDatLoading || !attendanceDatHasInput
-                    ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                    : 'bg-sky-600 text-white hover:bg-sky-500'"
+                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800'
+                    : 'border-cyan-600 bg-cyan-600 text-white hover:bg-cyan-500'"
                 >
                   <span v-if="attendanceDatLoading" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   <RefreshIcon v-else class="h-4 w-4" />
@@ -2017,10 +2245,10 @@ onUnmounted(() => {
                   type="button"
                   @click="importAttendanceDat"
                   :disabled="attendanceDatImporting || attendanceDatLoading || !attendanceDatHasInput"
-                  class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-medium transition"
+                  class="inline-flex h-9 items-center gap-2 border px-3 text-xs font-semibold transition"
                   :class="attendanceDatImporting || attendanceDatLoading || !attendanceDatHasInput
-                    ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                    : 'bg-emerald-600 text-white hover:bg-emerald-500'"
+                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800'
+                    : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-500'"
                 >
                   <span v-if="attendanceDatImporting" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                   <RefreshIcon v-else class="h-4 w-4" />
@@ -2031,31 +2259,31 @@ onUnmounted(() => {
                   v-if="attendanceDatPreview"
                   type="button"
                   @click="exportAttendanceDatCsv"
-                  class="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-700 px-4 text-sm font-medium text-white transition hover:bg-slate-600"
+                  class="inline-flex h-9 items-center gap-2 border border-slate-700 bg-slate-700 px-3 text-xs font-semibold text-white transition hover:bg-slate-600"
                 >
                   Export Decoded CSV
                 </button>
               </div>
 
-              <p v-if="attendanceDatError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
+              <p v-if="attendanceDatError" class="border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
                 {{ attendanceDatError }}
               </p>
 
-              <div v-if="attendanceDatProgressVisible" class="rounded-2xl border border-sky-200 bg-sky-50/80 px-4 py-3 dark:border-sky-900/40 dark:bg-sky-900/20">
+              <div v-if="attendanceDatProgressVisible" class="border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-sm font-medium text-sky-800 dark:text-sky-200">
+                  <p class="text-sm font-medium text-slate-800 dark:text-slate-200">
                     {{ attendanceDatProgress?.message || (attendanceDatImporting ? 'Importing attendance records...' : 'Preparing import...') }}
                   </p>
-                  <span class="text-xs font-semibold text-sky-700 dark:text-sky-300">{{ attendanceDatProgressText }}</span>
+                  <span class="text-xs font-semibold text-cyan-700 dark:text-cyan-300">{{ attendanceDatProgressText }}</span>
                 </div>
 
-                <div class="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-sky-100 dark:bg-sky-900/40">
+                <div class="mt-3 h-2 w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                   <div
                     v-if="Number(attendanceDatProgress?.total || 0) > 0"
-                    class="h-full rounded-full bg-sky-500 transition-all duration-300"
+                    class="h-full bg-cyan-500 transition-all duration-300"
                     :style="{ width: `${attendanceDatProgressPercent}%` }"
                   ></div>
-                  <div v-else class="h-full w-full rounded-full bg-sky-400/70 animate-pulse"></div>
+                  <div v-else class="h-full w-full animate-pulse bg-cyan-400/70"></div>
                 </div>
 
                 <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-4">
@@ -2067,47 +2295,47 @@ onUnmounted(() => {
               </div>
 
               <div v-if="attendanceDatPreview" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+                <div class="border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
                   <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Decoded</p>
                   <p class="mt-1 text-lg font-semibold text-slate-800 dark:text-white">{{ attendanceDatPreview.total || 0 }}</p>
                 </div>
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+                <div class="border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-900/10">
                   <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Importable</p>
                   <p class="mt-1 text-lg font-semibold text-emerald-700 dark:text-emerald-300">{{ attendanceDatPreview.importable || 0 }}</p>
                 </div>
-                <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-900/10">
+                <div class="border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-900/10">
                   <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Unmapped</p>
                   <p class="mt-1 text-lg font-semibold text-amber-700 dark:text-amber-300">{{ attendanceDatPreview.unmapped || 0 }}</p>
                 </div>
-                <div class="rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 dark:border-sky-900/40 dark:bg-sky-900/10">
-                  <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Pages</p>
-                  <p class="mt-1 text-lg font-semibold text-sky-700 dark:text-sky-300">{{ attendanceDatTotalPages }}</p>
+                <div class="border border-cyan-200 bg-cyan-50 px-3 py-2 dark:border-cyan-900/40 dark:bg-cyan-900/10">
+                  <p class="text-[11px] font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">Pages</p>
+                  <p class="mt-1 text-lg font-semibold text-cyan-700 dark:text-cyan-300">{{ attendanceDatTotalPages }}</p>
                 </div>
               </div>
 
-              <div v-if="attendanceDatPreview" class="rounded-[24px] border border-slate-200 dark:border-slate-800">
+              <div v-if="attendanceDatPreview" class="border border-slate-200 dark:border-slate-800">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
                   <div class="text-sm text-slate-600 dark:text-slate-300">
                     Showing <strong>{{ ((attendanceDatPage - 1) * attendanceDatPageSize) + 1 }}</strong>-<strong>{{ Math.min(attendanceDatPage * attendanceDatPageSize, attendanceDatRows.length) }}</strong>
                     of <strong>{{ attendanceDatRows.length }}</strong>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage - 1)" :disabled="attendanceDatPage <= 1" class="rounded-xl px-3 py-2 text-sm font-medium" :class="attendanceDatPage <= 1 ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800' : 'bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'">Prev</button>
+                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage - 1)" :disabled="attendanceDatPage <= 1" class="border px-3 py-1.5 text-xs font-semibold" :class="attendanceDatPage <= 1 ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">Prev</button>
                     <span class="min-w-20 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">{{ attendanceDatPage }} / {{ attendanceDatTotalPages }}</span>
-                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage + 1)" :disabled="attendanceDatPage >= attendanceDatTotalPages" class="rounded-xl px-3 py-2 text-sm font-medium" :class="attendanceDatPage >= attendanceDatTotalPages ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800' : 'bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700'">Next</button>
+                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage + 1)" :disabled="attendanceDatPage >= attendanceDatTotalPages" class="border px-3 py-1.5 text-xs font-semibold" :class="attendanceDatPage >= attendanceDatTotalPages ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">Next</button>
                   </div>
                 </div>
 
                 <div class="max-h-[48vh] overflow-auto">
                   <table class="min-w-full divide-y divide-slate-200 text-left text-xs dark:divide-slate-800">
-                    <thead class="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-900/90">
+                    <thead class="sticky top-0 bg-slate-900 text-white dark:bg-slate-800">
                       <tr>
-                        <th class="px-3 py-2 font-semibold">USERID</th>
-                        <th class="px-3 py-2 font-semibold">CHECKTIME</th>
-                        <th class="px-3 py-2 font-semibold">CHECKTYPE</th>
-                        <th class="px-3 py-2 font-semibold">VERIFYCODE</th>
-                        <th class="px-3 py-2 font-semibold">SENSORID</th>
-                        <th class="px-3 py-2 font-semibold">WORKCODE</th>
+                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">USERID</th>
+                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">CHECKTIME</th>
+                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">CHECKTYPE</th>
+                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">VERIFYCODE</th>
+                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">SENSORID</th>
+                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">WORKCODE</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
@@ -2124,7 +2352,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <p v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT, text, CSV, or Excel attendance file to preview the decoded rows.</p>
+              <p v-else class="border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT, text, CSV, or Excel attendance file to preview the decoded rows.</p>
             </div>
           </div>
         </div>

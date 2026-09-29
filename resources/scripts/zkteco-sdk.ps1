@@ -133,6 +133,9 @@ function Invoke-FingerprintEnrollment($device, $parameters) {
                 throw "Cannot create device user (SDK error $(Get-SdkError))."
             }
         }
+        if (-not $device.RefreshData(1)) {
+            throw "Cannot refresh user data before face enrollment (SDK error $(Get-SdkError))."
+        }
         if (-not $device.EnableDevice(1, $true)) { throw "Cannot enable scanner (SDK error $(Get-SdkError))." }
         $disabled = $false
         if (-not $device.RegEvent(1, 65535)) { throw "Cannot register enrollment events (SDK error $(Get-SdkError))." }
@@ -158,8 +161,8 @@ function Invoke-FaceEnrollment($device, $parameters) {
         throw 'A user PIN is required for face enrollment.'
     }
 
-    # Backup numbers observed for face capture across firmware variants.
-    $faceBackupCandidates = @(111, 50, 12, 15)
+    # FacePro2 uses slot 50 for camera capture; retain legacy slots as fallbacks.
+    $faceBackupCandidates = @(50, 111, 12, 15)
 
     $disabled = $false
     $started = $false
@@ -270,6 +273,12 @@ try {
         $result = @{ ok = $true; data = (Invoke-FingerprintEnrollment $zk $request.parameters) }
     } elseif ($request.operation -eq 'enroll_face') {
         $result = @{ ok = $true; data = (Invoke-FaceEnrollment $zk $request.parameters) }
+        $holdSeconds = [Math]::Min(55, [Math]::Max(0, [int]$request.parameters.capture_hold_seconds))
+        if ($holdSeconds -gt 0) {
+            # FacePro2 cancels remote face enrollment when the SDK session closes.
+            # Keep this request connected while the user completes on-device capture.
+            [Threading.Thread]::Sleep($holdSeconds * 1000)
+        }
     } elseif ($request.operation -eq 'cancel_enrollment') {
         $result = @{ ok = $true; data = (Stop-FingerprintEnrollment $zk) }
     } elseif ($request.operation -eq 'fingerprint_template') {

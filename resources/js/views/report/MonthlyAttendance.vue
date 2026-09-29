@@ -31,6 +31,7 @@ const pickerConfig = {
   plugins: [new monthSelectPlugin({ dateFormat: 'Y-m', altFormat: 'F Y' })],
   altInput: true,
 }
+const leaveTypes = ['cto', 'vacation', 'sick', 'spl', 'without_pay']
 let requestId = 0
 let controller
 
@@ -159,25 +160,256 @@ async function logSaved() {
   notice.value = report.value ? 'Attendance log saved. Monthly totals have been recalculated.' : 'Attendance log saved. Refresh the report to see the updated totals.'
 }
 const reportNote = computed(() => `${selectedShiftName.value}. Each work period counts separately. IN = late minutes; OUT = undertime minutes. ${report.value?.provisional ? 'Provisional: the reporting month or its final overnight shift is not complete. ' : ''}H = Holiday. M = Missing. A = Filed absence. Unfiled absences show their assessed minutes. ? = excluded rest day. M = no attendance recorded for a completed work period. Future/pending periods and exemptions are not marked missing. Effective-dated schedules, weekly exceptions, and holiday/suspension exemptions apply. Configured rest days are excluded from monthly totals and missing-record checks. Leave rules are not configured.`)
+const leaveLabel = type => ({ cto: 'CTO', vacation: 'Vacation', sick: 'Sick', spl: 'SPL', without_pay: 'W/out Pay' }[type] || 'Unclassified')
+const durationValue = duration => duration === 'whole_day' ? 1 : 0.5
+const durationLabel = duration => duration === 'whole_day' ? '' : duration === 'morning' ? ' AM' : ' PM'
+const numberValue = value => Number.isInteger(value) ? value : Number(value || 0).toFixed(1)
+const absencesRows = computed(() => {
+  const term = search.value.trim().toLowerCase()
 
-function exportCsv() {
-  if (!report.value) return
-  // Quote every field and neutralize spreadsheet formulas in employee/shift names.
-  const csvCell = value => {
-    const text = String(value ?? '')
-    return `"${(/^[\s]*[=+\-@]/.test(text) ? "'" + text : text).replaceAll('"', '""')}"`
+  return (report.value?.employees || []).map(employee => {
+    const absences = employee.days.filter(day => day.absence).map(day => ({ date: day.date, ...day.absence }))
+    const leaveTotals = Object.fromEntries(leaveTypes.map(type => [type, 0]))
+
+    for (const absence of absences) {
+      leaveTotals[absence.leave_type || 'without_pay'] += durationValue(absence.duration)
+    }
+
+    return {
+      id: employee.id,
+      name: employee.name,
+      shift: employee.shift_name,
+      filed: absences.filter(absence => absence.status === 'filed').length,
+      daysAbsent: absences.reduce((sum, absence) => sum + durationValue(absence.duration), 0),
+      dates: absences.map(absence => `${new Date(`${absence.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${durationLabel(absence.duration)} (${leaveLabel(absence.leave_type || 'without_pay')})`).join(', '),
+      ...leaveTotals,
+      times: employee.late_count + employee.undertime_count,
+      late_count: employee.late_count,
+      undertime_count: employee.undertime_count,
+      hours: Math.floor(employee.total_minutes / 60),
+      minutes: employee.total_minutes % 60,
+    }
+  }).filter(row => !term || `${row.name} ${row.shift}`.toLowerCase().includes(term))
+})
+
+const splitEmployeeName = (name) => {
+  const text = String(name || '').trim()
+  const commaIndex = text.indexOf(',')
+
+  if (commaIndex >= 0) {
+    const last = text.slice(0, commaIndex + 1).trim()
+    const rest = text.slice(commaIndex + 1).trim().split(/\s+/).filter(Boolean)
+    const middle = rest.length > 1 ? rest.pop() : ''
+
+    return [last, rest.join(' '), middle]
   }
-  const lines = [
-    ['Monthly Tardiness and Undertime', report.value.month_label, selectedShiftName.value],
-    [reportNote.value],
-    ['Employee name', 'Shift', ...dayColumns.value.map(c => `${c.day.date} ${c.period.label} ${c.direction.toUpperCase()}`), 'Total minutes', 'Times tardy', 'Times undertime'],
-    ...rows.value.map(row => [row.name, row.shift_name, ...row.cells.map(c => c.display), row.total_minutes, row.late_count, row.undertime_count]),
+
+  const parts = text.split(/\s+/).filter(Boolean)
+  const last = parts.length > 1 ? `${parts.pop()},` : text
+  const middle = parts.length > 1 ? parts.pop() : ''
+
+  return [last, parts.join(' '), middle]
+}
+
+const excelCell = (cell, defaultStyleId = 'Cell') => {
+  const normalized = Array.isArray(cell)
+    ? { value: cell[0], styleId: cell[1] || defaultStyleId, type: cell[2] || null }
+    : typeof cell === 'object' && cell !== null && !('nodeType' in cell)
+      ? cell
+      : { value: cell, styleId: defaultStyleId, type: null }
+  const value = normalized.value
+  const styleId = normalized.styleId || defaultStyleId
+  const type = normalized.type || null
+  const isNumber = type === 'Number' || (type === null && typeof value === 'number' && Number.isFinite(value))
+  const dataType = isNumber ? 'Number' : 'String'
+  const text = String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+  const mergeAcross = Number(normalized.mergeAcross || 0)
+  const mergeDown = Number(normalized.mergeDown || 0)
+  const index = Number(normalized.index || 0)
+  const mergeAttrs = `${index > 0 ? ` ss:Index="${index}"` : ''}${mergeAcross > 0 ? ` ss:MergeAcross="${mergeAcross}"` : ''}${mergeDown > 0 ? ` ss:MergeDown="${mergeDown}"` : ''}`
+
+  return `<Cell ss:StyleID="${styleId}"${mergeAttrs}><Data ss:Type="${dataType}">${text}</Data></Cell>`
+}
+
+const excelRow = (cells, styleId = 'Cell') => {
+  return `<Row>${cells.map(cell => excelCell(cell, styleId)).join('')}</Row>`
+}
+
+const excelSheet = (name, rowsXml, columnWidths = []) => {
+  const columns = columnWidths.map(width => `<Column ss:Width="${width}"/>`).join('')
+  const escapedName = String(name).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+
+  return `<Worksheet ss:Name="${escapedName}"><Table>${columns}${rowsXml.join('')}</Table></Worksheet>`
+}
+
+const excelWorkbook = (worksheets) => `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Cell"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Left" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Right" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Top" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/></Borders><Font ss:FontName="Arial" ss:Size="8"/></Style>
+  <Style ss:ID="Title"><Font ss:FontName="Arial" ss:Size="12" ss:Bold="1"/><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Note"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="8" ss:Italic="1" ss:Color="#444444"/></Style>
+  <Style ss:ID="Header"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#111111" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/></Borders></Style>
+  <Style ss:ID="TemplateTitle"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="11" ss:Bold="1"/></Style>
+  <Style ss:ID="TemplateSubTitle"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="9" ss:Bold="1"/></Style>
+  <Style ss:ID="TemplateHeader"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="7" ss:Bold="1"/><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#000000"/></Borders></Style>
+  <Style ss:ID="Name"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>
+  <Style ss:ID="NameCell"><Alignment ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="8"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Left" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Right" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Top" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/></Borders></Style>
+  <Style ss:ID="Total"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/><Interior ss:Color="#EDEDED" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Issue"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1" ss:Color="#B91C1C"/></Style>
+  <Style ss:ID="Holiday"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1" ss:Color="#000000"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Left" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Right" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/><Border ss:Position="Top" ss:LineStyle="Dot" ss:Weight="1" ss:Color="#777777"/></Borders></Style>
+  <Style ss:ID="Weekend"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Interior ss:Color="#EDEDED" ss:Pattern="Solid"/></Style>
+  <Style ss:ID="Missing"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="8" ss:Bold="1" ss:Color="#92400E"/><Interior ss:Color="#FEF3C7" ss:Pattern="Solid"/></Style>
+ </Styles>
+ ${worksheets.join('')}
+</Workbook>`
+
+function exportExcel() {
+  if (!report.value) return
+
+  const daySpans = report.value.days.map(day => ({
+    day,
+    excluded: excludedDate(day),
+    span: excludedDate(day) ? 2 : 4,
+  }))
+  const workdayColumns = daySpans.flatMap(({ day, excluded }) => {
+    if (excluded) {
+      return [{ day, spacer: true }, { day, spacer: true }]
+    }
+
+    const dayCells = rows.value[0]?.cells.filter(cell => cell.date === day.date) || []
+    const amIn = dayCells.find(cell => cell.label === 'AM' && cell.direction === 'in')
+    const amOut = dayCells.find(cell => cell.label === 'AM' && cell.direction === 'out')
+    const pmIn = dayCells.find(cell => cell.label === 'PM' && cell.direction === 'in')
+    const pmOut = dayCells.find(cell => cell.label === 'PM' && cell.direction === 'out')
+
+    return [
+      { day, label: 'AM', direction: 'in', fallback: amIn },
+      { day, label: 'AM', direction: 'out', fallback: amOut },
+      { day, label: 'PM', direction: 'in', fallback: pmIn },
+      { day, label: 'PM', direction: 'out', fallback: pmOut },
+    ]
+  })
+  const dayColumnCount = daySpans.reduce((sum, item) => sum + item.span, 0)
+  const monthTitle = `For the Month of ${String(report.value.month_label || '').toUpperCase()}`
+  const groupTitle = shiftId.value ? selectedShiftName.value : 'ADMIN Employees'
+  const blankDayCells = count => Array.from({ length: count }, () => '')
+  const tardinessRows = [
+    // excelRow([{ value: 'SAMAR STATE UNIVERSITY', styleId: 'TemplateTitle', mergeAcross: 3 }]),
+    // excelRow([{ value: 'Arteche Blvd., Catbalogan City, Philippines 6700', styleId: 'TemplateSubTitle', mergeAcross: 3 }]),
+    // excelRow([{ value: 'OVPAF | Human Resource Management Office', styleId: 'TemplateSubTitle', mergeAcross: 3 }]),
+    excelRow([]),
+    excelRow([]),
+    excelRow([{ index: 5, value: "MONTHLY REPORT ON EMPLOYEE'S TARDINESS", styleId: 'TemplateTitle', mergeAcross: Math.max(0, dayColumnCount - 1) }]),
+    excelRow([{ index: 5, value: `(  ${groupTitle} )`, styleId: 'TemplateSubTitle', mergeAcross: Math.max(0, dayColumnCount - 1) }]),
+    excelRow([]),
+    excelRow([
+      { value: 'Employee Name', styleId: 'TemplateHeader', mergeAcross: 3, mergeDown: 3 },
+      { value: monthTitle, styleId: 'TemplateHeader', mergeAcross: Math.max(0, dayColumnCount - 1) },
+      { value: 'TOTAL NO. OF MINUTES (Tardy / Undertimes)', styleId: 'TemplateHeader', mergeDown: 4 },
+      { value: 'TOTAL NO. OF TIMES TARDY', styleId: 'TemplateHeader', mergeDown: 4 },
+      { value: 'TOTAL NO. OF TIMES UNDERTIMES', styleId: 'TemplateHeader', mergeDown: 4 },
+    ]),
+    excelRow([
+      ...daySpans.map(({ day, span, excluded }, index) => ({ index: index === 0 ? 5 : 0, value: day.day, styleId: excluded ? 'Weekend' : 'TemplateHeader', mergeAcross: span - 1, mergeDown: 1 })),
+    ]),
+    excelRow([]),
+    excelRow(daySpans.flatMap(({ excluded }, index) => excluded
+      ? [{ index: index === 0 ? 5 : 0, value: '', styleId: 'Weekend', mergeAcross: 1 }]
+      : [
+        { index: index === 0 ? 5 : 0, value: 'AM', styleId: 'TemplateHeader', mergeAcross: 1 },
+        { value: 'PM', styleId: 'TemplateHeader', mergeAcross: 1 },
+      ])),
+    excelRow(workdayColumns.map((column, index) => column.spacer
+      ? { index: index === 0 ? 5 : 0, value: '', styleId: 'Weekend' }
+      : { index: index === 0 ? 5 : 0, value: column.direction === 'in' ? 'I' : 'O', styleId: 'TemplateHeader' })),
+    ...rows.value.map((row, index) => {
+      const cellsByDateLabel = new Map(row.cells.map(cell => [`${cell.date}-${cell.label}-${cell.direction}`, cell]))
+      const [lastName, firstName, middleName] = splitEmployeeName(row.name)
+
+      return excelRow([
+        [index + 1, 'Cell', 'Number'],
+        [lastName, 'NameCell'],
+        [firstName, 'NameCell'],
+        [middleName, 'NameCell'],
+        ...workdayColumns.map(column => {
+          if (column.spacer) return ['', 'Weekend']
+          const cell = cellsByDateLabel.get(`${column.day.date}-${column.label}-${column.direction}`)
+
+          if (!cell) return ['', 'Cell']
+          if (cell.holiday || cell.exempt) return ['', 'Holiday']
+          if (cell.missing || cell.filedAbsence) return ['', 'Cell']
+          if (cell.value) return [cell.display, 'Issue']
+          return [cell.display, 'Cell']
+        }),
+        [row.total_minutes, 'Total', 'Number'],
+        [row.late_count, 'Total', 'Number'],
+        [row.undertime_count, 'Total', 'Number'],
+      ])
+    }),
   ]
-  const blob = new Blob(['\uFEFF' + lines.map(line => line.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+
+  const absencesSheetRows = [
+    excelRow([]),
+    excelRow([ '', '', { value: 'Republic of the Philippines', styleId: 'TemplateSubTitle', mergeAcross: 2 }]),
+    excelRow([ '', '', { value: 'SAMAR STATE UNIVERSITY', styleId: 'TemplateTitle', mergeAcross: 2 }]),
+    excelRow([ '', '', { value: 'Catbalogan City, Samar', styleId: 'TemplateSubTitle', mergeAcross: 2 }]),
+    excelRow([{ value: 'REPORT OF ABSENCES / TARDINESS / UNDERTIMES', styleId: 'TemplateTitle', mergeAcross: 16 }]),
+    excelRow([{ value: `For the Month of ${report.value.month_label}`, styleId: 'TemplateSubTitle', mergeAcross: 16 }]),
+    excelRow([]),
+    excelRow([
+      { value: 'Employee Name', styleId: 'TemplateHeader', mergeAcross: 3, mergeDown: 2 },
+      { value: 'Number of Times Filed', styleId: 'TemplateHeader', mergeDown: 2 },
+      { value: 'Number of Days Absent', styleId: 'TemplateHeader', mergeDown: 2 },
+      { value: 'Date Absent', styleId: 'TemplateHeader', mergeDown: 2 },
+      { value: 'Total Number of Days Absent', styleId: 'TemplateHeader', mergeAcross: 4, mergeDown: 1 },
+      { value: 'Total number of Times Undertime', styleId: 'TemplateHeader', mergeDown: 2 },
+      { value: 'Total number of Times Tardy', styleId: 'TemplateHeader', mergeDown: 2 },
+      { value: 'Total Number of Hours / Minutes Undertime / Tardy', styleId: 'TemplateHeader', mergeAcross: 1, mergeDown: 1 },
+      { value: 'Remarks', styleId: 'TemplateHeader', mergeDown: 2 },
+    ]),
+    excelRow([]),
+    excelRow([
+      ...leaveTypes.map((type, index) => ({ index: index === 0 ? 8 : 0, value: leaveLabel(type), styleId: 'TemplateHeader' })),
+      { index: 15, value: 'Hours', styleId: 'TemplateHeader' },
+      { value: 'Minutes', styleId: 'TemplateHeader' },
+    ]),
+    ...absencesRows.value.map((row, index) => {
+      const [lastName, firstName, middleName] = splitEmployeeName(row.name)
+
+      return excelRow([
+      [index + 1, 'Cell', 'Number'],
+      [lastName, 'NameCell'],
+      [firstName, 'NameCell'],
+      [middleName, 'NameCell'],
+      [row.filed, 'Cell', 'Number'],
+      [numberValue(row.daysAbsent), 'Cell', 'Number'],
+      row.dates || '-',
+      ...leaveTypes.map(type => [numberValue(row[type]), 'Cell', 'Number']),
+      [row.undertime_count || 0, 'Total', 'Number'],
+      [row.late_count || 0, 'Total', 'Number'],
+      [row.hours, 'Total', 'Number'],
+      [row.minutes, 'Total', 'Number'],
+      '',
+    ])
+    }),
+  ]
+
+  const workbook = excelWorkbook([
+    excelSheet('Monthly Tardiness', tardinessRows, [28, 88, 110, 32, ...workdayColumns.map(column => column.spacer ? 18 : 20), 72, 72, 80]),
+    excelSheet('Absences and tardiness', absencesSheetRows, [28, 88, 110, 32, 64, 64, 230, 58, 70, 58, 58, 70, 72, 72, 52, 58, 84]),
+  ])
+  const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `monthly-tardiness-${report.value.month}-${shiftId.value || 'all'}.csv`
+  link.download = `monthly-tardiness-report-${report.value.month}-${shiftId.value || 'all'}.xls`
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
@@ -227,8 +459,8 @@ function printReport() {
         <div class="flex flex-wrap gap-2">
           <button type="button" @click="load" :disabled="loading" class="action-button">{{ loading ? 'Loading…' :
             'Refresh' }}</button>
-          <button type="button" @click="exportCsv" :disabled="!report || !rows.length" class="action-button">Export
-            CSV</button>
+          <button type="button" @click="exportExcel" :disabled="!report || !rows.length" class="action-button">Export
+            Excel</button>
           <button type="button" @click="printReport" :disabled="!report || !rows.length" class="action-button">Print /
             PDF</button>
         </div>

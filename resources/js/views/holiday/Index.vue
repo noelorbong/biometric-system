@@ -64,41 +64,41 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-3">
-    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6 space-y-3">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border p-3 pb-4 shadow-sm md:-mr-6 space-y-3">
       <section>
         <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Holidays</h1>
             <span class="text-xs text-slate-500 dark:text-slate-400">{{ holidays.length }} configured</span>
           </div>
-          <Button @click="openCreate" :className="'h-9 whitespace-nowrap border border-sky-200 bg-sky-50 px-2.5 text-xs text-sky-700 hover:bg-sky-100 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'" size="sm" variant="primary" :startIcon="PlusIcon">Add Holiday</Button>
+          <Button @click="openCreate" :className="'h-9 whitespace-nowrap rounded border border-cyan-600 bg-cyan-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 dark:border-cyan-500 dark:bg-cyan-500 dark:text-white'" size="sm" variant="primary" :startIcon="PlusIcon">Add Holiday</Button>
         </div>
       </section>
 
   <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
-        <input v-model="search" type="search" placeholder="Search holiday..." class="h-9 w-full rounded-md border border-slate-300 bg-transparent px-3 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90" />
+        <input v-model="search" type="search" placeholder="Search holiday..." class="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white/90" />
       </section>
     </div>
 
-    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="overflow-x-auto">
         <table class="min-w-full">
-          <thead class="bg-slate-50 dark:bg-slate-900/60"><tr>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Date</th>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Holiday</th>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Type</th>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Duration</th>
-            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Attendance</th>
-            <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Actions</th>
+          <thead class="bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_50%,_#0891b2_100%)]"><tr>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Date</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Holiday</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Type</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Duration</th>
+            <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Attendance</th>
+            <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-100">Actions</th>
           </tr></thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
             <tr v-for="holiday in filteredHolidays" :key="holiday.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
               <td class="whitespace-nowrap px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-100">{{ holiday.holiday_date }}</td>
               <td class="px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200">{{ holiday.name }}</td>
               <td class="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300">{{ typeLabel(holiday.type) }}</td>
-              <td class="px-3 py-1.5"><span class="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">{{ durationLabel(holiday.duration) }}</span></td>
+              <td class="px-3 py-1.5"><span class="rounded border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-700 dark:border-cyan-900/50 dark:bg-cyan-900/30 dark:text-cyan-300">{{ durationLabel(holiday.duration) }}</span></td>
               <td class="px-3 py-1.5"><span class="rounded px-1.5 py-0.5 text-[10px] font-semibold" :class="holiday.is_working_day ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'">{{ holiday.is_working_day ? 'Working day' : 'Non-working' }}</span></td>
-              <td class="px-3 py-1.5"><div class="flex justify-end gap-1.5"><button @click="openEdit(holiday)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300"><PencilIcon /></button><button @click="openDelete(holiday)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300"><TrashIcon /></button></div></td>
+              <td class="px-3 py-1.5"><div class="flex justify-end gap-1.5"><button @click="openEdit(holiday)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded border border-cyan-200 bg-white text-cyan-700 hover:bg-cyan-50 dark:border-cyan-800/60 dark:bg-slate-900 dark:text-cyan-300"><PencilIcon /></button><button @click="openDelete(holiday)" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded border border-rose-200 bg-white text-rose-600 hover:bg-rose-50 dark:border-rose-800/60 dark:bg-slate-900 dark:text-rose-300"><TrashIcon /></button></div></td>
             </tr>
             <tr v-if="!filteredHolidays.length"><td colspan="6" class="px-3 py-5 text-center text-xs text-slate-500">No holidays found.</td></tr>
           </tbody>
@@ -106,7 +106,56 @@ onMounted(async () => {
       </div>
     </section>
 
-    <Modal v-if="isModalOpen" @close="isModalOpen = false"><template #body><div class="relative m-2 w-full max-w-lg rounded-xl bg-white p-4 dark:bg-gray-900"><h4 class="text-base font-semibold text-slate-900 dark:text-white">{{ isEdit ? 'Update Holiday' : 'Add Holiday' }}</h4><div class="mt-3 grid gap-3 sm:grid-cols-2"><label class="sm:col-span-2 text-xs font-medium text-slate-700 dark:text-slate-300">Name<input v-model="form.name" type="text" class="mt-1 h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" /></label><label class="text-xs font-medium text-slate-700 dark:text-slate-300">Date<input v-model="form.holiday_date" type="date" class="mt-1 h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" /></label><label class="text-xs font-medium text-slate-700 dark:text-slate-300">Type<select v-model="form.type" class="mt-1 h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700"><option value="regular">Regular</option><option value="special_non_working">Special Non-working</option><option value="special_working">Special Working</option></select></label><label class="text-xs font-medium text-slate-700 dark:text-slate-300">Duration<select v-model="form.duration" class="mt-1 h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700"><option value="full_day">Full Day</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option></select></label><label class="flex items-end gap-2 pb-2 text-xs font-medium text-slate-700 dark:text-slate-300"><input v-model="form.is_working_day" type="checkbox" class="h-3.5 w-3.5" /> Working day</label><label class="sm:col-span-2 text-xs font-medium text-slate-700 dark:text-slate-300">Notes<textarea v-model="form.notes" rows="2" class="mt-1 w-full rounded-md border border-slate-300 bg-transparent px-2 py-1.5 text-xs dark:border-slate-700" /></label></div><div class="mt-4 flex justify-end gap-2"><button type="button" @click="isModalOpen = false" class="h-8 rounded-md border border-slate-300 px-2.5 text-xs dark:border-slate-700">Cancel</button><button type="button" @click="saveHoliday" class="h-8 rounded-md bg-sky-600 px-2.5 text-xs font-medium text-white hover:bg-sky-500">Save</button></div></div></template></Modal>
+    <Modal v-if="isModalOpen" @close="isModalOpen = false">
+      <template #body>
+        <div class="relative m-2 w-full max-w-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-gray-900 lg:p-6">
+          <div class="-m-4 mb-4 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_45%,_#0891b2_100%)] px-4 py-4 text-white lg:-m-6 lg:mb-5 lg:px-6">
+            <h4 class="text-lg font-semibold">{{ isEdit ? 'Update Holiday' : 'Add Holiday' }}</h4>
+            <p class="mt-0.5 text-xs text-white/80">Configure date coverage and attendance treatment.</p>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Name
+              <input v-model="form.name" type="text" class="mt-1 h-10 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+            </label>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Date
+              <input v-model="form.holiday_date" type="date" class="mt-1 h-10 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+            </label>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Type
+              <select v-model="form.type" class="mt-1 h-10 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <option value="regular">Regular</option>
+                <option value="special_non_working">Special Non-working</option>
+                <option value="special_working">Special Working</option>
+              </select>
+            </label>
+            <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Duration
+              <select v-model="form.duration" class="mt-1 h-10 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <option value="full_day">Full Day</option>
+                <option value="morning">Morning</option>
+                <option value="afternoon">Afternoon</option>
+              </select>
+            </label>
+            <label class="flex items-end gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+              <input v-model="form.is_working_day" type="checkbox" class="h-4 w-4" />
+              Working day
+            </label>
+            <label class="sm:col-span-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Notes
+              <textarea v-model="form.notes" rows="3" class="mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+            </label>
+          </div>
+
+          <div class="mt-5 flex justify-end gap-2">
+            <button type="button" @click="isModalOpen = false" class="h-9 rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Cancel</button>
+            <button type="button" @click="saveHoliday" class="h-9 rounded bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-500">Save</button>
+          </div>
+        </div>
+      </template>
+    </Modal>
     <ModalDelete v-if="isDeleteModal" head="Holiday" :data="selectedHoliday" :text="selectedHoliday?.name || ''" @close="isDeleteModal = false" @delete="deleteHoliday" />
   </div>
 </template>

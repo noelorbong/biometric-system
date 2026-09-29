@@ -76,6 +76,7 @@ Route::post('/machines', [MachineController::class, 'index'])->middleware('auth:
 Route::post('/machine/store', [MachineController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/machine/update', [MachineController::class, 'update'])->middleware('auth:sanctum');
 Route::post('/machine/delete', [MachineController::class, 'delete'])->middleware('auth:sanctum');
+Route::post('/machine/discover', [MachineController::class, 'discover'])->middleware('auth:sanctum');
 Route::post('/machine/connect', [MachineController::class, 'testConnection'])->middleware('auth:sanctum');
 Route::post('/machine/auto-sync-status', [MachineController::class, 'autoSyncStatus'])->middleware('auth:sanctum');
 Route::post('/machine/sync-attendance', [MachineController::class, 'syncAttendance'])->middleware('auth:sanctum');

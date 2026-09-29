@@ -33,7 +33,7 @@ const daemonConfigHint = computed(() => {
 </script>
 
 <template>
-  <aside class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+  <aside class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
     <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Quick Notes</h3>
     <ul class="mt-3 space-y-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
       <li>Timer values are clamped between 250ms and 300000ms on save.</li>
@@ -41,7 +41,7 @@ const daemonConfigHint = computed(() => {
       <li>Changes apply globally and are used by machine monitoring screens.</li>
     </ul>
 
-    <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+    <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
       <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Required Patch Commands</h3>
       <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
         Super Admin can run required maintenance commands directly from this panel.
@@ -60,7 +60,7 @@ const daemonConfigHint = computed(() => {
         type="button"
         @click="props.onRunMaintenancePatch()"
         :disabled="props.patching"
-        class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30"
+        class="mt-3 inline-flex h-10 w-full items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30"
       >
         {{ props.patching ? 'Running Patch...' : 'Run Required Patch' }}
       </button>
@@ -78,7 +78,7 @@ const daemonConfigHint = computed(() => {
       </div>
     </div>
 
-    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+    <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
       <div class="flex items-start justify-between gap-3">
         <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Attendance Daemon ({{ daemonPlatformLabel }})</h3>
         <button
@@ -114,7 +114,7 @@ const daemonConfigHint = computed(() => {
         type="button"
         @click="props.onInstallDaemon()"
         :disabled="props.daemonInstalling"
-        class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900/40 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+        class="mt-3 inline-flex h-10 w-full items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900/40 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
       >
         {{ props.daemonInstalling ? 'Installing Daemon...' : 'Install / Repair Daemon Service' }}
       </button>
@@ -132,7 +132,7 @@ const daemonConfigHint = computed(() => {
       </div>
     </div>
 
-    <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+    <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
       <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">System Update</h3>
       <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
         Pull latest code from main branch.
@@ -146,7 +146,7 @@ const daemonConfigHint = computed(() => {
         type="button"
         @click="props.onRunSystemUpdate()"
         :disabled="props.updating"
-        class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+        class="mt-3 inline-flex h-10 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
       >
         {{ props.updating ? 'Running Update...' : 'Run System Update' }}
       </button>

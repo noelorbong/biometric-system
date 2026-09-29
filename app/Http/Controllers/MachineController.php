@@ -97,6 +97,117 @@ class MachineController extends Controller
         ]);
     }
 
+    public function discover(Request $request)
+    {
+        $validated = $request->validate([
+            'subnet' => ['nullable', 'string', 'max:15'],
+            'start' => ['nullable', 'integer', 'min:1', 'max:254'],
+            'end' => ['nullable', 'integer', 'min:1', 'max:254'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'timeout_ms' => ['nullable', 'integer', 'min:80', 'max:1500'],
+            'comm_password' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $subnet = $this->normalizeDiscoverySubnet($validated['subnet'] ?? null)
+            ?? $this->inferDiscoverySubnet();
+
+        if (!$subnet) {
+            return response()->json([
+                'message' => 'Unable to detect a local subnet. Enter the first three IP parts, for example 192.168.1.',
+            ], 422);
+        }
+
+        $start = (int) ($validated['start'] ?? 1);
+        $end = (int) ($validated['end'] ?? 254);
+
+        if ($start > $end) {
+            [$start, $end] = [$end, $start];
+        }
+
+        $port = (int) ($validated['port'] ?? 4370);
+        $timeoutMs = (int) ($validated['timeout_ms'] ?? 180);
+        $password = blank($validated['comm_password'] ?? null) ? '0' : (string) $validated['comm_password'];
+        $existingByIp = Machine::query()
+            ->whereNotNull('IP')
+            ->get(['ID', 'MachineAlias', 'IP'])
+            ->keyBy('IP');
+
+        $machines = [];
+
+        for ($host = $start; $host <= $end; $host++) {
+            $ip = "{$subnet}.{$host}";
+
+            if (!$this->tcpPortOpen($ip, $port, $timeoutMs)) {
+                continue;
+            }
+
+            $device = [
+                'ip' => $ip,
+                'port' => $port,
+                'reachable' => true,
+                'verified' => false,
+                'already_added' => $existingByIp->has($ip),
+                'existing_machine' => $existingByIp->has($ip) ? [
+                    'ID' => $existingByIp[$ip]->ID,
+                    'MachineAlias' => $existingByIp[$ip]->MachineAlias,
+                ] : null,
+                'device_name' => null,
+                'serial' => null,
+                'firmware' => null,
+                'product' => null,
+                'user_count' => null,
+                'finger_count' => null,
+                'face_count' => null,
+                'info' => null,
+                'error' => null,
+            ];
+
+            $zk = new ZKTecoService(
+                ip: $ip,
+                port: $port,
+                timeout: 2,
+                password: $password
+            );
+
+            try {
+                $zk->connect();
+                $info = $zk->getDeviceInfo();
+                $zk->disconnect();
+
+                $device['verified'] = true;
+                $device['info'] = $info;
+                $device['device_name'] = $info['DeviceName'] ?? $info['Platform'] ?? null;
+                $device['serial'] = $info['SerialNumber'] ?? null;
+                $device['firmware'] = $info['FirmVer'] ?? null;
+                $device['product'] = $info['ProduceKind'] ?? $info['Platform'] ?? null;
+                $device['user_count'] = isset($info['UserCount']) && is_numeric($info['UserCount']) ? (int) $info['UserCount'] : null;
+                $device['finger_count'] = isset($info['FPCount']) && is_numeric($info['FPCount']) ? (int) $info['FPCount'] : null;
+                $device['face_count'] = isset($info['FaceCount']) && is_numeric($info['FaceCount']) ? (int) $info['FaceCount'] : null;
+            } catch (\Throwable $e) {
+                try {
+                    $zk->disconnect();
+                } catch (\Throwable) {
+                    //
+                }
+
+                $device['error'] = $e->getMessage();
+            }
+
+            $machines[] = $device;
+        }
+
+        return response()->json([
+            'subnet' => $subnet,
+            'port' => $port,
+            'range' => [
+                'start' => $start,
+                'end' => $end,
+            ],
+            'scanned' => $end - $start + 1,
+            'machines' => $machines,
+        ]);
+    }
+
     /**
      * Test connectivity to the biometric device and return its live info.
      */
@@ -3093,6 +3204,79 @@ class MachineController extends Controller
         }
 
         return implode('', $chunks);
+    }
+
+    private function normalizeDiscoverySubnet(?string $subnet): ?string
+    {
+        $subnet = trim((string) $subnet);
+
+        if ($subnet === '') {
+            return null;
+        }
+
+        if (filter_var($subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $subnet);
+            array_pop($parts);
+
+            return implode('.', $parts);
+        }
+
+        if (preg_match('/^(?:25[0-5]|2[0-4]\d|1?\d?\d)\.(?:25[0-5]|2[0-4]\d|1?\d?\d)\.(?:25[0-5]|2[0-4]\d|1?\d?\d)$/', $subnet)) {
+            return $subnet;
+        }
+
+        return null;
+    }
+
+    private function inferDiscoverySubnet(): ?string
+    {
+        $candidates = array_filter(array_unique([
+            gethostbyname(gethostname()),
+            $_SERVER['SERVER_ADDR'] ?? null,
+            $_SERVER['LOCAL_ADDR'] ?? null,
+        ]));
+
+        foreach ($candidates as $ip) {
+            if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                continue;
+            }
+
+            if (!$this->isPrivateIpv4($ip)) {
+                continue;
+            }
+
+            $parts = explode('.', $ip);
+            array_pop($parts);
+
+            return implode('.', $parts);
+        }
+
+        return null;
+    }
+
+    private function isPrivateIpv4(string $ip): bool
+    {
+        return filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false && !str_starts_with($ip, '127.');
+    }
+
+    private function tcpPortOpen(string $ip, int $port, int $timeoutMs): bool
+    {
+        $errno = 0;
+        $errstr = '';
+        $timeout = max(0.08, $timeoutMs / 1000);
+        $socket = @fsockopen($ip, $port, $errno, $errstr, $timeout);
+
+        if (!$socket) {
+            return false;
+        }
+
+        fclose($socket);
+
+        return true;
     }
 
     private function rules(?int $ignoreId = null): array

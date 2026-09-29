@@ -350,22 +350,69 @@ const rememberUploadMachineIds = (machineIds) => {
 }
 
 const chooseMachineAction = async (selectedUser) => {
+  const actions = [
+    {
+      value: 'upload',
+      title: 'Upload User + Template',
+      description: 'Send the user profile and saved biometric templates to one or more machines.',
+      badge: 'Sync',
+    },
+    {
+      value: 'fingerprint',
+      title: 'Register Fingerprint',
+      description: 'Start fingerprint enrollment on a selected biometric machine.',
+      badge: 'Enroll',
+    },
+    {
+      value: 'face',
+      title: 'Register Face',
+      description: 'Start face registration and wait for the saved face template.',
+      badge: 'Capture',
+    },
+  ]
+
+  const actionHtml = actions.map((action, index) => `
+    <label class="machine-action-card ${index === 0 ? 'is-selected' : ''}" data-machine-action-card>
+      <input type="radio" name="machine-action" value="${action.value}" ${index === 0 ? 'checked' : ''} />
+      <span class="machine-action-mark"></span>
+      <span class="machine-action-copy">
+        <span class="machine-action-title">${action.title}</span>
+        <span class="machine-action-description">${action.description}</span>
+      </span>
+      <span class="machine-action-badge">${action.badge}</span>
+    </label>
+  `).join('')
+
   return Swal.fire({
     title: 'Choose Machine Action',
-    html: `<p class="text-sm text-gray-600">Select what you want to do for <strong>${selectedUser.name}</strong>.</p>`,
-    input: 'select',
-    inputOptions: {
-      upload: 'Upload User + Template',
-      fingerprint: 'Register Fingerprint',
-      face: 'Register Face',
-    },
-    inputValue: 'upload',
-    inputPlaceholder: 'Choose machine action',
+    html: `
+      <div class="machine-action-dialog">
+        <p class="machine-action-subtitle">Select what you want to do for <strong>${selectedUser.name}</strong>.</p>
+        <div class="machine-action-list">${actionHtml}</div>
+      </div>
+    `,
     showCancelButton: true,
     confirmButtonText: 'Continue',
+    cancelButtonText: 'Cancel',
     focusConfirm: false,
+    customClass: {
+      popup: 'machine-action-popup',
+      title: 'machine-action-heading',
+      confirmButton: 'machine-action-confirm',
+      cancelButton: 'machine-action-cancel',
+      actions: 'machine-action-buttons',
+    },
+    didOpen: () => {
+      const cards = Array.from(document.querySelectorAll('[data-machine-action-card]'))
+      cards.forEach((card) => {
+        card.addEventListener('click', () => {
+          cards.forEach((item) => item.classList.remove('is-selected'))
+          card.classList.add('is-selected')
+        })
+      })
+    },
     preConfirm: () => {
-      const value = Swal.getInput()?.value
+      const value = document.querySelector('input[name="machine-action"]:checked')?.value
       if (!value) {
         Swal.showValidationMessage('Select a machine action.')
         return false
@@ -380,15 +427,23 @@ const chooseUploadMachines = async (selectedUser, availableMachines) => {
   const rememberedMachineIds = getRememberedUploadMachineIds()
   const machineHtml = availableMachines.map((machine) => {
     const inputId = `machine-upload-${machine.ID}`
-    const checked = rememberedMachineIds.includes(Number(machine.ID)) ? 'checked' : ''
+    const isChecked = rememberedMachineIds.includes(Number(machine.ID))
+    const checked = isChecked ? 'checked' : ''
+    const meta = [
+      machine.IP ? `IP ${machine.IP}` : null,
+      machine.Port ? `Port ${machine.Port}` : null,
+      machine.SerialNumber ? `SN ${machine.SerialNumber}` : null,
+    ].filter(Boolean).join(' · ')
 
     return `
-      <label for="${inputId}" class="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left hover:bg-slate-50 cursor-pointer">
-        <input id="${inputId}" type="checkbox" value="${machine.ID}" ${checked} class="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-        <span>
-          <span class="block text-sm font-medium text-slate-800">${buildMachineLabel(machine)}</span>
-          <span class="block text-xs text-slate-500">Upload this user's basic info and saved template rows.</span>
+      <label for="${inputId}" class="machine-action-card ${isChecked ? 'is-selected' : ''}" data-upload-machine-card>
+        <input id="${inputId}" type="checkbox" value="${machine.ID}" ${checked} />
+        <span class="machine-action-checkmark"></span>
+        <span class="machine-action-copy">
+          <span class="machine-action-title">${buildMachineLabel(machine)}</span>
+          <span class="machine-action-description">${meta || 'Upload this user and saved template rows.'}</span>
         </span>
+        <span class="machine-action-badge">Upload</span>
       </label>
     `
   }).join('')
@@ -396,28 +451,50 @@ const chooseUploadMachines = async (selectedUser, availableMachines) => {
   return Swal.fire({
     title: 'Select Upload Machines',
     html: `
-      <div class="space-y-3 text-left">
-        <p class="text-sm text-gray-600">Choose one or more machines for <strong>${selectedUser.name}</strong>.</p>
-        <label for="upload-machine-select-all" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 cursor-pointer">
-          <input id="upload-machine-select-all" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-          <span class="text-sm font-medium text-slate-700">Select All</span>
+      <div class="machine-action-dialog">
+        <p class="machine-action-subtitle">Choose one or more machines for <strong>${selectedUser.name}</strong>.</p>
+        <label for="upload-machine-select-all" class="machine-action-select-all">
+          <input id="upload-machine-select-all" type="checkbox" />
+          <span class="machine-action-checkmark"></span>
+          <span class="machine-action-select-all-copy">
+            <span>Select All</span>
+            <small>Toggle every available upload target</small>
+          </span>
         </label>
-        <div id="upload-machine-list" class="space-y-2 max-h-72 overflow-y-auto pr-1">${machineHtml}</div>
+        <div id="upload-machine-list" class="machine-action-list machine-action-scroll">${machineHtml}</div>
       </div>
     `,
     showCancelButton: true,
     confirmButtonText: 'Upload Selected Machines',
+    cancelButtonText: 'Cancel',
     focusConfirm: false,
+    customClass: {
+      popup: 'machine-action-popup',
+      title: 'machine-action-heading',
+      confirmButton: 'machine-action-confirm',
+      cancelButton: 'machine-action-cancel',
+      actions: 'machine-action-buttons',
+    },
     didOpen: () => {
       const selectAll = document.getElementById('upload-machine-select-all')
       const checkboxes = Array.from(document.querySelectorAll('#upload-machine-list input[type="checkbox"]'))
+      const cards = Array.from(document.querySelectorAll('[data-upload-machine-card]'))
+
+      const syncCards = () => {
+        cards.forEach((card) => {
+          const input = card.querySelector('input[type="checkbox"]')
+          card.classList.toggle('is-selected', Boolean(input?.checked))
+        })
+      }
 
       const syncSelectAll = () => {
         const checkedCount = checkboxes.filter((input) => input.checked).length
         if (selectAll) {
           selectAll.checked = checkedCount > 0 && checkedCount === checkboxes.length
           selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length
+          selectAll.closest('.machine-action-select-all')?.classList.toggle('is-selected', checkedCount > 0)
         }
+        syncCards()
       }
 
       if (selectAll) {
@@ -455,22 +532,58 @@ const chooseUploadMachines = async (selectedUser, availableMachines) => {
 
 const chooseRegisterMachine = async (selectedUser, availableMachines, registrationType = 'fingerprint') => {
   const registrationLabel = registrationType === 'face' ? 'face registration' : 'fingerprint registration'
-  const machineOptions = availableMachines.reduce((carry, machine) => {
-    carry[machine.ID] = buildMachineLabel(machine)
-    return carry
-  }, {})
+  const machineHtml = availableMachines.map((machine, index) => {
+    const label = buildMachineLabel(machine)
+    const isFirst = index === 0
+    const meta = [
+      machine.IP ? `IP ${machine.IP}` : null,
+      machine.Port ? `Port ${machine.Port}` : null,
+      machine.SerialNumber ? `SN ${machine.SerialNumber}` : null,
+    ].filter(Boolean).join(' · ')
+
+    return `
+      <label class="machine-action-card ${isFirst ? 'is-selected' : ''}" data-machine-card>
+        <input type="radio" name="registration-machine" value="${machine.ID}" ${isFirst ? 'checked' : ''} />
+        <span class="machine-action-mark"></span>
+        <span class="machine-action-copy">
+          <span class="machine-action-title">${label}</span>
+          <span class="machine-action-description">${meta || 'Ready for registration'}</span>
+        </span>
+        <span class="machine-action-badge">${registrationType === 'face' ? 'Face' : 'Finger'}</span>
+      </label>
+    `
+  }).join('')
 
   return Swal.fire({
     title: 'Select Registration Machine',
-    html: `<p class="text-sm text-gray-600">Choose one biometric device for ${registrationLabel} of <strong>${selectedUser.name}</strong>.</p>`,
-    input: 'select',
-    inputOptions: machineOptions,
-    inputPlaceholder: 'Choose target machine',
+    html: `
+      <div class="machine-action-dialog">
+        <p class="machine-action-subtitle">Choose one biometric device for ${registrationLabel} of <strong>${selectedUser.name}</strong>.</p>
+        <div class="machine-action-list">${machineHtml}</div>
+      </div>
+    `,
     showCancelButton: true,
     confirmButtonText: 'Continue',
+    cancelButtonText: 'Cancel',
     focusConfirm: false,
+    customClass: {
+      popup: 'machine-action-popup',
+      title: 'machine-action-heading',
+      confirmButton: 'machine-action-confirm',
+      cancelButton: 'machine-action-cancel',
+      actions: 'machine-action-buttons',
+    },
+    didOpen: () => {
+      const cards = Array.from(document.querySelectorAll('[data-machine-card]'))
+      cards.forEach((card) => {
+        card.addEventListener('click', () => {
+          cards.forEach((item) => item.classList.remove('is-selected'))
+          card.classList.add('is-selected')
+        })
+      })
+    },
     preConfirm: () => {
-      const value = Swal.getInput()?.value
+      const value = document.querySelector('input[name="registration-machine"]:checked')?.value
       if (!value) {
         Swal.showValidationMessage('Target machine is required.')
         return false
@@ -1054,15 +1167,15 @@ const closeEnrollModal = () => {
             </svg>
           </button>
           <input id="search_button" type="text" v-model="search_user" placeholder="Search name, email, or contact"
-            class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500" />
+            class="h-9 w-full rounded border border-white/15 bg-slate-950/30 py-2 pl-11 pr-4 text-sm font-medium text-white shadow-inner outline-none transition placeholder:text-slate-400 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/30" />
           </div>
           <div class="grid grid-cols-3 gap-2 sm:flex sm:items-center">
-            <Button @click="addUser" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary"
+            <Button @click="addUser" :className="'h-9 justify-center whitespace-nowrap rounded border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="primary"
               :startIcon="PlusIcon">User</Button>
-            <Button @click="openImportUserDatModal" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="outline">
+            <Button @click="openImportUserDatModal" :className="'h-9 justify-center whitespace-nowrap rounded border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="outline">
               Import Users
             </Button>
-            <Button @click="openImportBiometricTemplateDatModal" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="outline">
+            <Button @click="openImportBiometricTemplateDatModal" :className="'h-9 justify-center whitespace-nowrap rounded border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="outline">
               Import Templates
             </Button>
           </div>
@@ -1114,3 +1227,204 @@ const closeEnrollModal = () => {
     />
   </div>
 </template>
+
+<style>
+.machine-action-popup {
+  border-radius: 0;
+  border: 1px solid #cbd5e1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.machine-action-heading {
+  margin: 0;
+  padding: 18px 20px 10px;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 30%),
+    linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f766e 100%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.machine-action-dialog {
+  padding: 14px 18px 0;
+  text-align: left;
+}
+
+.machine-action-subtitle {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.machine-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.machine-action-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 74px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0;
+  background: #fff;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.machine-action-card:hover,
+.machine-action-card.is-selected {
+  border-color: #0891b2;
+  background: #ecfeff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.machine-action-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.machine-action-mark {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #94a3b8;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+.machine-action-card.is-selected .machine-action-mark {
+  border-color: #0891b2;
+  background: #0891b2;
+}
+
+.machine-action-checkmark {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  border: 2px solid #94a3b8;
+  background: #fff;
+}
+
+.machine-action-card.is-selected .machine-action-checkmark,
+.machine-action-select-all.is-selected .machine-action-checkmark {
+  border-color: #0891b2;
+  background: #0891b2;
+}
+
+.machine-action-card.is-selected .machine-action-checkmark::after,
+.machine-action-select-all.is-selected .machine-action-checkmark::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.machine-action-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.machine-action-title {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.machine-action-description {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.machine-action-badge {
+  border: 1px solid #bae6fd;
+  background: #f0f9ff;
+  color: #0369a1;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.machine-action-select-all {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.machine-action-select-all:hover,
+.machine-action-select-all.is-selected {
+  border-color: #0891b2;
+  background: #ecfeff;
+}
+
+.machine-action-select-all input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.machine-action-select-all-copy {
+  display: grid;
+  gap: 1px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.machine-action-select-all-copy small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.machine-action-scroll {
+  max-height: 288px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.machine-action-buttons {
+  border-top: 1px solid #e2e8f0;
+  margin: 16px 0 0;
+  padding: 12px 18px 16px;
+}
+
+.machine-action-confirm,
+.machine-action-cancel {
+  border-radius: 0 !important;
+  height: 34px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.machine-action-confirm {
+  border: 1px solid rgba(103, 232, 249, 0.3) !important;
+  background: linear-gradient(135deg, #0891b2 0%, #0f766e 100%) !important;
+}
+
+.machine-action-cancel {
+  border: 1px solid #cbd5e1 !important;
+  background: #fff !important;
+  color: #334155 !important;
+}
+</style>

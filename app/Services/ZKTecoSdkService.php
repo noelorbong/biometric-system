@@ -57,7 +57,11 @@ class ZKTecoSdkService
             'parameters' => $parameters,
             'sdk_directory' => realpath(__DIR__ . '/../../resources/sdk/zkteco/x86'),
         ], JSON_THROW_ON_ERROR));
-        $process->setTimeout(in_array($operation, ['attendance', 'users'], true) ? max(120, $this->timeout) : max(20, $this->timeout));
+        $process->setTimeout(match ($operation) {
+            'attendance', 'users' => max(120, $this->timeout),
+            'enroll_face' => max(60, $this->timeout),
+            default => max(20, $this->timeout),
+        });
         $process->run();
 
         if (!$process->isSuccessful() && trim($process->getOutput()) === '') {

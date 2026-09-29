@@ -29,6 +29,7 @@ class FakeEnrollmentDevice {
         if ($this.Fail -ne 'set') { $this.Exists = $true }
         return $this.Fail -ne 'set'
     }
+    [bool] RefreshData([int]$machine) { $this.Calls.Add('refresh'); return $this.Fail -ne 'refresh' }
     [bool] RegEvent([int]$machine, [int]$flags) { $this.Calls.Add('events'); return $true }
     [bool] CancelOperation() { $this.Calls.Add('cancel'); return $this.Fail -ne 'cancel' }
     [bool] StartEnrollEx([string]$pin, [int]$finger, [int]$flag) {
@@ -89,10 +90,15 @@ try { Invoke-FingerprintEnrollment $zk $parameters | Out-Null } catch { $failed 
 Assert-True ($failed -and $zk.Calls.Count -eq 0) 'Invalid slot reached the device'
 
 $zk = [FakeEnrollmentDevice]::new(); $zk.Exists = $true
+$result = Invoke-FaceEnrollment $zk $parameters
+Assert-True $result.started 'Face enrollment failed'
+Assert-True (($zk.Calls -join ',') -eq 'enable:False,get:00123,refresh,enable:True,events,cancel,enroll:00123:50:1') 'Face enrollment did not refresh data before using the FacePro2 capture slot'
+
+$zk = [FakeEnrollmentDevice]::new(); $zk.Exists = $true
 $result = Read-FingerprintTemplate $zk ([pscustomobject]@{user_id='00123';finger_id=9})
 Assert-True ($result.found -and $result.template -eq 'AQID') 'Template was not returned'
 Assert-True ($zk.Calls -contains 'template:00123:9') 'Template queried with incorrect PIN'
 $zk.Exists = $false; $zk.ErrorCode = 0
 $result = Read-FingerprintTemplate $zk ([pscustomobject]@{user_id='00123';finger_id=9})
 Assert-True (-not $result.found) 'Missing template returned as enrolled'
-Write-Output 'PASS: 8 SDK enrollment/template scenarios'
+Write-Output 'PASS: 9 SDK enrollment/template scenarios'

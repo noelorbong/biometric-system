@@ -1,5 +1,5 @@
 <template>
-  <section class="border-b border-slate-200 bg-white pb-2 dark:border-slate-800 dark:bg-slate-900">
+  <section class=" pb-2 ">
     <div class="flex flex-wrap items-center gap-2">
       <RouterLink
         to="/main/settings"
