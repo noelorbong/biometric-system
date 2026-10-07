@@ -386,7 +386,7 @@
               </button>
               <button @click="$emit('machineAction', _user)" type="button"
                 class="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950">
-                Machine
+                Machine Actions
               </button>
               <div class="relative col-span-2" v-click-outside="closeActionMenu">
                 <button
@@ -406,6 +406,16 @@
                   v-if="isActionMenuOpen(_user.id)"
                   class="mt-2 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
                 >
+                  <button
+                    @click="handleActionMenu('machineAction', _user)"
+                    type="button"
+                    class="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m3 6V7m3 10v-4m5 8H4a2 2 0 01-2-2V7a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2z" />
+                    </svg>
+                    Machine Actions
+                  </button>
                   <button
                     @click="handleActionMenu('editUser', _user)"
                     type="button"

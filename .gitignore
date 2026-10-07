@@ -5,6 +5,7 @@
 /public/storage
 /public/output/
 /public/output/*
+/Offline or standalone SDK  6.3.1.43 and DEMO can download new logs from FacePro series device/
 .env
 .env.backup
 .env.production
