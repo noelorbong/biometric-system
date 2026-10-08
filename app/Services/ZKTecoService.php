@@ -1499,8 +1499,11 @@ class ZKTecoService
                 && $declaredSize >= $preferredRecordSize
                 && $declaredSize % $preferredRecordSize === 0;
 
+            // Only treat the first 4 bytes as a size header when it matches the
+            // payload exactly; an unframed record's uid/user_id bytes can otherwise
+            // look like a small "size" and truncate the data.
             if ($declaredSize > 0
-                && ($declaredSize <= strlen($payload) - 4 || $hasValidPreferredHeader)) {
+                && ($declaredSize === strlen($payload) - 4 || $hasValidPreferredHeader)) {
                 $payload = substr($payload, 4, min($declaredSize, strlen($payload) - 4));
             }
         }
@@ -1557,21 +1560,56 @@ class ZKTecoService
             return $preferredRecordSize;
         }
 
-        // Some DAT exports in this project are large 16-byte record sets and are
-        // not compatible with the older 40-byte TCP layout. If the payload cleanly
-        // divides into 16-byte rows and looks like a bulk export, prefer 16-byte
-        // decoding first so the preview/import uses the right field positions.
-        if ($length % 16 === 0 && intdiv($length, 16) >= 1000) {
-            return 16;
-        }
+        // Sizes overlap (e.g. any multiple of 80 divides by both 16 and 40), so
+        // pick the layout whose decoded timestamps are most plausible instead of
+        // trusting divisibility alone.
+        $bestSize = null;
+        $bestScore = -1.0;
 
         foreach ([40, 16, 8] as $candidate) {
-            if ($length >= $candidate && $length % $candidate === 0) {
-                return $candidate;
+            if ($length < $candidate || $length % $candidate !== 0) {
+                continue;
+            }
+
+            $score = $this->scoreAttendanceLayout($payload, $candidate);
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestSize = $candidate;
             }
         }
 
-        return null;
+        return $bestSize;
+    }
+
+    private function scoreAttendanceLayout(string $payload, int $recordSize): float
+    {
+        $total = intdiv(strlen($payload), $recordSize);
+        $sample = min($total, 200);
+        $maxYear = (int) date('Y') + 1;
+        $valid = 0;
+
+        for ($i = 0; $i < $sample; $i++) {
+            $record = substr($payload, $i * $recordSize, $recordSize);
+            $parsed = match ($recordSize) {
+                8 => $this->parseAttendanceRecord8($record),
+                16 => $this->parseAttendanceRecord16($record),
+                40 => $this->parseAttendanceRecord40($record),
+            };
+
+            if ($parsed === null) {
+                continue;
+            }
+
+            $year = (int) substr($parsed['check_time'], 0, 4);
+            $pin = $parsed['pin'];
+
+            if ($year >= 2000 && $year <= $maxYear && $pin !== '' && preg_match('/^[\x20-\x7e]+$/', $pin)) {
+                $valid++;
+            }
+        }
+
+        return $sample > 0 ? $valid / $sample : 0.0;
     }
 
     /**
