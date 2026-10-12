@@ -628,7 +628,8 @@ const attendanceRows = computed(() => {
         // Consecutive same-type punches are common in biometric logs.
         // Keep latest OUT within each consecutive group.
         // For schedule-based views, keep consecutive IN punches so they can map to different slots.
-        if (type === 'I' && hasScheduleBoundaries) {
+        // Likewise keep consecutive OUT punches so each can map to its own slot (e.g. 12:38 PM and 8:00 PM).
+        if (hasScheduleBoundaries) {
           normalizedPunches.push({
             type,
             time: item.CHECKTIME,
