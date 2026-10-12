@@ -224,15 +224,7 @@ class BiometricReportController extends Controller
                     continue;
                 }
 
-                $last = $normalized[count($normalized) - 1] ?? null;
-                if (!$last || $last['type'] !== $type) {
-                    $normalized[] = ['type' => $type, 'time' => $item['checktime']];
-                    continue;
-                }
-
-                if ($type === 'O') {
-                    $normalized[count($normalized) - 1]['time'] = $item['checktime'];
-                }
+                $normalized[] = ['type' => $type, 'time' => $item['checktime']];
             }
 
             $sessions = [];

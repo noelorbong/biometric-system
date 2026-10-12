@@ -931,7 +931,7 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
         return
       }
 
-      if (type === 'I' && hasScheduleBoundaries) {
+      if (hasScheduleBoundaries) {
         normalizedPunches.push({ type, time: item.CHECKTIME })
         return
       }
