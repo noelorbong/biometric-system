@@ -14,7 +14,7 @@
       </div> -->
 
       <div class="border-b border-slate-300 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
-        <div class="grid gap-2 sm:grid-cols-2 min-[800px]:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto]">
+        <div class="grid gap-2 grid-cols-2 min-[800px]:grid-cols-[minmax(0,.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_auto]">
           <div>
             <label class="sr-only" for="user-role-filter">Role</label>
             <select id="user-role-filter" v-model="filters.role" class="h-8 w-full rounded border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-900 focus:border-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
@@ -322,19 +322,19 @@
             </div>
 
             <div class="mb-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 text-xs dark:border-slate-700">
-              <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
+              <div class="hidden rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
                 <span class="block font-semibold text-slate-500 dark:text-slate-400">Contact</span>
                 <span class="mt-1 block text-slate-700 dark:text-slate-200">{{ _user.primary_contact?.value || '-' }}</span>
               </div>
-              <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
+              <div class="col-span-2 flex gap-x-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
                 <span class="block font-semibold text-slate-500 dark:text-slate-400">Last Login</span>
-                <span class="mt-1 block text-slate-700 dark:text-slate-200">{{ formatDateTime(_user.last_login) }}</span>
+                <span class="block text-slate-700 dark:text-slate-200">{{ formatDateTime(_user.last_login) }}</span>
               </div>
-              <div class="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
+              <div class="hidden col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
                 <span class="block font-semibold text-slate-500 dark:text-slate-400">Address</span>
                 <span class="mt-1 block text-slate-700 dark:text-slate-200">{{ addressSummary(_user.primary_address) }}</span>
               </div>
-              <div class="col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
+              <div class="hidden col-span-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/70">
                 <span class="block font-semibold text-slate-500 dark:text-slate-400">Department</span>
                 <span class="mt-1 block text-slate-700 dark:text-slate-200">{{ _user.department_ref?.department_name || _user.department || '-' }}</span>
               </div>
@@ -384,11 +384,11 @@
                 class="rounded-xl border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
                 View
               </button>
-              <button @click="$emit('machineAction', _user)" type="button"
+              <!-- <button @click="$emit('machineAction', _user)" type="button"
                 class="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950">
                 Machine Actions
-              </button>
-              <div class="relative col-span-2" v-click-outside="closeActionMenu">
+              </button> -->
+              <div class="relative col-span-1" v-click-outside="closeActionMenu">
                 <button
                   @click.stop="toggleActionMenu(_user.id)"
                   type="button"
@@ -402,9 +402,11 @@
                   More Actions
                 </button>
 
-                <div
+                
+              </div>
+              <div
                   v-if="isActionMenuOpen(_user.id)"
-                  class="mt-2 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+                  class="mt-2 col-span-2 space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
                 >
                   <button
                     @click="handleActionMenu('machineAction', _user)"
@@ -433,7 +435,6 @@
                     Delete
                   </button>
                 </div>
-              </div>
             </div>
           </div>
         </template>

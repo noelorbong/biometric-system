@@ -89,7 +89,7 @@ class WorkScheduleController extends Controller
             }
             $profile = $input['profile_key'] === 'existing'
                 ? OfficeShift::with('schedules')->findOrFail($input['source_shift_id'])->toArray()
-                : array_merge(array_intersect_key($shift->toArray(), array_flip(['grace_enabled', 'grace_before_minutes', 'grace_after_minutes'])), WorkScheduleResolver::profiles()[$input['profile_key']]);
+                : array_merge(array_intersect_key($shift->toArray(), array_flip(['grace_enabled', 'grace_before_minutes', 'grace_after_minutes', 'grace_checkin_before_minutes', 'grace_checkin_after_minutes', 'grace_checkout_before_minutes', 'grace_checkout_after_minutes'])), WorkScheduleResolver::profiles()[$input['profile_key']]);
             $profile['working_days'] = array_map('intval', $input['working_days']);
             return WorkScheduleRule::create(['office_shift_id' => $shift->id, 'user_id' => $userId,
                 'kind' => $input['kind'], 'effective_from' => $input['effective_from'],

@@ -307,6 +307,10 @@ const shiftGraceSettings = computed(() => {
     enabled: Boolean(officeShift?.grace_enabled),
     before: Math.max(0, Number(officeShift?.grace_before_minutes || 0)),
     after: Math.max(0, Number(officeShift?.grace_after_minutes || 0)),
+    checkInBefore: Math.max(0, Number(officeShift?.grace_checkin_before_minutes ?? officeShift?.grace_before_minutes ?? 0)),
+    checkInAfter: Math.max(0, Number(officeShift?.grace_checkin_after_minutes ?? officeShift?.grace_after_minutes ?? 0)),
+    checkOutBefore: Math.max(0, Number(officeShift?.grace_checkout_before_minutes ?? officeShift?.grace_before_minutes ?? 0)),
+    checkOutAfter: Math.max(0, Number(officeShift?.grace_checkout_after_minutes ?? officeShift?.grace_after_minutes ?? 0)),
   }
 })
 
@@ -514,6 +518,8 @@ const resolveCheckOutSlotIndex = (minutes, slotMeta, graceAfter = 0) => {
 
 const resolveGraceCorrectedCheckType = (record, slotMeta, grace = shiftGraceSettings.value) => {
   const rawType = String(record?.CHECKTYPE || '').toUpperCase()
+  // Explicit device/override types take precedence over schedule proximity.
+  if (rawType === 'I' || rawType === 'O') return rawType
   const minutes = toMinutesFromDateTime(record?.CHECKTIME)
 
   if (!grace.enabled || minutes === null || !slotMeta.length) {
@@ -523,11 +529,11 @@ const resolveGraceCorrectedCheckType = (record, slotMeta, grace = shiftGraceSett
   const candidates = []
 
   slotMeta.forEach((slot) => {
-    if (slot.inMinute !== null && minutes >= slot.inMinute - grace.before && minutes <= slot.inMinute + grace.after) {
+    if (slot.inMinute !== null && minutes >= slot.inMinute - grace.checkInBefore && minutes <= slot.inMinute + grace.checkInAfter) {
       candidates.push({ type: 'I', distance: Math.abs(minutes - slot.inMinute) })
     }
 
-    if (slot.outMinute !== null && minutes >= slot.outMinute - grace.before && minutes <= slot.outMinute + grace.after) {
+    if (slot.outMinute !== null && minutes >= slot.outMinute - grace.checkOutBefore && minutes <= slot.outMinute + grace.checkOutAfter) {
       candidates.push({ type: 'O', distance: Math.abs(minutes - slot.outMinute) })
     }
   })
@@ -551,6 +557,10 @@ const resolveGraceCorrectedPunches = (records, slotMeta, grace = shiftGraceSetti
   const assignedEndpoints = new Set()
 
   return records.map((record) => {
+    const rawType = String(record?.CHECKTYPE || '').toUpperCase()
+    if (rawType === 'I' || rawType === 'O') {
+      return { record, type: rawType }
+    }
     const minutes = toMinutesFromDateTime(record?.CHECKTIME)
     if (minutes === null) {
       return { record, type: String(record?.CHECKTYPE || '').toUpperCase() }
@@ -558,8 +568,8 @@ const resolveGraceCorrectedPunches = (records, slotMeta, grace = shiftGraceSetti
 
     const endpoint = endpoints.find((candidate) => (
       !assignedEndpoints.has(candidate.key)
-      && minutes >= candidate.minute - grace.before
-      && minutes <= candidate.minute + grace.after
+      && minutes >= candidate.minute - (candidate.type === 'I' ? grace.checkInBefore : grace.checkOutBefore)
+      && minutes <= candidate.minute + (candidate.type === 'I' ? grace.checkInAfter : grace.checkOutAfter)
     ))
 
     if (!endpoint) {
@@ -692,7 +702,7 @@ const attendanceRows = computed(() => {
       if (hasScheduleBoundaries) {
         normalizedPunches.forEach((punch) => {
           const minutes = toMinutesFromDateTime(punch.time)
-          const graceAfter = grace.enabled ? grace.after : 0
+          const graceAfter = grace.enabled ? grace.checkOutAfter : 0
           const slotIndex = punch.type === 'I'
             ? resolveCheckInSlotIndex(minutes, slotMeta)
             : resolveCheckOutSlotIndex(minutes, slotMeta, graceAfter)
@@ -944,6 +954,33 @@ const formatDateOnly = (value) => {
   })
 }
 
+const toLocalCalendarDate = (value) => {
+  if (!value) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    const [year, month, day] = String(value).split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const formatDayName = (value) => {
+  const date = toLocalCalendarDate(value)
+  return date ? date.toLocaleDateString('en-US', { weekday: 'short' }) : '-'
+}
+
+const isHolidayOrWeekend = (row) => {
+  const date = toLocalCalendarDate(row?.date)
+  const isWeekend = date ? date.getDay() === 0 || date.getDay() === 6 : false
+  const holidays = row?.resolved_schedule?._holidays
+  const isHoliday = (Array.isArray(holidays) && holidays.length > 0)
+    || Number(row?.resolved_schedule?._holiday_credit_minutes || 0) > 0
+
+  return isWeekend || isHoliday
+}
+
 const formatTimeOnly = (value) => {
   if (!value) {
     return '-'
@@ -957,6 +994,20 @@ const formatTimeOnly = (value) => {
   return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
+  })
+}
+
+const formatScheduleTime = (value) => {
+  const [hour, minute] = String(value || '').split(':').map(Number)
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    return '-'
+  }
+
+  const date = new Date(2000, 0, 1, hour, minute)
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
   })
 }
 
@@ -1393,12 +1444,38 @@ const saveEditedUser = async (payload) => {
       <div class="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <!-- Avatar + Name -->
         <div class="flex items-center gap-4">
-          <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white/30 shadow-lg">
+          <div class="relative h-20 w-20 flex-shrink-0 rounded-2xl border-2 border-white/30 shadow-lg">
             <img
               :src="selectedUser?.thumbnail || '/images/extras/add-image.png'"
               alt="user"
-              class="h-full w-full object-cover"
+              class="h-full w-full rounded-[14px] object-cover"
             />
+            <button
+              v-if="canGoBackToUsers"
+              type="button"
+              @click="router.push({ name: 'User' })"
+              aria-label="Back to users"
+              title="Back to users"
+              class="absolute left-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/40 bg-slate-900/70 text-white shadow-sm backdrop-blur-sm transition hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-white/70"
+            >
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <button
+              v-if="isSuperAdmin"
+              type="button"
+              @click="openEditUserModal"
+              :disabled="userEditSaving"
+              aria-label="Edit user"
+              title="Edit user"
+              class="absolute right-1 top-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/40 bg-slate-900/70 text-white shadow-sm backdrop-blur-sm transition hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:opacity-60"
+            >
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
           </div>
           <div>
             <h1 class="text-2xl font-bold leading-tight text-white">{{ heroFullName }}</h1>
@@ -1415,34 +1492,8 @@ const saveEditedUser = async (payload) => {
           </div>
         </div>
 
-        <!-- Stats + Back -->
-        <div class="flex flex-col items-start gap-3 md:items-end">
-          <div class="flex flex-wrap items-center gap-2">
-            <button
-              v-if="isSuperAdmin"
-              type="button"
-              @click="openEditUserModal"
-              :disabled="userEditSaving"
-              class="flex items-center gap-1.5 rounded-xl border border-emerald-300/30 bg-emerald-400/20 px-4 py-2 text-sm font-medium text-emerald-50 backdrop-blur-sm transition hover:bg-emerald-400/30 disabled:opacity-60"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              Edit User
-            </button>
-            <button
-              v-if="canGoBackToUsers"
-              type="button"
-              @click="router.push({ name: 'User' })"
-              class="flex items-center gap-1.5 rounded-xl border border-sky-300/30 bg-sky-400/20 px-4 py-2 text-sm font-medium text-sky-50 backdrop-blur-sm transition hover:bg-sky-400/30"
-            >
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-              </svg>
-              Back to Users
-            </button>
-          </div>
+        <!-- Stats -->
+        <!-- <div class="flex flex-col items-start gap-3 md:items-end">
           <div class="flex flex-wrap gap-2">
             <div class="rounded-xl bg-white/10 px-4 py-2 text-center backdrop-blur-sm ring-1 ring-inset ring-white/10">
               <p class="text-xs text-slate-300">Department</p>
@@ -1457,15 +1508,15 @@ const saveEditedUser = async (payload) => {
               <p class="text-sm font-semibold text-white">{{ biometricData?.user_id || '-' }}</p>
             </div>
           </div>
-        </div>
+        </div> -->
       </div>
     </div>
-      <div v-if="selectedUser" class="flex gap-1  border border-slate-200 bg-white p-1.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div v-if="selectedUser" class="flex gap-1 border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <button
           type="button"
           @click="activeTab = 'userinfo'"
           :class="[
-            'flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
+            'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
             activeTab === 'userinfo'
               ? 'bg-sky-500 text-white shadow-sm'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
@@ -1475,7 +1526,7 @@ const saveEditedUser = async (payload) => {
           type="button"
           @click="activeTab = 'biometrics'"
           :class="[
-            'flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
+            'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
             activeTab === 'biometrics'
               ? 'bg-sky-500 text-white shadow-sm'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
@@ -1485,21 +1536,21 @@ const saveEditedUser = async (payload) => {
           type="button"
           @click="activeTab = 'print'"
           :class="[
-            'flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
+            'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
             activeTab === 'print'
               ? 'bg-sky-500 text-white shadow-sm'
               : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
           ]"
         >Print Record</button>
       </div>
-      <div v-if="selectedUser && activeTab === 'biometrics'" class="flex flex-wrap items-end gap-4  border border-slate-200 bg-white pt-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div v-if="selectedUser && activeTab === 'biometrics'" class="flex flex-wrap items-end gap-2 border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div>
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
-            <div class="inline-flex rounded-lg border border-slate-300 p-1 dark:border-slate-700">
+            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
+            <div class="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
               <button
                 type="button"
                 @click="filterMode = 'monthly'"
-                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                class="rounded px-2 py-1 text-xs font-medium transition"
                 :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
               >
                 Month
@@ -1507,7 +1558,7 @@ const saveEditedUser = async (payload) => {
               <button
                 type="button"
                 @click="filterMode = 'custom'"
-                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
+                class="rounded px-2 py-1 text-xs font-medium transition"
                 :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
               >
                 Custom
@@ -1515,34 +1566,34 @@ const saveEditedUser = async (payload) => {
             </div>
           </div>
           <div v-if="filterMode === 'monthly'">
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
+            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
             <select
               v-model.number="selectedYear"
-              class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              class="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
               <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
             </select>
           </div>
           <div v-if="filterMode === 'monthly'">
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
+            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
             <select
               v-model.number="selectedMonth"
-              class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              class="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             >
               <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
             </select>
           </div>
-          <div v-if="filterMode === 'custom'" class="min-w-[280px]">
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
+          <div v-if="filterMode === 'custom'" class="min-w-[220px] flex-1 sm:max-w-[280px]">
+            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
             <flat-pickr
               v-model="customDateRange"
               :config="customRangePickerConfig"
-              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               placeholder="Select date range"
             />
           </div>
-          <div v-if="checkinoutLoading" class="flex items-center gap-2 pb-0.5 text-sm text-slate-500 dark:text-slate-400">
-            <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <div v-if="checkinoutLoading" class="flex items-center gap-1.5 pb-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
             </svg>
@@ -1675,28 +1726,28 @@ const saveEditedUser = async (payload) => {
         </div>
 
         <!-- Attendance table -->
-        <div v-if="biometricsViewTab === 'attendance'" class="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-          <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+        <div v-if="biometricsViewTab === 'attendance'" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03] sm:rounded-[24px]">
+          <div class="border-b border-slate-200 px-3 py-2.5 dark:border-slate-800 sm:px-5 sm:py-4">
             <h3 class="text-base font-semibold text-slate-800 dark:text-white/90">Attendance Record</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">
               {{ selectedPeriodLabel }}
             </p>
           </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full border-collapse">
+          <div class="overflow-x-auto overscroll-x-contain">
+            <table class="w-max min-w-full border-collapse">
               <thead>
                 <tr class="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Day</th>
+                  <th class="min-w-[180px] whitespace-nowrap px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-5 sm:py-3">Day</th>
                   <template v-for="(slot, index) in scheduleSlots" :key="`head-${slot.sequence || index}`">
-                    <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <th class="min-w-[110px] whitespace-nowrap px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-5 sm:py-3">
                       Check In{{ scheduleSlots.length > 1 ? ` ${index + 1}` : '' }}
                     </th>
-                    <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    <th class="min-w-[110px] whitespace-nowrap px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-5 sm:py-3">
                       Check Out{{ scheduleSlots.length > 1 ? ` ${index + 1}` : '' }}
                     </th>
                   </template>
-                  <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Absence</th>
-                  <th class="px-5 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Logs</th>
+                  <th class="min-w-[130px] whitespace-nowrap px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-5 sm:py-3">Absence</th>
+                  <th class="min-w-[170px] whitespace-nowrap px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-5 sm:py-3">Logs</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1713,13 +1764,22 @@ const saveEditedUser = async (payload) => {
                 <tr
                   v-for="row in attendanceRows"
                   :key="row.date"
-                  class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                  class="transition-colors"
+                  :class="isHolidayOrWeekend(row)
+                    ? 'bg-rose-50/70 hover:bg-rose-100/70 dark:bg-rose-950/15 dark:hover:bg-rose-950/25'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'"
                 >
-                  <td class="px-5 py-3 text-center">
-                    <span class="text-sm font-semibold text-slate-800 dark:text-white">{{ formatDateOnly(row.date) }}</span><span v-if="row.resolved_schedule" class="block text-[10px] text-slate-500">{{ row.resolved_schedule._is_working_day === false ? 'Rest day' : row.resolved_schedule.name }} ? {{ (row.resolved_schedule.schedules || []).map(s => `${s.time_in.slice(0, 5)}?${s.time_out.slice(0, 5)}`).join(', ') }}</span><span v-if="row.resolved_schedule?._holiday_credit_minutes" class="block text-[10px] text-sky-600">{{ row.resolved_schedule._holiday_credit_minutes / 60 }} hours holiday / suspension credit</span>
+                  <td class="min-w-[180px] px-3 py-2.5 text-center sm:px-5 sm:py-3">
+                    <span
+                      class="whitespace-nowrap text-sm font-semibold"
+                      :class="isHolidayOrWeekend(row) ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-white'"
+                    >
+                      {{ formatDateOnly(row.date) }}
+                      <span class="ml-1 text-xs font-bold">{{ formatDayName(row.date) }}</span>
+                    </span><span v-if="row.resolved_schedule" class="block whitespace-nowrap text-[10px]" :class="isHolidayOrWeekend(row) ? 'text-rose-500 dark:text-rose-400' : 'text-slate-500'">{{ row.resolved_schedule._is_working_day === false ? 'Rest day' : row.resolved_schedule.name }} &middot; {{ (row.resolved_schedule.schedules || []).map(s => `${formatScheduleTime(s.time_in)}–${formatScheduleTime(s.time_out)}`).join(', ') }}</span><span v-if="row.resolved_schedule?._holiday_credit_minutes" class="block whitespace-nowrap text-[10px] text-rose-600 dark:text-rose-400">{{ row.resolved_schedule._holiday_credit_minutes / 60 }} hours holiday / suspension credit</span>
                   </td>
                   <template v-for="(slot, index) in row.slots" :key="`slot-${row.date}-${index}`">
-                    <td class="px-5 py-3 text-center">
+                    <td class="min-w-[110px] px-3 py-2.5 text-center sm:px-5 sm:py-3">
                       <div class="flex flex-col items-center gap-1">
                         <span
                           v-if="slot.check_in_action"
@@ -1735,7 +1795,7 @@ const saveEditedUser = async (payload) => {
 
                       </div>
                     </td>
-                    <td class="px-5 py-3 text-center">
+                    <td class="min-w-[110px] px-3 py-2.5 text-center sm:px-5 sm:py-3">
                       <div class="flex flex-col items-center gap-1">
                         <span
                           v-if="slot.check_out_action"
@@ -1752,7 +1812,7 @@ const saveEditedUser = async (payload) => {
                       </div>
                     </td>
                   </template>
-                  <td class="px-5 py-3 text-center">
+                  <td class="min-w-[130px] px-3 py-2.5 text-center sm:px-5 sm:py-3">
                     <button
                       v-if="isSuperAdmin && canManageAbsence(row.date)"
                       type="button"
@@ -1763,8 +1823,8 @@ const saveEditedUser = async (payload) => {
                     <span v-else-if="row.absence" :class="row.absence.status === 'filed' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'" class="text-xs font-medium">{{ absenceLabel(row.absence) }}</span>
                     <span v-else class="text-slate-400">-</span>
                   </td>
-                  <td class="px-5 py-3 text-center">
-                    <div class="flex justify-center gap-2">
+                  <td class="min-w-[170px] px-3 py-2.5 text-center sm:px-5 sm:py-3">
+                    <div class="flex flex-nowrap justify-center gap-2">
                       <button
                         type="button"
                         @click="openRawLogs(row.date)"

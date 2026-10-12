@@ -46,14 +46,18 @@ class DailyAttendanceService
                 continue;
             }
             $type = strtoupper($punch['type']);
+            $rawType = $type;
             $target = null;
             $distance = PHP_INT_MAX;
             if (!empty($shift['grace_enabled'])) {
                 foreach ($timeline as $i => $period) {
                     foreach (['I' => 'start', 'O' => 'end'] as $candidateType => $boundary) {
+                        if ($rawType !== $candidateType) continue;
                         $seconds = $time->timestamp - $period[$boundary]->timestamp;
-                        if ($seconds >= -(int) ($shift['grace_before_minutes'] ?? 0) * 60
-                            && $seconds <= (int) ($shift['grace_after_minutes'] ?? 0) * 60
+                        $before = $candidateType === 'I' ? ($shift['grace_checkin_before_minutes'] ?? $shift['grace_before_minutes'] ?? 0) : ($shift['grace_checkout_before_minutes'] ?? $shift['grace_before_minutes'] ?? 0);
+                        $after = $candidateType === 'I' ? ($shift['grace_checkin_after_minutes'] ?? $shift['grace_after_minutes'] ?? 0) : ($shift['grace_checkout_after_minutes'] ?? $shift['grace_after_minutes'] ?? 0);
+                        if ($seconds >= -(int) $before * 60
+                            && $seconds <= (int) $after * 60
                             && abs($seconds) < $distance) {
                             $target = $i;
                             $type = $candidateType;

@@ -246,7 +246,7 @@ onMounted(async () => {
               {{ dashboard?.role_label || roleMap[Number(user?.role)] || 'User' }}
             </span>
           </div>
-          <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-100/90">{{ headline }}</p>
+          <p class="hidden mt-2 max-w-3xl text-sm leading-6 text-slate-100/90">{{ headline }}</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 xl:justify-end">
@@ -260,10 +260,10 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="mt-5 grid gap-3 md:grid-cols-3">
+      <div class="mt-5 grid gap-3 grid-cols-3">
         <article v-for="metric in heroMetrics" :key="metric.label" class="border border-white/15 bg-white/10 p-3 backdrop-blur">
           <div class="flex items-start justify-between gap-3">
-            <p class="text-[11px] font-semibold uppercase tracking-wide text-cyan-50/80">{{ metric.label }}</p>
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-cyan-50/80 truncate">{{ metric.label }}</p>
             <span class="h-2 w-2 bg-cyan-200"></span>
           </div>
           <p class="mt-2 text-2xl font-semibold tracking-tight text-white">{{ formatNumber(metric.value) }}</p>

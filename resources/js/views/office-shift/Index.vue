@@ -24,6 +24,8 @@ const form = ref({
   grace_enabled: false,
   grace_before_minutes: 0,
   grace_after_minutes: 0,
+  grace_checkin_before_minutes: 0, grace_checkin_after_minutes: 0,
+  grace_checkout_before_minutes: 0, grace_checkout_after_minutes: 0,
   schedules: [{ time_in: '', time_out: '', is_next_day: false }],
 })
 
@@ -79,6 +81,8 @@ const openCreate = () => {
     grace_enabled: false,
     grace_before_minutes: 0,
     grace_after_minutes: 0,
+    grace_checkin_before_minutes: 0, grace_checkin_after_minutes: 0,
+    grace_checkout_before_minutes: 0, grace_checkout_after_minutes: 0,
     schedules: [{ time_in: '', time_out: '', is_next_day: false }],
   }
   isModalOpen.value = true
@@ -93,6 +97,10 @@ const openEdit = (shift) => {
     grace_enabled: Boolean(shift.grace_enabled),
     grace_before_minutes: Number(shift.grace_before_minutes || 0),
     grace_after_minutes: Number(shift.grace_after_minutes || 0),
+    grace_checkin_before_minutes: Number(shift.grace_checkin_before_minutes ?? shift.grace_before_minutes ?? 0),
+    grace_checkin_after_minutes: Number(shift.grace_checkin_after_minutes ?? shift.grace_after_minutes ?? 0),
+    grace_checkout_before_minutes: Number(shift.grace_checkout_before_minutes ?? shift.grace_before_minutes ?? 0),
+    grace_checkout_after_minutes: Number(shift.grace_checkout_after_minutes ?? shift.grace_after_minutes ?? 0),
     schedules: shift.schedules?.length
       ? shift.schedules.map((row) => ({
           time_in: (row.time_in || '').slice(0, 5),
@@ -119,6 +127,10 @@ const saveShift = async () => {
     grace_enabled: form.value.is_flexible ? false : form.value.grace_enabled,
     grace_before_minutes: form.value.grace_enabled ? Number(form.value.grace_before_minutes || 0) : 0,
     grace_after_minutes: form.value.grace_enabled ? Number(form.value.grace_after_minutes || 0) : 0,
+    grace_checkin_before_minutes: form.value.grace_enabled ? Number(form.value.grace_checkin_before_minutes || 0) : 0,
+    grace_checkin_after_minutes: form.value.grace_enabled ? Number(form.value.grace_checkin_after_minutes || 0) : 0,
+    grace_checkout_before_minutes: form.value.grace_enabled ? Number(form.value.grace_checkout_before_minutes || 0) : 0,
+    grace_checkout_after_minutes: form.value.grace_enabled ? Number(form.value.grace_checkout_after_minutes || 0) : 0,
     schedules: form.value.is_flexible ? [] : schedules,
   }
 
@@ -228,7 +240,7 @@ const formatScheduleChip = (row) => {
       </section>
 
   <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center">
+        <div class="flex  gap-3 flex-row md:items-center">
           <div class="relative flex-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.3 5.3a7.5 7.5 0 0011.35 11.35z" />
@@ -248,7 +260,7 @@ const formatScheduleChip = (row) => {
     </div>
 
     <section class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="max-w-full overflow-x-auto custom-scrollbar">
+      <div class="hidden max-w-full overflow-x-auto custom-scrollbar md:block">
         <table class="min-w-full">
           <thead class="bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_50%,_#0891b2_100%)]">
             <tr>
@@ -311,6 +323,57 @@ const formatScheduleChip = (row) => {
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class=" md:hidden">
+        <article
+          v-for="shift in filteredOfficeShifts"
+          :key="`mobile-shift-${shift.id}`"
+          class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ shift.name }}</h3>
+              <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                <span
+                  :class="shift.is_flexible
+                    ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-400/10 dark:text-amber-300'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-400/10 dark:text-emerald-300'"
+                  class="inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold"
+                >
+                  {{ shift.is_flexible ? 'Flexible' : 'Fixed' }}
+                </span>
+                <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ shift.users_count || 0 }} assigned</span>
+              </div>
+            </div>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <button @click="openEdit(shift)" type="button" aria-label="Edit office shift" class="inline-flex h-8 w-8 items-center justify-center rounded border border-cyan-200 bg-white text-cyan-700 transition hover:bg-cyan-50 dark:border-cyan-800/60 dark:bg-slate-900 dark:text-cyan-300 dark:hover:bg-cyan-900/20"><PencilIcon /></button>
+              <button @click="openDelete(shift)" type="button" aria-label="Delete office shift" class="inline-flex h-8 w-8 items-center justify-center rounded border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
+            </div>
+          </div>
+          <div class="mt-3 grid gap-2 text-xs">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Schedule</p>
+              <div v-if="shift.schedules?.length" class="mt-1 flex flex-wrap gap-1">
+                <span
+                  v-for="row in shift.schedules"
+                  :key="`mobile-shift-${shift.id}-row-${row.sequence}`"
+                  class="inline-flex rounded border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-medium text-cyan-700 dark:border-cyan-900/50 dark:bg-cyan-900/20 dark:text-cyan-300"
+                >
+                  {{ formatScheduleChip(row) }}
+                </span>
+              </div>
+              <span v-else class="mt-1 block text-slate-600 dark:text-slate-300">{{ shift.schedule || 'Flexible Time' }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 dark:border-slate-800">
+              <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Grace</span>
+              <span v-if="shift.grace_enabled" class="rounded border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-400/10 dark:text-violet-300">-{{ shift.grace_before_minutes || 0 }} / +{{ shift.grace_after_minutes || 0 }} min</span>
+              <span v-else class="text-slate-400">Disabled</span>
+            </div>
+          </div>
+        </article>
+        <div v-if="!filteredOfficeShifts.length" class="px-3 py-5 text-center text-xs text-slate-500 dark:text-slate-400">
+          No office shifts found.
+        </div>
       </div>
     </section>
 
@@ -382,14 +445,22 @@ const formatScheduleChip = (row) => {
                 </div>
               </div>
 
-              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+              <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Grace before scheduled time (minutes)</label>
-                  <input v-model.number="form.grace_before_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Check-in early</label>
+                  <input v-model.number="form.grace_checkin_before_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
                 </div>
                 <div>
-                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Grace after scheduled time (minutes)</label>
-                  <input v-model.number="form.grace_after_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Check-in late</label>
+                  <input v-model.number="form.grace_checkin_after_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Check-out early</label>
+                  <input v-model.number="form.grace_checkout_before_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
+                </div>
+                <div>
+                  <label class="mb-1 block text-xs font-medium text-violet-700 dark:text-violet-300">Check-out late</label>
+                  <input v-model.number="form.grace_checkout_after_minutes" :disabled="form.is_flexible || !form.grace_enabled" type="number" min="0" max="720" class="h-10 w-full rounded border border-violet-200 bg-white px-3 text-sm disabled:opacity-50 dark:border-violet-900/50 dark:bg-gray-950" />
                 </div>
               </div>
             </div>

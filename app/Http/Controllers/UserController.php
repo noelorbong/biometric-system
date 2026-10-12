@@ -141,6 +141,11 @@ class UserController extends Controller
             $cardValue = trim((string) ($mapped['CARDNO'] ?? ''));
             $rows[] = [
                 'row' => count($rows) + 1,
+                '_source_columns' => $header,
+                '_source_values' => $columns,
+                '_source_data' => collect($header)->mapWithKeys(
+                    fn ($name, $index) => [(string) $name => $columns[$index] ?? '']
+                )->all(),
                 'uid' => ctype_digit($userIdValue) ? (int) $userIdValue : 0,
                 'pin' => $pin,
                 'name' => trim((string) ($mapped['NAME'] ?? '')),
@@ -179,6 +184,19 @@ class UserController extends Controller
         }
 
         try {
+            $sharedStrings = [];
+            $sharedXml = $zip->getFromName('xl/sharedStrings.xml');
+            if (is_string($sharedXml)) {
+                $shared = simplexml_load_string($sharedXml);
+                if ($shared === false) {
+                    throw new \RuntimeException('Unable to read Excel shared strings.');
+                }
+                foreach ($shared->si as $item) {
+                    $item->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                    $parts = $item->xpath('./x:t | ./x:r/x:t') ?: [];
+                    $sharedStrings[] = implode('', array_map(static fn ($part) => (string) $part, $parts));
+                }
+            }
             $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
             if (!is_string($sheetXml) || ($xml = simplexml_load_string($sheetXml)) === false) {
                 throw new \RuntimeException('Unable to read the first Excel worksheet.');
@@ -194,11 +212,16 @@ class UserController extends Controller
                         $columnIndex = ($columnIndex * 26) + (ord($letter) - 64);
                     }
                     $columnIndex--;
-
                     if ((string) $cell['t'] === 'inlineStr') {
                         $cell->registerXPathNamespace('x', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
                         $parts = $cell->xpath('.//x:is//x:t') ?: [];
                         $value = implode('', array_map(static fn ($part) => (string) $part, $parts));
+                    } elseif ((string) $cell['t'] === 's') {
+                        $index = (string) $cell->v;
+                        if (!ctype_digit($index) || !array_key_exists((int) $index, $sharedStrings)) {
+                            throw new \RuntimeException('Invalid Excel shared-string reference.');
+                        }
+                        $value = $sharedStrings[(int) $index];
                     } else {
                         $value = (string) $cell->v;
                     }
@@ -1318,7 +1341,7 @@ class UserController extends Controller
             'contacts:id,user_id,type,value,is_primary',
             'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
             'biometricInfo',
-            'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
+        'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes',
             'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
             'departmentRef:id,department_name,dep_short,status',
             'collegeRef:id,company_id,college_short,college_long,college_head,status',
@@ -2019,7 +2042,7 @@ class UserController extends Controller
                 'contacts:id,user_id,type,value,is_primary',
                 'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
                 'biometricInfo',
-                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
+                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'inChargeUser:id,name,in_charge_user_id',
                 'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',

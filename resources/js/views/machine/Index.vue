@@ -6,7 +6,7 @@ import 'sweetalert2/src/sweetalert2.scss'
 import Button from '@/components/ui/Button.vue'
 import Modal from '@/components/common/Modal.vue'
 import ModalDelete from '@/components/common/ModalDelete.vue'
-import { PlusIcon, PencilIcon, TrashIcon, PlugInIcon, RefreshIcon } from '@/icons'
+import { PlusIcon, PencilIcon, TrashIcon, PlugInIcon, RefreshIcon, ClockIcon } from '@/icons'
 import { useMachineStore } from '@/store/MachineStore'
 import { useAppSettingStore } from '@/store/AppSettingStore'
 
@@ -1823,17 +1823,12 @@ onUnmounted(() => {
         </div>
 
         <div class="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:flex-wrap sm:items-center min-[1024px]:justify-end">
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Search machine, IP, or serial"
-            class="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-56 sm:flex-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
-          />
-          <button @click="toggleWebAutoFallback" type="button" class="h-9 rounded-lg border px-2.5 text-xs font-semibold transition" :class="webAutoFallbackEnabled ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'" :title="'Enable browser fallback auto-download when daemon is stopped'">
-            Web Fallback: {{ webAutoFallbackEnabled ? 'On' : 'Off' }}
+          <div class="flex w-full flex-wrap gap-2 sm:w-auto">
+          <button @click="toggleWebAutoFallback" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition" :class="webAutoFallbackEnabled ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'" :title="webAutoFallbackEnabled ? 'Disable browser fallback auto-download' : 'Enable browser fallback auto-download when daemon is stopped'" :aria-label="webAutoFallbackEnabled ? 'Disable browser fallback auto-download' : 'Enable browser fallback auto-download when daemon is stopped'" :aria-pressed="webAutoFallbackEnabled">
+            <RefreshIcon class="h-4 w-4" />
           </button>
-          <button @click="openMachineTimerSettings" type="button" class="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="Configure machine page timer intervals">
-            Timer Settings
+          <button @click="openMachineTimerSettings" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="Configure machine page timer intervals" aria-label="Configure machine page timer intervals">
+            <ClockIcon class="h-4 w-4" />
           </button>
           <button @click="openAttendanceDatImport" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30">
             <RefreshIcon class="h-3.5 w-3.5" />
@@ -1844,11 +1839,20 @@ onUnmounted(() => {
             <RefreshIcon v-else class="h-3.5 w-3.5" />
             {{ pushingUsers ? 'Pushing…' : 'Push Users' }}
           </button>
-          <button @click="openDiscoveryScanner" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30">
-            <RefreshIcon class="h-3.5 w-3.5" />
-            IP Scanner
-          </button>
-          <Button @click="openCreate" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary" :startIcon="PlusIcon">Add Machine</Button>
+          </div>
+          <div class="order-last flex w-full min-w-0 flex-1 basis-full flex-row items-center gap-2 sm:order-none sm:w-auto sm:basis-auto sm:flex-none">
+            <input
+              v-model="search"
+              type="text"
+              placeholder="Search machine, IP, or serial"
+              class="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-56 sm:flex-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
+            />
+            <Button @click="openCreate" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary" :startIcon="PlusIcon">Add Machine</Button>
+            <button @click="openDiscoveryScanner" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30">
+              <RefreshIcon class="h-3.5 w-3.5" />
+              IP Scanner
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -1975,7 +1979,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="grid gap-2 sm:grid-cols-2">
+            <div class="grid gap-2 grid-cols-2">
               <button
                 @click="connectMachine(machine)"
                 type="button"

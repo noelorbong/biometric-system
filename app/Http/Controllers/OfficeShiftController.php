@@ -79,6 +79,8 @@ class OfficeShiftController extends Controller
             'grace_enabled' => ['nullable', 'boolean'],
             'grace_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'grace_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'grace_checkin_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'], 'grace_checkin_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'grace_checkout_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'], 'grace_checkout_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'schedules' => ['nullable', 'array'],
             'schedules.*.time_in' => ['required_with:schedules', 'date_format:H:i'],
             'schedules.*.time_out' => ['required_with:schedules', 'date_format:H:i'],
@@ -104,6 +106,10 @@ class OfficeShiftController extends Controller
                 'grace_enabled' => $graceEnabled,
                 'grace_before_minutes' => $graceEnabled ? (int) ($validated['grace_before_minutes'] ?? 0) : 0,
                 'grace_after_minutes' => $graceEnabled ? (int) ($validated['grace_after_minutes'] ?? 0) : 0,
+                'grace_checkin_before_minutes' => $graceEnabled ? (int) ($validated['grace_checkin_before_minutes'] ?? $validated['grace_before_minutes'] ?? 0) : 0,
+                'grace_checkin_after_minutes' => $graceEnabled ? (int) ($validated['grace_checkin_after_minutes'] ?? $validated['grace_after_minutes'] ?? 0) : 0,
+                'grace_checkout_before_minutes' => $graceEnabled ? (int) ($validated['grace_checkout_before_minutes'] ?? $validated['grace_before_minutes'] ?? 0) : 0,
+                'grace_checkout_after_minutes' => $graceEnabled ? (int) ($validated['grace_checkout_after_minutes'] ?? $validated['grace_after_minutes'] ?? 0) : 0,
             ]);
 
             if (!$isFlexible && !empty($schedules)) {
@@ -131,6 +137,8 @@ class OfficeShiftController extends Controller
             'grace_enabled' => ['nullable', 'boolean'],
             'grace_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'grace_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'grace_checkin_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'], 'grace_checkin_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
+            'grace_checkout_before_minutes' => ['nullable', 'integer', 'min:0', 'max:720'], 'grace_checkout_after_minutes' => ['nullable', 'integer', 'min:0', 'max:720'],
             'schedules' => ['nullable', 'array'],
             'schedules.*.time_in' => ['required_with:schedules', 'date_format:H:i'],
             'schedules.*.time_out' => ['required_with:schedules', 'date_format:H:i'],
@@ -157,6 +165,10 @@ class OfficeShiftController extends Controller
                 'grace_enabled' => $graceEnabled,
                 'grace_before_minutes' => $graceEnabled ? (int) ($validated['grace_before_minutes'] ?? 0) : 0,
                 'grace_after_minutes' => $graceEnabled ? (int) ($validated['grace_after_minutes'] ?? 0) : 0,
+                'grace_checkin_before_minutes' => $graceEnabled ? (int) ($validated['grace_checkin_before_minutes'] ?? $validated['grace_before_minutes'] ?? 0) : 0,
+                'grace_checkin_after_minutes' => $graceEnabled ? (int) ($validated['grace_checkin_after_minutes'] ?? $validated['grace_after_minutes'] ?? 0) : 0,
+                'grace_checkout_before_minutes' => $graceEnabled ? (int) ($validated['grace_checkout_before_minutes'] ?? $validated['grace_before_minutes'] ?? 0) : 0,
+                'grace_checkout_after_minutes' => $graceEnabled ? (int) ($validated['grace_checkout_after_minutes'] ?? $validated['grace_after_minutes'] ?? 0) : 0,
             ]);
 
             if ($isFlexible) {

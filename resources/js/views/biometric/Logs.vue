@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { ChevronDownIcon, FilterIcon } from '@/icons'
 
 const logs = ref([])
 const loading = ref(false)
@@ -10,6 +11,7 @@ const previousCursor = ref(null)
 const filters = reactive({ date_from: '', date_to: '', checktype: '', sensorid: '', sn: '' })
 const sort = reactive({ by: 'id', direction: 'desc' })
 const perPage = ref(25)
+const showMobileFilters = ref(false)
 
 const loadLogs = async (cursor = null, requestedPage = 1) => {
   loading.value = true
@@ -58,12 +60,27 @@ onMounted(() => loadLogs(null, 1))
         <div class="flex flex-wrap items-center gap-2.5">
           <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Logs</h1>
           <span class="text-xs text-slate-500 dark:text-slate-400">Raw check-in and check-out records</span>
-          <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Server pagination</span>
+          <!-- <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Server pagination</span> -->
         </div>
       </section>
 
-  <section class="border-t border-white/15 pt-3">
-        <form class="grid gap-2 sm:grid-cols-2 min-[800px]:grid-cols-[repeat(5,minmax(0,1fr))_auto] min-[800px]:items-end" @submit.prevent="loadLogs(null, 1)">
+      <section class="border-t border-white/15 pt-3">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 min-[800px]:hidden">Filters</h2>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-1 rounded-md border border-white/15 px-2 py-1.5 text-[11px] font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white min-[800px]:hidden"
+            :aria-expanded="showMobileFilters"
+            aria-controls="biometric-logs-filters"
+            :aria-label="showMobileFilters ? 'Hide biometric log filters' : 'Show biometric log filters'"
+            :title="showMobileFilters ? 'Hide biometric log filters' : 'Show biometric log filters'"
+            @click="showMobileFilters = !showMobileFilters"
+          >
+            <FilterIcon class="h-3.5 w-3.5" />
+            <ChevronDownIcon class="h-3.5 w-3.5 transition-transform" :class="showMobileFilters ? 'rotate-180' : ''" />
+          </button>
+        </div>
+        <form id="biometric-logs-filters" class="gap-2 grid-cols-2 min-[800px]:grid-cols-[repeat(6,minmax(0,1fr))] min-[800px]:items-end" :class="showMobileFilters ? 'grid' : 'hidden min-[800px]:grid'" @submit.prevent="loadLogs(null, 1)">
           <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">From date
             <input v-model="filters.date_from" type="date" class="mt-1 h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30" />
           </label>
@@ -79,7 +96,7 @@ onMounted(() => loadLogs(null, 1))
           <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Serial number
             <input v-model.trim="filters.sn" type="text" placeholder="All serial numbers" class="mt-1 h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white placeholder-slate-400 shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30" />
           </label>
-          <div class="flex gap-2 sm:col-span-2 min-[800px]:col-span-1 min-[800px]:justify-end">
+          <div class="flex gap-2 sm:col-span-2 min-[800px]:col-span-1 min-[800px]:justify-end mt-auto">
             <button type="button" class="inline-flex h-8 items-center justify-center rounded border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm transition hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40" @click="resetFilters">Reset</button>
             <button type="submit" class="inline-flex h-8 items-center justify-center rounded border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40">Apply filters</button>
           </div>

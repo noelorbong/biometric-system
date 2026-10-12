@@ -42,7 +42,16 @@ class BiometricLogController extends Controller
         }
         foreach (['checktype' => 'CHECKTYPE', 'sensorid' => 'SENSORID', 'sn' => 'sn'] as $input => $column) {
             if (isset($validated[$input]) && $validated[$input] !== '') {
-                $query->where($column, $validated[$input]);
+                $value = $validated[$input];
+                $upper = strtoupper(trim($value));
+
+                if ($input === 'checktype' && in_array($upper, Checkinout::OUT_VARIANTS, true)) {
+                    $query->whereIn($column, Checkinout::OUT_VARIANTS);
+                } elseif ($input === 'checktype' && in_array($upper, Checkinout::IN_VARIANTS, true)) {
+                    $query->whereIn($column, Checkinout::IN_VARIANTS);
+                } else {
+                    $query->where($column, $value);
+                }
             }
         }
 

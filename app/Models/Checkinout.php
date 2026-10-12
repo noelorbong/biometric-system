@@ -30,6 +30,25 @@ class Checkinout extends Model
         'CHECKTIME' => 'datetime',
     ];
 
+    public const OUT_VARIANTS = ['O', '0', 'OUT'];
+    public const IN_VARIANTS = ['I', '1', 'IN'];
+
+    // Raw device data mixes '0' and 'O' for check-out; expose one canonical value.
+    public function getCHECKTYPEAttribute($value)
+    {
+        $normalized = strtoupper(trim((string) $value));
+
+        if (in_array($normalized, self::OUT_VARIANTS, true)) {
+            return 'O';
+        }
+
+        if (in_array($normalized, self::IN_VARIANTS, true)) {
+            return 'I';
+        }
+
+        return $value;
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'USERID', 'id');

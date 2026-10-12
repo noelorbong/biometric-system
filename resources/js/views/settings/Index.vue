@@ -390,13 +390,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3">
 
 
     <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-3 shadow-sm md:-mr-6">
       <SettingsNav class="mb-2" />
       <section class="px-2 pb-1 text-white">
-      <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+      <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div class="max-w-3xl">
           <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Settings</p>
           <!-- <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white lg:text-4xl">Settings</h1> -->
@@ -405,40 +405,48 @@ onMounted(async () => {
           </p> -->
         </div>
 
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[400px]">
-          <div class="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Timers</p>
-            <p class="mt-1 text-2xl font-semibold text-white">3</p>
-            <p class="text-xs text-slate-300">Configurable tasks</p>
+        <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:w-auto lg:min-w-[440px]">
+          <div class="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1.5 backdrop-blur-sm">
+            <p class="text-[10px] uppercase tracking-[0.18em] text-slate-300">Timers</p>
+            <div class="mt-0.5 flex items-baseline gap-1.5">
+              <p class="text-lg font-semibold leading-none text-white">3</p>
+              <p class="truncate text-[10px] text-slate-300">Configurable</p>
+            </div>
           </div>
-          <div class="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Enabled</p>
-            <p class="mt-1 text-2xl font-semibold text-white">{{ Number(form.machine_auto_sync_status_timer_enabled) + Number(form.machine_refresh_timer_enabled) + Number(form.machine_web_auto_fallback_timer_enabled) }}</p>
-            <p class="text-xs text-slate-300">Active timers</p>
+          <div class="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1.5 backdrop-blur-sm">
+            <p class="text-[10px] uppercase tracking-[0.18em] text-slate-300">Enabled</p>
+            <div class="mt-0.5 flex items-baseline gap-1.5">
+              <p class="text-lg font-semibold leading-none text-white">{{ Number(form.machine_auto_sync_status_timer_enabled) + Number(form.machine_refresh_timer_enabled) + Number(form.machine_web_auto_fallback_timer_enabled) }}</p>
+              <p class="truncate text-[10px] text-slate-300">Active</p>
+            </div>
           </div>
-          <div class="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Disabled</p>
-            <p class="mt-1 text-2xl font-semibold text-white">{{ 3 - (Number(form.machine_auto_sync_status_timer_enabled) + Number(form.machine_refresh_timer_enabled) + Number(form.machine_web_auto_fallback_timer_enabled)) }}</p>
-            <p class="text-xs text-slate-300">Paused timers</p>
+          <div class="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1.5 backdrop-blur-sm">
+            <p class="text-[10px] uppercase tracking-[0.18em] text-slate-300">Disabled</p>
+            <div class="mt-0.5 flex items-baseline gap-1.5">
+              <p class="text-lg font-semibold leading-none text-white">{{ 3 - (Number(form.machine_auto_sync_status_timer_enabled) + Number(form.machine_refresh_timer_enabled) + Number(form.machine_web_auto_fallback_timer_enabled)) }}</p>
+              <p class="truncate text-[10px] text-slate-300">Paused</p>
+            </div>
           </div>
-          <div class="rounded-xl border border-white/10 bg-white/10 px-3 py-2.5 backdrop-blur-sm">
-            <p class="text-xs uppercase tracking-[0.25em] text-slate-300">Save State</p>
-            <p class="mt-1 text-base font-semibold text-white">{{ saving ? 'Saving...' : 'Ready' }}</p>
-            <p class="text-xs text-slate-300">Settings persistence</p>
+          <div class="rounded-lg border border-white/10 bg-white/10 px-2.5 py-1.5 backdrop-blur-sm">
+            <p class="text-[10px] uppercase tracking-[0.18em] text-slate-300">Save State</p>
+            <div class="mt-0.5 flex items-baseline gap-1.5">
+              <p class="truncate text-sm font-semibold leading-none text-white">{{ saving ? 'Saving...' : 'Ready' }}</p>
+              <p class="truncate text-[10px] text-slate-300">Persistence</p>
+            </div>
           </div>
         </div>
       </div>
     </section>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/70 p-1.5 dark:border-slate-700 dark:bg-slate-900/40">
-      <div class="flex min-w-max gap-1.5" role="tablist" aria-label="General settings sections">
+    <div class="overflow-x-auto rounded-md border border-slate-200 bg-slate-50/70 p-1 dark:border-slate-700 dark:bg-slate-900/40">
+      <div class="flex min-w-max gap-1" role="tablist" aria-label="General settings sections">
         <button
           type="button"
           role="tab"
           :aria-selected="activeSettingsTab === 'general'"
           @click="activeSettingsTab = 'general'"
-          class="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition"
+          class="inline-flex h-8 items-center justify-center rounded px-2.5 text-xs font-semibold transition"
           :class="activeSettingsTab === 'general' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
         >
           General
@@ -448,7 +456,7 @@ onMounted(async () => {
           role="tab"
           :aria-selected="activeSettingsTab === 'license'"
           @click="activeSettingsTab = 'license'"
-          class="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition"
+          class="inline-flex h-8 items-center justify-center rounded px-2.5 text-xs font-semibold transition"
           :class="activeSettingsTab === 'license' ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
         >
           License
@@ -458,7 +466,7 @@ onMounted(async () => {
           role="tab"
           :aria-selected="activeSettingsTab === 'timers'"
           @click="activeSettingsTab = 'timers'"
-          class="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition"
+          class="inline-flex h-8 items-center justify-center rounded px-2.5 text-xs font-semibold transition"
           :class="activeSettingsTab === 'timers' ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
         >
           Machine Page Timers
@@ -468,7 +476,7 @@ onMounted(async () => {
           role="tab"
           :aria-selected="activeSettingsTab === 'notes'"
           @click="activeSettingsTab = 'notes'"
-          class="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-semibold transition"
+          class="inline-flex h-8 items-center justify-center rounded px-2.5 text-xs font-semibold transition"
           :class="activeSettingsTab === 'notes' ? 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
         >
           Quick Notes
@@ -476,11 +484,11 @@ onMounted(async () => {
       </div>
     </div>
 
-    <section v-if="activeSettingsTab === 'license'" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+    <section v-if="activeSettingsTab === 'license'" class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div class="flex flex-col gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 class="text-base font-semibold text-slate-800 dark:text-white">License</h2>
-          <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Current activation status for this installation.</p>
+          <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Current activation status for this installation.</p>
         </div>
         <span
           class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
@@ -501,15 +509,15 @@ onMounted(async () => {
         </span>
       </div>
 
-      <div class="grid gap-3 px-4 py-4 sm:grid-cols-3">
-        <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+      <div class="grid gap-2 px-3 py-3 sm:grid-cols-3">
+        <div class="rounded-md border border-slate-100 bg-slate-50/70 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
           <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Plan Type</p>
           <p class="mt-1.5 text-sm font-semibold text-slate-800 dark:text-white">
             {{ licenseStatus === 'licensed' ? 'Paid License' : licenseStatus === 'trial' ? 'Free Trial (7 days)' : 'Trial Expired' }}
           </p>
         </div>
 
-        <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+        <div class="rounded-md border border-slate-100 bg-slate-50/70 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
           <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Expires</p>
           <p class="mt-1.5 text-sm font-semibold text-slate-800 dark:text-white">
             <template v-if="licenseStatus === 'licensed'">
@@ -522,7 +530,7 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div class="rounded-lg border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+        <div class="rounded-md border border-slate-100 bg-slate-50/70 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
           <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Days Remaining</p>
           <p class="mt-1.5 text-sm font-semibold"
             :class="{
@@ -543,7 +551,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="licenseStatus === 'licensed'" class="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <div v-if="licenseStatus === 'licensed'" class="flex flex-col gap-2 border-t border-slate-100 px-3 py-2.5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p class="text-xs text-slate-400 dark:text-slate-500">License Key</p>
           <p class="mt-0.5 font-mono text-sm font-semibold tracking-widest text-slate-700 dark:text-slate-200">{{ maskedKey }}</p>
@@ -552,21 +560,21 @@ onMounted(async () => {
           <button
             @click="handleReplaceLicense"
             :disabled="replacing"
-            class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-4 text-xs font-semibold text-sky-600 transition hover:bg-sky-100 disabled:opacity-60 dark:border-sky-800/40 dark:bg-sky-950/20 dark:text-sky-400 dark:hover:bg-sky-950/40"
+            class="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 text-xs font-semibold text-sky-600 transition hover:bg-sky-100 disabled:opacity-60 dark:border-sky-800/40 dark:bg-sky-950/20 dark:text-sky-400 dark:hover:bg-sky-950/40"
           >
             {{ replacing ? 'Replacing…' : 'Replace' }}
           </button>
           <button
             @click="handleDeactivateLicense"
             :disabled="deactivating"
-            class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-60 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-400 dark:hover:bg-rose-950/40"
+            class="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-60 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-400 dark:hover:bg-rose-950/40"
           >
             {{ deactivating ? 'Removing…' : 'Remove' }}
           </button>
         </div>
       </div>
 
-      <div v-else class="border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+      <div v-else class="border-t border-slate-100 px-3 py-2.5 dark:border-slate-800">
         <p class="text-xs text-slate-500 dark:text-slate-400">
           <template v-if="licenseStatus === 'trial'">Upgrade to a paid license to continue after your trial ends.</template>
           <template v-else>Your trial has expired. Enter a license key to continue.</template>
@@ -575,32 +583,32 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div v-if="activeSettingsTab === 'general' || activeSettingsTab === 'timers'" class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-4">
+    <section class="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div v-if="activeSettingsTab === 'general' || activeSettingsTab === 'timers'" class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
         <template v-if="activeSettingsTab === 'general'">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">General</h2>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Display name appears in generated printable reports.</p>
+        <h2 class="text-base font-semibold text-slate-900 dark:text-white">General</h2>
+        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Display name appears in generated printable reports.</p>
 
-        <div class="mt-3">
+        <div class="mt-2.5">
           <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Company / School Name</label>
           <input
             v-model.trim="form.company_school_name"
             type="text"
             placeholder="Enter company or school name"
-            class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+            class="h-9 w-full rounded-md border border-slate-300 bg-transparent px-2.5 py-1.5 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
           />
         </div>
 
-        <div class="mt-3">
+        <div class="mt-2.5">
           <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Company / School Logo</label>
           <input
             type="file"
             accept="image/png,image/jpeg,image/jpg,image/webp"
             @change="uploadLogo"
-            class="block w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-sky-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-sky-700 hover:file:bg-sky-200 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
+            class="block h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-700 file:mr-2 file:rounded file:border-0 file:bg-sky-100 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-sky-700 hover:file:bg-sky-200 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
           />
-          <div v-if="form.company_school_logo" class="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900/40">
-            <img :src="form.company_school_logo" alt="Company logo" class="h-12 w-12 rounded-md bg-white object-contain p-1" />
+          <div v-if="form.company_school_logo" class="mt-1.5 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-700 dark:bg-slate-900/40">
+            <img :src="form.company_school_logo" alt="Company logo" class="h-10 w-10 rounded bg-white object-contain p-1" />
             <div class="min-w-0">
               <p class="text-sm font-medium text-slate-800 dark:text-white">Logo ready</p>
               <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.company_school_logo }}</p>
@@ -608,9 +616,9 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+        <div class="mt-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
           <label class="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-            <input v-model="form.company_school_logo_print_enabled" type="checkbox" class="h-4 w-4" />
+            <input v-model="form.company_school_logo_print_enabled" type="checkbox" class="h-3.5 w-3.5" />
             Show logo in printed reports
           </label>
           <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -618,7 +626,7 @@ onMounted(async () => {
           </p>
         </div>
 
-        <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+        <div class="mt-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
           <div class="flex items-start justify-between gap-3">
             <div>
               <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300">Biometric DTR Signatory</h3>
@@ -627,12 +635,12 @@ onMounted(async () => {
               </p>
             </div>
             <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-              <input v-model="form.biometric_dtr_signatory_use_default" type="checkbox" class="h-4 w-4" />
+              <input v-model="form.biometric_dtr_signatory_use_default" type="checkbox" class="h-3.5 w-3.5" />
               Use as default in Biometric DTR
             </label>
           </div>
 
-          <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
+          <div class="mt-2.5 grid gap-2.5 lg:grid-cols-[1fr_1fr]">
             <div>
               <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Signatory Name (optional)</label>
               <input
@@ -640,7 +648,7 @@ onMounted(async () => {
                 type="text"
                 placeholder="Optional"
                 :disabled="!form.biometric_dtr_signatory_use_default"
-                class="h-10 w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+                class="h-9 w-full rounded-md border border-slate-300 bg-transparent px-2.5 py-1.5 text-xs text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
               />
               <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">This name prints above the signature line when the default is enabled.</p>
             </div>
@@ -652,10 +660,10 @@ onMounted(async () => {
                 accept="image/png,image/jpeg,image/jpg,image/webp"
                 @change="uploadSignature"
                 :disabled="!form.biometric_dtr_signatory_use_default"
-                class="block w-full rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-sky-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-sky-700 hover:file:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
+                class="block h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-700 file:mr-2 file:rounded file:border-0 file:bg-sky-100 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-sky-700 hover:file:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
               />
-              <div v-if="form.biometric_dtr_signatory_signature" class="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/30">
-                <img :src="form.biometric_dtr_signatory_signature" alt="Signatory signature" class="h-12 max-w-[160px] object-contain" />
+              <div v-if="form.biometric_dtr_signatory_signature" class="mt-2 flex items-center gap-2 rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-950/30">
+                <img :src="form.biometric_dtr_signatory_signature" alt="Signatory signature" class="h-10 max-w-[140px] object-contain" />
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-slate-800 dark:text-white">Signature ready</p>
                   <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.biometric_dtr_signatory_signature }}</p>
@@ -664,7 +672,7 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-400">
+          <div class="mt-2.5 flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-400">
             <div>
               <p class="font-semibold text-slate-700 dark:text-slate-300">Print Preview</p>
               <p class="mt-1">
@@ -672,7 +680,7 @@ onMounted(async () => {
               </p>
             </div>
             <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-              <input v-model="form.biometric_dtr_signatory_signature_enabled" type="checkbox" class="h-4 w-4" />
+              <input v-model="form.biometric_dtr_signatory_signature_enabled" type="checkbox" class="h-3.5 w-3.5" />
               Use e-signature in Biometric DTR
             </label>
           </div>
@@ -681,11 +689,11 @@ onMounted(async () => {
         </template>
 
         <div v-if="activeSettingsTab === 'timers'">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Machine Page Timers</h2>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Set interval in milliseconds. Disable a timer to turn that background task off.</p>
+          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Machine Page Timers</h2>
+          <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Set interval in milliseconds. Disable a timer to turn that background task off.</p>
 
-          <div class="mt-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
-            <table class="min-w-full text-sm">
+          <div class="mt-2.5 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+            <table class="min-w-full text-xs">
               <thead class="bg-slate-50 dark:bg-slate-800/60">
                 <tr>
                   <th class="px-3 py-2 text-left font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Timer</th>
@@ -695,65 +703,65 @@ onMounted(async () => {
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
                 <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200">Daemon Status Poll</td>
-                  <td class="px-4 py-2.5">
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">Daemon Status Poll</td>
+                  <td class="px-3 py-2">
                     <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                      <input v-model="form.machine_auto_sync_status_timer_enabled" type="checkbox" class="h-4 w-4" />
+                      <input v-model="form.machine_auto_sync_status_timer_enabled" type="checkbox" class="h-3.5 w-3.5" />
                       <span :class="form.machine_auto_sync_status_timer_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'">
                         {{ form.machine_auto_sync_status_timer_enabled ? 'On' : 'Off' }}
                       </span>
                     </label>
                   </td>
-                  <td class="px-4 py-2.5">
+                  <td class="px-3 py-2">
                     <input
                       v-model.number="form.machine_auto_sync_status_timer_ms"
                       type="number"
                       min="250"
                       max="300000"
                       :disabled="!form.machine_auto_sync_status_timer_enabled"
-                      class="h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-white/90"
+                      class="h-8 w-full rounded border border-slate-300 bg-transparent px-2.5 text-xs text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-white/90"
                     />
                   </td>
                 </tr>
                 <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200">Machine List Refresh</td>
-                  <td class="px-4 py-2.5">
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">Machine List Refresh</td>
+                  <td class="px-3 py-2">
                     <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                      <input v-model="form.machine_refresh_timer_enabled" type="checkbox" class="h-4 w-4" />
+                      <input v-model="form.machine_refresh_timer_enabled" type="checkbox" class="h-3.5 w-3.5" />
                       <span :class="form.machine_refresh_timer_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'">
                         {{ form.machine_refresh_timer_enabled ? 'On' : 'Off' }}
                       </span>
                     </label>
                   </td>
-                  <td class="px-4 py-2.5">
+                  <td class="px-3 py-2">
                     <input
                       v-model.number="form.machine_refresh_timer_ms"
                       type="number"
                       min="250"
                       max="300000"
                       :disabled="!form.machine_refresh_timer_enabled"
-                      class="h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-white/90"
+                      class="h-8 w-full rounded border border-slate-300 bg-transparent px-2.5 text-xs text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-white/90"
                     />
                   </td>
                 </tr>
                 <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                  <td class="px-4 py-2.5 text-slate-700 dark:text-slate-200">Web Auto Fallback Cycle</td>
-                  <td class="px-4 py-2.5">
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">Web Auto Fallback Cycle</td>
+                  <td class="px-3 py-2">
                     <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                      <input v-model="form.machine_web_auto_fallback_timer_enabled" type="checkbox" class="h-4 w-4" />
+                      <input v-model="form.machine_web_auto_fallback_timer_enabled" type="checkbox" class="h-3.5 w-3.5" />
                       <span :class="form.machine_web_auto_fallback_timer_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'">
                         {{ form.machine_web_auto_fallback_timer_enabled ? 'On' : 'Off' }}
                       </span>
                     </label>
                   </td>
-                  <td class="px-4 py-2.5">
+                  <td class="px-3 py-2">
                     <input
                       v-model.number="form.machine_web_auto_fallback_timer_ms"
                       type="number"
                       min="250"
                       max="300000"
                       :disabled="!form.machine_web_auto_fallback_timer_enabled"
-                      class="h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-white/90"
+                      class="h-8 w-full rounded border border-slate-300 bg-transparent px-2.5 text-xs text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-white/90"
                     />
                   </td>
                 </tr>
@@ -762,8 +770,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="mt-3 flex justify-end">
-          <Button @click="saveSettings" size="sm" variant="primary" :className="'h-10 bg-sky-500 hover:bg-sky-600 text-white'" :disabled="saving">
+        <div class="mt-2.5 flex justify-end">
+          <Button @click="saveSettings" size="sm" variant="primary" :className="'h-9 bg-sky-500 hover:bg-sky-600 text-white'" :disabled="saving">
             {{ saving ? 'Saving...' : 'Save Settings' }}
           </Button>
         </div>

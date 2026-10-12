@@ -34,7 +34,7 @@ class BiometricReportController extends Controller
                 'profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
                 'inChargeUser:id,name,in_charge_user_id',
                 'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
-                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes',
+        'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'departmentRef:id,department_name',
                 'collegeRef:id,college_short,college_long',
@@ -170,6 +170,10 @@ class BiometricReportController extends Controller
 
         $resolveGraceCorrectedType = function ($officeShift, array $item) use ($parseClockMinutes) {
             $rawType = strtoupper((string) ($item['checktype'] ?? ''));
+            // Never turn a valid OUT punch into IN (or vice versa) due to grace windows.
+            if (in_array($rawType, ['I', 'O'], true)) {
+                return $rawType;
+            }
 
             if (!$officeShift || !(bool) ($officeShift->grace_enabled ?? false)) {
                 return $rawType;
@@ -181,19 +185,21 @@ class BiometricReportController extends Controller
             }
 
             $punchMinutes = ((int) date('G', $timestamp) * 60) + (int) date('i', $timestamp);
-            $before = max(0, (int) ($officeShift->grace_before_minutes ?? 0));
-            $after = max(0, (int) ($officeShift->grace_after_minutes ?? 0));
+            $checkInBefore = max(0, (int) ($officeShift->grace_checkin_before_minutes ?? $officeShift->grace_before_minutes ?? 0));
+            $checkInAfter = max(0, (int) ($officeShift->grace_checkin_after_minutes ?? $officeShift->grace_after_minutes ?? 0));
+            $checkOutBefore = max(0, (int) ($officeShift->grace_checkout_before_minutes ?? $officeShift->grace_before_minutes ?? 0));
+            $checkOutAfter = max(0, (int) ($officeShift->grace_checkout_after_minutes ?? $officeShift->grace_after_minutes ?? 0));
             $candidates = [];
 
             foreach (($officeShift->schedules ?? collect())->sortBy('sequence') as $slot) {
                 $inMinute = $parseClockMinutes($slot->time_in);
                 $outMinute = $parseClockMinutes($slot->time_out);
 
-                if ($inMinute !== null && $punchMinutes >= ($inMinute - $before) && $punchMinutes <= ($inMinute + $after)) {
+                if ($inMinute !== null && $punchMinutes >= ($inMinute - $checkInBefore) && $punchMinutes <= ($inMinute + $checkInAfter)) {
                     $candidates[] = ['type' => 'I', 'distance' => abs($punchMinutes - $inMinute)];
                 }
 
-                if ($outMinute !== null && $punchMinutes >= ($outMinute - $before) && $punchMinutes <= ($outMinute + $after)) {
+                if ($outMinute !== null && $punchMinutes >= ($outMinute - $checkOutBefore) && $punchMinutes <= ($outMinute + $checkOutAfter)) {
                     $candidates[] = ['type' => 'O', 'distance' => abs($punchMinutes - $outMinute)];
                 }
             }

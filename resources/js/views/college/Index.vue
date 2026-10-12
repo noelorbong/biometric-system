@@ -180,7 +180,7 @@ onMounted(async () => {
       </section>
 
   <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
-        <div class="flex flex-col gap-3 md:flex-row md:items-center">
+        <div class="flex  gap-3 flex-row md:items-center">
           <div class="relative flex-1">
             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.3 5.3a7.5 7.5 0 0011.35 11.35z" />
@@ -200,7 +200,7 @@ onMounted(async () => {
     </div>
 
     <section class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="max-w-full overflow-x-auto custom-scrollbar">
+      <div class="hidden max-w-full overflow-x-auto custom-scrollbar md:block">
         <table class="min-w-full">
           <thead class="bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_50%,_#0891b2_100%)]">
             <tr>
@@ -240,6 +240,35 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class=" md:hidden">
+        <article
+          v-for="college in filteredColleges"
+          :key="`mobile-college-${college.id}`"
+          class="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/70"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ college.college_long || '-' }}</h3>
+              <p class="truncate text-[11px] text-slate-500 dark:text-slate-400">{{ college.college_short || '-' }} · {{ college.college_head || 'No head assigned' }}</p>
+            </div>
+            <div class="flex shrink-0 items-center gap-1.5">
+              <button @click="openEdit(college)" type="button" aria-label="Edit college" class="inline-flex h-8 w-8 items-center justify-center rounded border border-cyan-200 bg-white text-cyan-700 transition hover:bg-cyan-50 dark:border-cyan-800/60 dark:bg-slate-900 dark:text-cyan-300 dark:hover:bg-cyan-900/20"><PencilIcon /></button>
+              <button @click="openDelete(college)" type="button" aria-label="Delete college" class="inline-flex h-8 w-8 items-center justify-center rounded border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-800/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-900/20"><TrashIcon /></button>
+            </div>
+          </div>
+          <div class="mt-2">
+            <span
+              class="rounded px-2 py-0.5 text-[10px] font-semibold"
+              :class="college.status ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300'"
+            >
+              {{ college.status ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+        </article>
+        <div v-if="!filteredColleges.length" class="px-3 py-5 text-center text-xs text-slate-500 dark:text-slate-400">
+          No colleges found.
+        </div>
       </div>
     </section>
 

@@ -47,6 +47,25 @@
             />
           </div>
 
+          <div v-if="rows.length && sourceColumns.length" class="mt-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900/60 dark:bg-sky-950/20">
+            <div class="mb-2">
+              <p class="text-sm font-semibold text-slate-800 dark:text-slate-100">Column Mapper</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Choose which uploaded column supplies each user field, then apply the mapping.</p>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <label v-for="field in mappingFields" :key="field.key" class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {{ field.label }}
+                <select v-model="columnMapping[field.key]" class="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900">
+                  <option value="">Not mapped</option>
+                  <option v-for="column in sourceColumns" :key="`${field.key}-${column.index}`" :value="String(column.label)">{{ column.label }}</option>
+                </select>
+              </label>
+            </div>
+            <button type="button" class="mt-3 h-8 rounded-md bg-sky-600 px-3 text-xs font-semibold text-white hover:bg-sky-700" @click="applyColumnMapping">
+              Apply Mapping
+            </button>
+          </div>
+
           <p v-if="errorText" class="mt-2 text-sm text-red-600">{{ errorText }}</p>
 
           <div v-if="summary" class="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
@@ -193,6 +212,24 @@ const selectedMap = ref({})
 const searchQuery = ref('')
 const sortField = ref('id')
 const sortDirection = ref('asc')
+const columnMapping = ref({})
+
+const mappingFields = [
+  { key: 'uid', label: 'ID' },
+  { key: 'pin', label: 'PIN' },
+  { key: 'name', label: 'Name' },
+  { key: 'password', label: 'Password' },
+  { key: 'privilege', label: 'Privilege' },
+  { key: 'card', label: 'Card' },
+]
+
+const sourceColumns = computed(() => {
+  const columns = rows.value[0]?._source_columns || []
+  return Object.entries(columns).map(([index, label]) => ({
+    index,
+    label: label || `Column ${Number(index) + 1}`,
+  }))
+})
 
 const normalizeText = (value) => String(value ?? '').toLowerCase()
 
@@ -273,6 +310,57 @@ const onFileChange = (event) => {
   summary.value = null
   selectedMap.value = {}
   errorText.value = ''
+  columnMapping.value = {}
+}
+
+const initializeColumnMapping = () => {
+  const columns = sourceColumns.value
+  const normalized = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const aliases = {
+    uid: ['userid', 'id', 'employeeid'],
+    pin: ['badgenumber', 'pin', 'badge', 'biometricid'],
+    name: ['name', 'fullname', 'username'],
+    password: ['password', 'mverifypass'],
+    privilege: ['privilege', 'privilage', 'role'],
+    card: ['cardno', 'card', 'cardnumber'],
+  }
+  const next = {}
+  mappingFields.forEach((field) => {
+    const match = columns.find((column) => aliases[field.key].includes(normalized(column.label)))
+    next[field.key] = match ? String(match.label) : ''
+  })
+  columnMapping.value = next
+}
+
+const applyColumnMapping = () => {
+  rows.value = rows.value.map((row) => {
+    const values = row._source_data || {}
+    const read = (key) => values[columnMapping.value[key]] ?? ''
+    const uid = String(read('uid')).trim()
+    const pin = String(read('pin')).trim()
+    const resolvedUserId = /^\d+$/.test(uid) ? Number(uid) : (/^\d+$/.test(pin) ? Number(pin) : null)
+    return {
+      ...row,
+      uid: /^\d+$/.test(uid) ? Number(uid) : 0,
+      pin,
+      name: String(read('name')).trim(),
+      password: String(read('password')).trim(),
+      privilege: Number(read('privilege')) || 0,
+      card: Number(read('card')) || 0,
+      resolved_user_id: resolvedUserId,
+      valid_for_import: resolvedUserId !== null && resolvedUserId > 0 && /^\d+$/.test(pin),
+    }
+  })
+  selectedMap.value = {}
+  rows.value.forEach((row) => {
+    if (row.valid_for_import && !row.has_existing_id) selectedMap.value[row.resolved_user_id] = true
+  })
+  summary.value = {
+    total_rows: rows.value.length,
+    valid_rows: rows.value.filter((row) => row.valid_for_import).length,
+    existing_id_rows: rows.value.filter((row) => row.valid_for_import && row.has_existing_id).length,
+    new_rows: rows.value.filter((row) => row.valid_for_import && !row.has_existing_id).length,
+  }
 }
 
 const isRowSelectable = (row) => {
@@ -388,6 +476,7 @@ const previewFile = async () => {
   if (result.success) {
     rows.value = result.data.rows || []
     summary.value = result.data.summary || null
+    initializeColumnMapping()
 
     const next = {}
     rows.value.forEach((row) => {

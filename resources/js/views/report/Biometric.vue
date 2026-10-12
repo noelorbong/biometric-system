@@ -10,6 +10,7 @@ import { useUserStore } from '@/store/UserStore'
 import { useAppSettingStore } from '@/store/AppSettingStore'
 import { storeToRefs } from 'pinia'
 import PrintableAttendance from '@/views/user/components/PrintableAttendance.vue'
+import { ChevronDownIcon, FilterIcon } from '@/icons'
 
 const userStore = useUserStore()
 const appSettingStore = useAppSettingStore()
@@ -125,6 +126,7 @@ const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
 const filterMode = ref('monthly')
+const showMobileFilters = ref(false)
 const filters = ref({
   year: now.getFullYear(),
   month: now.getMonth() + 1,
@@ -767,11 +769,17 @@ const getShiftGraceSettings = (user) => {
     enabled: Boolean(officeShift?.grace_enabled),
     before: Math.max(0, Number(officeShift?.grace_before_minutes || 0)),
     after: Math.max(0, Number(officeShift?.grace_after_minutes || 0)),
+    checkInBefore: Math.max(0, Number(officeShift?.grace_checkin_before_minutes ?? officeShift?.grace_before_minutes ?? 0)),
+    checkInAfter: Math.max(0, Number(officeShift?.grace_checkin_after_minutes ?? officeShift?.grace_after_minutes ?? 0)),
+    checkOutBefore: Math.max(0, Number(officeShift?.grace_checkout_before_minutes ?? officeShift?.grace_before_minutes ?? 0)),
+    checkOutAfter: Math.max(0, Number(officeShift?.grace_checkout_after_minutes ?? officeShift?.grace_after_minutes ?? 0)),
   }
 }
 
 const resolveGraceCorrectedCheckType = (user, record, slotMeta) => {
   const rawType = String(record?.CHECKTYPE || '').toUpperCase()
+  // Explicit device/override types take precedence over schedule proximity.
+  if (rawType === 'I' || rawType === 'O') return rawType
   const minutes = toMinutesFromDateTime(record?.CHECKTIME)
   const grace = getShiftGraceSettings(user)
 
@@ -782,11 +790,11 @@ const resolveGraceCorrectedCheckType = (user, record, slotMeta) => {
   const candidates = []
 
   slotMeta.forEach((slot) => {
-    if (slot.inMinute !== null && minutes >= slot.inMinute - grace.before && minutes <= slot.inMinute + grace.after) {
+    if (slot.inMinute !== null && minutes >= slot.inMinute - grace.checkInBefore && minutes <= slot.inMinute + grace.checkInAfter) {
       candidates.push({ type: 'I', distance: Math.abs(minutes - slot.inMinute) })
     }
 
-    if (slot.outMinute !== null && minutes >= slot.outMinute - grace.before && minutes <= slot.outMinute + grace.after) {
+    if (slot.outMinute !== null && minutes >= slot.outMinute - grace.checkOutBefore && minutes <= slot.outMinute + grace.checkOutAfter) {
       candidates.push({ type: 'O', distance: Math.abs(minutes - slot.outMinute) })
     }
   })
@@ -811,6 +819,10 @@ const resolveGraceCorrectedPunches = (user, records, slotMeta) => {
   const assignedEndpoints = new Set()
 
   return records.map((record) => {
+    const rawType = String(record?.CHECKTYPE || '').toUpperCase()
+    if (rawType === 'I' || rawType === 'O') {
+      return { record, type: rawType }
+    }
     const minutes = toMinutesFromDateTime(record?.CHECKTIME)
     if (minutes === null) {
       return { record, type: String(record?.CHECKTYPE || '').toUpperCase() }
@@ -818,8 +830,8 @@ const resolveGraceCorrectedPunches = (user, records, slotMeta) => {
 
     const endpoint = endpoints.find((candidate) => (
       !assignedEndpoints.has(candidate.key)
-      && minutes >= candidate.minute - grace.before
-      && minutes <= candidate.minute + grace.after
+      && minutes >= candidate.minute - (candidate.type === 'I' ? grace.checkInBefore : grace.checkOutBefore)
+      && minutes <= candidate.minute + (candidate.type === 'I' ? grace.checkInAfter : grace.checkOutAfter)
     ))
 
     if (!endpoint) {
@@ -967,7 +979,7 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
       normalizedPunches.forEach((punch) => {
         const minutes = toMinutesFromDateTime(punch.time)
         const grace = getShiftGraceSettings(dateUser)
-        const graceAfter = grace.enabled ? grace.after : 0
+          const graceAfter = grace.enabled ? grace.checkOutAfter : 0
         const slotIndex = punch.type === 'I'
           ? resolveCheckInSlotIndex(minutes, slotMeta)
           : resolveCheckOutSlotIndex(minutes, slotMeta, graceAfter)
@@ -1088,7 +1100,7 @@ const getPrintableRecords = (user) => {
       </div>
 
       <section
-        class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+        class="mt-3 border-t border-slate-200 sm:pt-3 dark:border-slate-800">
         <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-end">
           <div class="shrink-0">
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mode</label>
@@ -1103,10 +1115,22 @@ const getPrintableRecords = (user) => {
                 :class="filterMode === 'custom' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:bg-white/10 hover:text-white'">
                 Custom
               </button>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center gap-1 rounded-sm border-l border-white/20 px-2 text-[11px] font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                :aria-expanded="showMobileFilters"
+                aria-controls="active-biometric-report-filters"
+                :aria-label="showMobileFilters ? 'Hide report filters' : 'Show report filters'"
+                :title="showMobileFilters ? 'Hide report filters' : 'Show report filters'"
+                @click="showMobileFilters = !showMobileFilters"
+              >
+                <FilterIcon class="h-3.5 w-3.5" />
+                <ChevronDownIcon class="h-3.5 w-3.5 transition-transform" :class="showMobileFilters ? 'rotate-180' : ''" />
+              </button>
             </div>
           </div>
 
-          <div class="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div id="active-biometric-report-filters" class="flex-1 gap-2 grid-cols-2 lg:grid-cols-6" :class="showMobileFilters ? 'grid' : 'hidden lg:grid'">
             <div v-if="filterMode === 'monthly'">
               <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
               <select v-model.number="filters.year" class="h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
@@ -1146,11 +1170,12 @@ const getPrintableRecords = (user) => {
                 <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)" class="bg-white text-slate-900">{{ college.college_long || college.college_short || `College #${college.id}` }}</option>
               </select>
             </div>
-          </div>
-          <Button @click="generateReport" size="sm" variant="primary" :disabled="loading"
-            :className="'h-8 rounded border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:opacity-60'">
+            <Button @click="generateReport" size="sm" variant="primary" :disabled="loading"
+            :className="'mt-auto h-8 rounded border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:opacity-60'">
             {{ loading ? 'Generating...' : 'Generate' }}
           </Button>
+          </div>
+          
         </div>
       </section>
 
@@ -1236,7 +1261,7 @@ const getPrintableRecords = (user) => {
       <div
         class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+          <div class="flex items-center justify-between gap-3">
             <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Report Filters</h2>
             <!-- <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Set criteria to generate the attendance
               population.</p> -->
@@ -1244,7 +1269,7 @@ const getPrintableRecords = (user) => {
           
         </div>
 
-        <div class="mt-2 space-y-3">
+        <div class="mt-2 flex items-end justify-between gap-3">
           <div>
             <label
               class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
@@ -1261,7 +1286,9 @@ const getPrintableRecords = (user) => {
               </button>
             </div>
           </div>
+        </div>
 
+        <div id="biometric-report-filters" class="mt-2 space-y-3" :class="showMobileFilters ? 'block' : 'hidden md:block'">
           <div class="grid grid-cols-1 gap-3 md:grid-cols-6">
             <div v-if="filterMode === 'monthly'">
               <label
