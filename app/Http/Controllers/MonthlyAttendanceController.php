@@ -16,6 +16,7 @@ class MonthlyAttendanceController extends Controller
 {
     public function index(Request $request, MonthlyAttendanceService $attendance, AttendanceLogService $logs, WorkScheduleResolver $resolver)
     {
+        $started = microtime(true);
         abort_unless((int) ($request->user()?->role ?? -1) === 1, 403);
         $validated = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
@@ -30,7 +31,9 @@ class MonthlyAttendanceController extends Controller
             ->when($validated['office_shift_id'] ?? null, fn ($query, $id) => $query->where('office_shift_id', $id))
             ->orderBy('name')->get();
         // One range query includes the next month's first day for overnight departures.
+        $logsStarted = microtime(true);
         $punches = $logs->forUsers($users->modelKeys(), $month, $end->addDay());
+        $logsMs = (microtime(true) - $logsStarted) * 1000;
         $holidays = Holiday::where('holiday_date', '>=', $month->toDateString())
             ->where('holiday_date', '<', $end->toDateString())->get();
         $holidaysByDate = $holidays->groupBy(fn ($holiday) => $holiday->holiday_date->format('Y-m-d'))
@@ -55,6 +58,7 @@ class MonthlyAttendanceController extends Controller
                 'weekend' => $date->isWeekend(), 'future' => $date->startOfDay() > $now,
                 'holidays' => $resolver->events($date->toDateString(), $validated['office_shift_id'] ?? null)];
         }
+        $calculationStarted = microtime(true);
         $employees = $users->map(function ($user) use ($attendance, $month, $punches, $holidaysByDate, $absencesByUser, $now, $resolver) {
             $profile = $user->profile;
             $fullName = trim(implode(' ', array_filter([$profile?->first_name, $profile?->middle_name,
@@ -65,11 +69,14 @@ class MonthlyAttendanceController extends Controller
             ], $attendance->calculate($month, $user->officeShift?->toArray(), $punches[$user->id] ?? [], $holidaysByDate, $absencesByUser[$user->id] ?? [], $now, $resolver->forMonth($user, $month)));
         })->sortBy([['late_count', 'desc'], ['total_minutes', 'desc'], ['name', 'asc']])->values();
 
-        return response()->json([
+        $calculationMs = (microtime(true) - $calculationStarted) * 1000;
+        $response = response()->json([
             'month' => $month->format('Y-m'), 'month_label' => $month->format('F Y'),
             'generated_at' => $now->format('Y-m-d H:i:s'), 'timezone' => $now->timezoneName,
             'provisional' => $end->addDay() > $now,
             'days' => $days, 'office_shifts' => $shifts, 'employees' => $employees,
         ]);
+        return $response->header('Server-Timing', sprintf('logs;dur=%.2f, calculation;dur=%.2f, total;dur=%.2f',
+            $logsMs, $calculationMs, (microtime(true) - $started) * 1000));
     }
 }

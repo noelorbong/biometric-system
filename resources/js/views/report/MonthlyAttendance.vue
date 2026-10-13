@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import flatPickr from 'vue-flatpickr-component'
@@ -15,7 +15,7 @@ const route = useRoute()
 const activeTab = ref(route.query.tab === 'absences' ? 'absences' : 'attendance')
 const month = ref('')
 const shiftId = ref('')
-const report = ref(null)
+const report = shallowRef(null)
 const shifts = ref([])
 const loading = ref(false)
 const initializing = ref(true)

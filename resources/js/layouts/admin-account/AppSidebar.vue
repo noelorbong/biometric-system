@@ -3,9 +3,9 @@
     :class="[
       'admin-sidebar fixed flex flex-col top-0 px-4 left-0 text-slate-200 h-screen transition-all duration-300 ease-in-out z-40 border-r',
       {
-        'lg:w-[290px]': isExpanded || isMobileOpen || isHovered,
-        'lg:w-[90px]': !isExpanded && !isHovered,
-        'translate-x-0 w-[290px]': isMobileOpen,
+        'lg:w-[250px]': isExpanded || isMobileOpen || isHovered,
+        'lg:w-[72px]': !isExpanded && !isHovered,
+        'translate-x-0 w-[250px]': isMobileOpen,
         '-translate-x-full': !isMobileOpen,
         'lg:translate-x-0': true,
       },

@@ -12,6 +12,7 @@ class WorkScheduleResolver
 {
     private array $rules = [];
     private array $events = [];
+    private array $resolved = [];
 
     public static function profiles(): array
     {
@@ -31,9 +32,17 @@ class WorkScheduleResolver
 
     public function load(CarbonImmutable $from, CarbonImmutable $to): self
     {
-        $this->rules = WorkScheduleRule::where('effective_from', '<=', $to->toDateString())
+        $rules = WorkScheduleRule::where('effective_from', '<=', $to->toDateString())
             ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', $from->toDateString()))
             ->get()->toArray();
+        $priority = fn ($rule) => ($rule['kind'] === 'weekly' ? 20 : ($rule['kind'] === 'baseline' ? 0 : 10)) + ($rule['user_id'] ? 1 : 0);
+        usort($rules, fn ($a, $b) => ($priority($b) <=> $priority($a))
+            ?: strcmp($b['effective_from'], $a['effective_from']) ?: ($b['id'] <=> $a['id']));
+        $this->rules = [];
+        $this->resolved = [];
+        foreach ($rules as $rule) {
+            $this->rules[(int) $rule['office_shift_id']][] = $rule;
+        }
         $this->events = [];
         foreach (Holiday::whereBetween('holiday_date', [$from->toDateString(), $to->toDateString()])->get() as $holiday) {
             $this->events[$holiday->holiday_date->format('Y-m-d')][] = $holiday->toArray();
@@ -56,14 +65,20 @@ class WorkScheduleResolver
     public function resolve(User $user, string $date): ?array
     {
         $base = $user->officeShift?->toArray();
-        $applicable = array_filter($this->rules, fn ($rule) =>
-            (int) $rule['office_shift_id'] === (int) $user->office_shift_id
-            && (!$rule['user_id'] || (int) $rule['user_id'] === (int) $user->id)
-            && $rule['effective_from'] <= $date && (!$rule['effective_to'] || $rule['effective_to'] >= $date));
-        $priority = fn ($rule) => ($rule['kind'] === 'weekly' ? 20 : ($rule['kind'] === 'baseline' ? 0 : 10)) + ($rule['user_id'] ? 1 : 0);
-        usort($applicable, fn ($a, $b) => ($priority($b) <=> $priority($a))
-            ?: strcmp($b['effective_from'], $a['effective_from']) ?: ($b['id'] <=> $a['id']));
-        $rule = $applicable[0] ?? null;
+        $rule = null;
+        foreach ($this->rules[(int) $user->office_shift_id] ?? [] as $candidate) {
+            if ((!$candidate['user_id'] || (int) $candidate['user_id'] === (int) $user->id)
+                && $candidate['effective_from'] <= $date
+                && (!$candidate['effective_to'] || $candidate['effective_to'] >= $date)) {
+                $rule = $candidate;
+                break;
+            }
+        }
+        // Share results only for identical base schedules, rules and dates in this load.
+        $cacheKey = $date.':'.(int) $user->office_shift_id.':'.($rule['id'] ?? 0).':'.md5(serialize($base));
+        if (array_key_exists($cacheKey, $this->resolved)) {
+            return $this->resolved[$cacheKey];
+        }
         if ($rule) {
             $base = array_merge($base ?? [], $rule['profile']);
         }
@@ -76,7 +91,7 @@ class WorkScheduleResolver
         $base['_reason'] = $rule['reason'] ?? null;
         $base['_holidays'] = $this->events($date, (int) $user->office_shift_id);
         $base['_holiday_credit_minutes'] = 0;
-        if ($base['_is_working_day'] !== false) {
+        if ($base['_is_working_day'] !== false && $base['_holidays']) {
             foreach ($base['schedules'] ?? [] as $slot) {
                 $start = CarbonImmutable::parse($date.' '.$slot['time_in']);
                 $end = CarbonImmutable::parse($date.' '.$slot['time_out']);
@@ -91,7 +106,7 @@ class WorkScheduleResolver
                 }
             }
         }
-        return $base;
+        return $this->resolved[$cacheKey] = $base;
     }
 
     public function forMonth(User $user, CarbonImmutable $month): array

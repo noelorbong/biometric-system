@@ -3,7 +3,14 @@
 
     <!-- Profile Details -->
     <div class="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]">
-      <h5 class="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Profile Details</h5>
+      <div class="mb-3 flex items-center gap-3">
+        <img
+          :src="user.profile?.thumbnail || user.profile?.image || user.thumbnail || user.image || '/images/extras/add-image.png'"
+          alt="Profile photo"
+          class="h-16 w-16 rounded-lg border border-gray-200 object-cover dark:border-gray-700"
+        />
+        <h5 class="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Profile Details</h5>
+      </div>
       <dl class="space-y-1.5">
         <div v-for="(item, i) in profileFields" :key="`pf-${i}`"
           class="flex items-center justify-between gap-3 border-b border-gray-100 pb-1.5 last:border-0 last:pb-0 dark:border-gray-800">
@@ -160,6 +167,7 @@ const formatDob = (value) => {
 }
 
 const profileFields = computed(() => [
+  { label: 'Email',          value: props.user.email || '-' },
   { label: 'First Name',      value: props.user.profile?.first_name || '-' },
   { label: 'Middle Name',     value: props.user.profile?.middle_name || '-' },
   { label: 'Last Name',       value: props.user.profile?.last_name || '-' },

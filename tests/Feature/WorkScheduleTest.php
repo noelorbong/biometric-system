@@ -10,6 +10,30 @@ use Tests\Support\AttendanceDatabaseTestCase;
 
 class WorkScheduleTest extends AttendanceDatabaseTestCase
 {
+    public function test_resolver_cache_preserves_user_rules_and_resets_on_load(): void
+    {
+        $this->saveRule()->assertOk();
+        $resolver = new \App\Services\WorkScheduleResolver;
+        $month = CarbonImmutable::parse('2026-09-01');
+        $resolver->load($month, $month->addMonth());
+        $user = User::with('officeShift.schedules')->findOrFail(1);
+        $initial = $resolver->resolve($user, '2026-09-02');
+        $this->assertSame($initial, $resolver->resolve($user, '2026-09-02'));
+
+        $rule = WorkScheduleRule::where('kind', 'permanent')->firstOrFail();
+        $personal = $rule->replicate();
+        $personal->user_id = $user->id;
+        $profile = $personal->profile;
+        $profile['name'] = 'Personal schedule';
+        $personal->profile = $profile;
+        $personal->save();
+        $resolver->load($month, $month->addMonth());
+        $this->assertSame('Personal schedule', $resolver->resolve($user, '2026-09-02')['name']);
+        $other = clone $user;
+        $other->id = 999;
+        $this->assertSame($initial, $resolver->resolve($other, '2026-09-02'));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

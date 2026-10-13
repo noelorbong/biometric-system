@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 
 class DailyAttendanceService
 {
+    private array $timelines = [];
+
     /** Match punches to schedule periods, never to their position in the log list. */
     public function calculate(string $date, ?array $shift, array $punches, array $holidays, CarbonImmutable $now): array
     {
@@ -26,7 +28,9 @@ class DailyAttendanceService
         $schedules = $shift['schedules'];
         usort($schedules, fn ($a, $b) => $a['sequence'] <=> $b['sequence']);
         // Adjacent days keep overnight punches and early arrivals in their own shift.
-        $timeline = [];
+        $timelineKey = $date.':'.$now->timezoneName.':'.md5(serialize($schedules));
+        $timeline = $this->timelines[$timelineKey] ?? [];
+        if (!$timeline) {
         foreach ([-1, 0, 1] as $offset) {
             foreach ($schedules as $index => $schedule) {
                 $start = $day->addDays($offset)->setTimeFromTimeString($schedule['time_in']);
@@ -39,6 +43,10 @@ class DailyAttendanceService
             }
         }
         usort($timeline, fn ($a, $b) => $a['start'] <=> $b['start']);
+            // Immutable dates and copy-on-write arrays keep each employee's punches isolated.
+            if (count($this->timelines) >= 2048) $this->timelines = [];
+            $this->timelines[$timelineKey] = $timeline;
+        }
 
         if (!empty($shift['enable_auto_correction'])) {
             $autoCorrection = new BiometricAutoCorrectionService();
