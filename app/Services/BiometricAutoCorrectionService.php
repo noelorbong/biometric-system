@@ -149,8 +149,27 @@ class BiometricAutoCorrectionService
             $break = $dedupedBreak;
 
             if (count($break) === 0) {
-                $sessionPunches[0] = $pre;
-                $sessionPunches[1] = $post;
+                // A late morning checkout can occur after the afternoon start.
+                // If it is followed by an afternoon IN, keep that OUT with the morning session.
+                if (!empty($pre) && !empty($post) && $post[0]['type'] === 'O') {
+                    $firstAfternoonIn = null;
+                    foreach (array_slice($post, 1) as $postIndex => $postPunch) {
+                        if ($postPunch['type'] === 'I') {
+                            $firstAfternoonIn = $postIndex + 1;
+                            break;
+                        }
+                    }
+                    if ($firstAfternoonIn !== null) {
+                        $sessionPunches[0] = array_merge($pre, [$post[0]]);
+                        $sessionPunches[1] = array_slice($post, 1);
+                    } else {
+                        $sessionPunches[0] = $pre;
+                        $sessionPunches[1] = $post;
+                    }
+                } else {
+                    $sessionPunches[0] = $pre;
+                    $sessionPunches[1] = $post;
+                }
             } elseif (count($break) === 1) {
                 $b = $break[0];
                 if (empty($pre) && !empty($post)) {

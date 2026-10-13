@@ -125,8 +125,21 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
     breakPunches = dedupedBreak
 
     if (breakPunches.length === 0) {
-      sessionPunches[0] = pre
-      sessionPunches[1] = post
+      // A late morning checkout can occur after the afternoon start.
+      // If it is followed by an afternoon IN, keep that OUT with the morning session.
+      if (pre.length > 0 && post.length > 0 && post[0].type === 'O') {
+        const firstAfternoonIn = post.slice(1).findIndex((p) => p.type === 'I')
+        if (firstAfternoonIn >= 0) {
+          sessionPunches[0] = [...pre, post[0]]
+          sessionPunches[1] = post.slice(1)
+        } else {
+          sessionPunches[0] = pre
+          sessionPunches[1] = post
+        }
+      } else {
+        sessionPunches[0] = pre
+        sessionPunches[1] = post
+      }
     } else if (breakPunches.length === 1) {
       const b = breakPunches[0]
       if (pre.length === 0 && post.length > 0) {
