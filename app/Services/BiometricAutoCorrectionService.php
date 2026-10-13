@@ -135,7 +135,7 @@ class BiometricAutoCorrectionService
                 $last = end($dedupedBreak);
                 $isSameType = ($last['type'] && $p['type'] && $last['type'] === $p['type']);
                 $diffSec = $p['ts'] - $last['ts'];
-                if ($isSameType && $diffSec <= 300) {
+                if ($isSameType && $diffSec <= 60) {
                     if ($p['type'] === 'O') {
                         // For OUT, retain the latest scan
                         array_pop($dedupedBreak);

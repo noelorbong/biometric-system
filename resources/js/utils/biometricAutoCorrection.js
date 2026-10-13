@@ -111,7 +111,7 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
       const last = dedupedBreak[dedupedBreak.length - 1]
       const isSameType = Boolean(last.type && p.type && last.type === p.type)
       const diffSec = Math.round((p.ts - last.ts) / 1000)
-      if (isSameType && diffSec <= 300) {
+      if (isSameType && diffSec <= 60) {
         if (p.type === 'O') {
           // For OUT, retain the latest scan
           dedupedBreak.pop()
