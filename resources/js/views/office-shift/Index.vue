@@ -26,6 +26,7 @@ const form = ref({
   grace_after_minutes: 0,
   grace_checkin_before_minutes: 0, grace_checkin_after_minutes: 0,
   grace_checkout_before_minutes: 0, grace_checkout_after_minutes: 0,
+  enable_auto_correction: false,
   schedules: [{ time_in: '', time_out: '', is_next_day: false }],
 })
 
@@ -54,6 +55,7 @@ const filteredOfficeShifts = computed(() => {
 const totalShifts = computed(() => officeShifts.value.length)
 const fixedShifts = computed(() => officeShifts.value.filter((item) => !item.is_flexible).length)
 const flexibleShifts = computed(() => officeShifts.value.filter((item) => item.is_flexible).length)
+const autoCorrectShifts = computed(() => officeShifts.value.filter((item) => item.enable_auto_correction).length)
 const assignedUsersTotal = computed(() => {
   return officeShifts.value.reduce((sum, item) => sum + Number(item.users_count || 0), 0)
 })
@@ -83,6 +85,7 @@ const openCreate = () => {
     grace_after_minutes: 0,
     grace_checkin_before_minutes: 0, grace_checkin_after_minutes: 0,
     grace_checkout_before_minutes: 0, grace_checkout_after_minutes: 0,
+    enable_auto_correction: false,
     schedules: [{ time_in: '', time_out: '', is_next_day: false }],
   }
   isModalOpen.value = true
@@ -101,6 +104,7 @@ const openEdit = (shift) => {
     grace_checkin_after_minutes: Number(shift.grace_checkin_after_minutes ?? shift.grace_after_minutes ?? 0),
     grace_checkout_before_minutes: Number(shift.grace_checkout_before_minutes ?? shift.grace_before_minutes ?? 0),
     grace_checkout_after_minutes: Number(shift.grace_checkout_after_minutes ?? shift.grace_after_minutes ?? 0),
+    enable_auto_correction: Boolean(shift.enable_auto_correction),
     schedules: shift.schedules?.length
       ? shift.schedules.map((row) => ({
           time_in: (row.time_in || '').slice(0, 5),
@@ -131,6 +135,7 @@ const saveShift = async () => {
     grace_checkin_after_minutes: form.value.grace_enabled ? Number(form.value.grace_checkin_after_minutes || 0) : 0,
     grace_checkout_before_minutes: form.value.grace_enabled ? Number(form.value.grace_checkout_before_minutes || 0) : 0,
     grace_checkout_after_minutes: form.value.grace_enabled ? Number(form.value.grace_checkout_after_minutes || 0) : 0,
+    enable_auto_correction: Boolean(form.value.enable_auto_correction),
     schedules: form.value.is_flexible ? [] : schedules,
   }
 
@@ -234,6 +239,10 @@ const formatScheduleChip = (row) => {
           <p class="font-semibold text-amber-700 dark:text-amber-300">{{ flexibleShifts }}</p>
         </article>
         <article class="flex items-baseline gap-1.5">
+          <p class="font-medium text-slate-500 dark:text-slate-400">Auto Correct</p>
+          <p class="font-semibold text-teal-700 dark:text-teal-300">{{ autoCorrectShifts }}</p>
+        </article>
+        <article class="flex items-baseline gap-1.5">
           <p class="font-medium text-slate-500 dark:text-slate-400">Assigned Users</p>
           <p class="font-semibold text-slate-900 dark:text-white">{{ assignedUsersTotal }}</p>
         </article>
@@ -267,6 +276,7 @@ const formatScheduleChip = (row) => {
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Name</th>
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Schedule</th>
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Grace</th>
+              <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Auto Correct</th>
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Type</th>
               <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-100">Assigned Users</th>
               <th class="px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-100">Actions</th>
@@ -300,6 +310,15 @@ const formatScheduleChip = (row) => {
               </td>
               <td class="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300">
                 <span
+                  v-if="shift.enable_auto_correction"
+                  class="inline-flex rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:border-teal-900/50 dark:bg-teal-400/10 dark:text-teal-300"
+                >
+                  Enabled
+                </span>
+                <span v-else class="text-xs text-slate-400">Disabled</span>
+              </td>
+              <td class="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300">
+                <span
                   :class="shift.is_flexible
                     ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-400/10 dark:text-amber-300'
                     : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-400/10 dark:text-emerald-300'"
@@ -317,7 +336,7 @@ const formatScheduleChip = (row) => {
               </td>
             </tr>
             <tr v-if="!filteredOfficeShifts.length">
-              <td colspan="6" class="px-3 py-5 text-center text-xs text-slate-500 dark:text-slate-400">
+              <td colspan="7" class="px-3 py-5 text-center text-xs text-slate-500 dark:text-slate-400">
                 No office shifts found.
               </td>
             </tr>
@@ -367,6 +386,11 @@ const formatScheduleChip = (row) => {
             <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 dark:border-slate-800">
               <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Grace</span>
               <span v-if="shift.grace_enabled" class="rounded border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-900/50 dark:bg-violet-400/10 dark:text-violet-300">-{{ shift.grace_before_minutes || 0 }} / +{{ shift.grace_after_minutes || 0 }} min</span>
+              <span v-else class="text-slate-400">Disabled</span>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 dark:border-slate-800">
+              <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Auto Correct</span>
+              <span v-if="shift.enable_auto_correction" class="rounded border border-teal-200 bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:border-teal-900/50 dark:bg-teal-400/10 dark:text-teal-300">Enabled</span>
               <span v-else class="text-slate-400">Disabled</span>
             </div>
           </div>
@@ -432,6 +456,14 @@ const formatScheduleChip = (row) => {
                 Flexible Time
               </label>
               <p class="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">When enabled, schedule rows are ignored and users can clock in/out at any time.</p>
+            </div>
+
+            <div class="border border-teal-200 bg-teal-50 px-3 py-3 dark:border-teal-800/40 dark:bg-teal-400/10">
+              <label class="inline-flex items-center gap-2 text-sm font-medium text-teal-800 dark:text-teal-300">
+                <input v-model="form.enable_auto_correction" type="checkbox" class="h-4 w-4" />
+                Enable auto correction
+              </label>
+              <p class="mt-1 text-xs text-teal-700/80 dark:text-teal-300/80">When enabled, incorrect punches (wrong IN/OUT state, duplicate punches, reversed sequences, and extra lunch punches) are automatically corrected according to the shift schedule.</p>
             </div>
 
             <div class="border border-violet-200 bg-violet-50 px-3 py-3 dark:border-violet-800/40 dark:bg-violet-400/10">

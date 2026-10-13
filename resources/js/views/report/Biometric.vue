@@ -11,6 +11,7 @@ import { useAppSettingStore } from '@/store/AppSettingStore'
 import { storeToRefs } from 'pinia'
 import PrintableAttendance from '@/views/user/components/PrintableAttendance.vue'
 import { ChevronDownIcon, FilterIcon } from '@/icons'
+import { autoCorrectPunches } from '@/utils/biometricAutoCorrection'
 
 const userStore = useUserStore()
 const appSettingStore = useAppSettingStore()
@@ -908,12 +909,23 @@ const buildAttendanceRowsFromCheckinouts = (user, checkinouts = []) => {
 
   const buildAttendanceRow = (date, recordsInDay = []) => {
     const dateUser = { ...user, office_shift: user.schedule_by_date?.[date] || user.office_shift }
-  const scheduleSlots = getScheduleSlots(dateUser)
-  const slotMeta = scheduleSlots.map((slot) => ({
-    inMinute: toMinutesFromScheduleTime(slot?.time_in),
-    outMinute: toMinutesFromScheduleTime(slot?.time_out),
-    isNextDay: Boolean(slot?.is_next_day),
-  }))
+    const currentShift = dateUser.office_shift
+    const scheduleSlots = getScheduleSlots(dateUser)
+
+    if (currentShift?.enable_auto_correction && scheduleSlots.length) {
+      const corrected = autoCorrectPunches(recordsInDay, scheduleSlots, date)
+      const slots = scheduleSlots.map((_, idx) => ({
+        check_in: corrected[idx]?.in || null,
+        check_out: corrected[idx]?.out || null,
+      }))
+      return { date, slots }
+    }
+
+    const slotMeta = scheduleSlots.map((slot) => ({
+      inMinute: toMinutesFromScheduleTime(slot?.time_in),
+      outMinute: toMinutesFromScheduleTime(slot?.time_out),
+      isNextDay: Boolean(slot?.is_next_day),
+    }))
   const hasScheduleBoundaries = slotMeta.some((slot) => slot.inMinute !== null || slot.outMinute !== null)
 
 

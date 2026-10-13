@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/AuthStore'
 import Swal from 'sweetalert2'
 import flatPickr from 'vue-flatpickr-component'
 import 'flatpickr/dist/flatpickr.css'
+import { autoCorrectPunches } from '@/utils/biometricAutoCorrection'
 
 const route = useRoute()
 const router = useRouter()
@@ -297,12 +298,11 @@ const shiftSchedules = computed(() => {
 
 const graceForDate = date => {
   const shift = resolvedSchedules.value[date]
-  return shift ? { enabled: Boolean(shift.grace_enabled), before: Number(shift.grace_before_minutes || 0), after: Number(shift.grace_after_minutes || 0) } : shiftGraceSettings.value
+  return shift ? graceSettingsForShift(shift) : shiftGraceSettings.value
 }
 const slotsForDate = date => resolvedSchedules.value[date]?.schedules || scheduleSlots.value
-const shiftGraceSettings = computed(() => {
-  const officeShift = selectedUser.value?.office_shift || selectedUser.value?.officeShift
-
+const shiftForDate = date => resolvedSchedules.value[date] || selectedUser.value?.office_shift || selectedUser.value?.officeShift
+const graceSettingsForShift = officeShift => {
   return {
     enabled: Boolean(officeShift?.grace_enabled),
     before: Math.max(0, Number(officeShift?.grace_before_minutes || 0)),
@@ -312,7 +312,10 @@ const shiftGraceSettings = computed(() => {
     checkOutBefore: Math.max(0, Number(officeShift?.grace_checkout_before_minutes ?? officeShift?.grace_before_minutes ?? 0)),
     checkOutAfter: Math.max(0, Number(officeShift?.grace_checkout_after_minutes ?? officeShift?.grace_after_minutes ?? 0)),
   }
-})
+}
+const shiftGraceSettings = computed(() => graceSettingsForShift(
+  selectedUser.value?.office_shift || selectedUser.value?.officeShift
+))
 
 const scheduleSlots = computed(() => {
   const slots = [...shiftSchedules.value].sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
@@ -601,6 +604,25 @@ const attendanceRows = computed(() => {
       const sorted = recordsInDay
         .sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
       const dateSlots = slotsForDate(date)
+      const currentShift = shiftForDate(date)
+
+      if (currentShift?.enable_auto_correction && dateSlots.length) {
+        const corrected = autoCorrectPunches(recordsInDay, dateSlots, date)
+        const slots = dateSlots.map((_, idx) => ({
+          check_in: corrected[idx]?.in || null,
+          check_out: corrected[idx]?.out || null,
+          check_in_action: corrected[idx]?.in_action || null,
+          check_out_action: corrected[idx]?.out_action || null,
+        }))
+
+        return {
+          date,
+          slots,
+          absence: absencesByDate.value.get(date) || null,
+          resolved_schedule: resolvedSchedules.value[date],
+        }
+      }
+
       const grace = graceForDate(date)
       const slotMeta = dateSlots.map((slot) => ({
         inMinute: toMinutesFromScheduleTime(slot?.time_in),

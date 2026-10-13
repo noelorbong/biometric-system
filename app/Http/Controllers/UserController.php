@@ -1341,7 +1341,7 @@ class UserController extends Controller
             'contacts:id,user_id,type,value,is_primary',
             'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
             'biometricInfo',
-        'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes',
+        'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes,enable_auto_correction',
             'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
             'departmentRef:id,department_name,dep_short,status',
             'collegeRef:id,company_id,college_short,college_long,college_head,status',
@@ -1362,7 +1362,7 @@ class UserController extends Controller
 
         $office_shifts = OfficeShift::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'schedule', 'is_flexible', 'grace_enabled', 'grace_before_minutes', 'grace_after_minutes']);
+            ->get(['id', 'name', 'schedule', 'is_flexible', 'grace_enabled', 'grace_before_minutes', 'grace_after_minutes', 'grace_checkin_before_minutes', 'grace_checkin_after_minutes', 'grace_checkout_before_minutes', 'grace_checkout_after_minutes']);
 
         $departments = Department::query()
             ->where('status', true)
@@ -2042,7 +2042,7 @@ class UserController extends Controller
                 'contacts:id,user_id,type,value,is_primary',
                 'addresses:id,user_id,label,address1,address2,barangay,municipality,province,zipcode,is_primary',
                 'biometricInfo',
-                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes',
+                'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes,enable_auto_correction',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'inChargeUser:id,name,in_charge_user_id',
                 'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',

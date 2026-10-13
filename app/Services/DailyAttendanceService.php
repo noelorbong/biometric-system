@@ -40,53 +40,69 @@ class DailyAttendanceService
         }
         usort($timeline, fn ($a, $b) => $a['start'] <=> $b['start']);
 
-        foreach ($punches as $punch) {
-            $time = CarbonImmutable::parse($punch['time'], $now->timezone);
-            if ($time > $now) {
-                continue;
+        if (!empty($shift['enable_auto_correction'])) {
+            $autoCorrection = new BiometricAutoCorrectionService();
+            $corrected = $autoCorrection->correct($punches, $schedules, $day, $now);
+            foreach ($timeline as $i => &$period) {
+                if (!$period['current']) {
+                    continue;
+                }
+                $idx = $period['index'];
+                if (isset($corrected[$idx])) {
+                    $period['in'] = $corrected[$idx]['in'] ? CarbonImmutable::parse($corrected[$idx]['in'], $now->timezone) : null;
+                    $period['out'] = $corrected[$idx]['out'] ? CarbonImmutable::parse($corrected[$idx]['out'], $now->timezone) : null;
+                }
             }
-            $type = strtoupper($punch['type']);
-            $rawType = $type;
-            $target = null;
-            $distance = PHP_INT_MAX;
-            if (!empty($shift['grace_enabled'])) {
-                foreach ($timeline as $i => $period) {
-                    foreach (['I' => 'start', 'O' => 'end'] as $candidateType => $boundary) {
-                        if ($rawType !== $candidateType) continue;
-                        $seconds = $time->timestamp - $period[$boundary]->timestamp;
-                        $before = $candidateType === 'I' ? ($shift['grace_checkin_before_minutes'] ?? $shift['grace_before_minutes'] ?? 0) : ($shift['grace_checkout_before_minutes'] ?? $shift['grace_before_minutes'] ?? 0);
-                        $after = $candidateType === 'I' ? ($shift['grace_checkin_after_minutes'] ?? $shift['grace_after_minutes'] ?? 0) : ($shift['grace_checkout_after_minutes'] ?? $shift['grace_after_minutes'] ?? 0);
-                        if ($seconds >= -(int) $before * 60
-                            && $seconds <= (int) $after * 60
-                            && abs($seconds) < $distance) {
-                            $target = $i;
-                            $type = $candidateType;
-                            $distance = abs($seconds);
+            unset($period);
+        } else {
+            foreach ($punches as $punch) {
+                $time = CarbonImmutable::parse($punch['time'], $now->timezone);
+                if ($time > $now) {
+                    continue;
+                }
+                $type = strtoupper($punch['type']);
+                $rawType = $type;
+                $target = null;
+                $distance = PHP_INT_MAX;
+                if (!empty($shift['grace_enabled'])) {
+                    foreach ($timeline as $i => $period) {
+                        foreach (['I' => 'start', 'O' => 'end'] as $candidateType => $boundary) {
+                            if ($rawType !== $candidateType) continue;
+                            $seconds = $time->timestamp - $period[$boundary]->timestamp;
+                            $before = $candidateType === 'I' ? ($shift['grace_checkin_before_minutes'] ?? $shift['grace_before_minutes'] ?? 0) : ($shift['grace_checkout_before_minutes'] ?? $shift['grace_before_minutes'] ?? 0);
+                            $after = $candidateType === 'I' ? ($shift['grace_checkin_after_minutes'] ?? $shift['grace_after_minutes'] ?? 0) : ($shift['grace_checkout_after_minutes'] ?? $shift['grace_after_minutes'] ?? 0);
+                            if ($seconds >= -(int) $before * 60
+                                && $seconds <= (int) $after * 60
+                                && abs($seconds) < $distance) {
+                                $target = $i;
+                                $type = $candidateType;
+                                $distance = abs($seconds);
+                            }
                         }
                     }
                 }
-            }
-            if (!in_array($type, ['I', 'O'], true)) {
-                continue;
-            }
-            if ($target === null) {
-                foreach ($timeline as $i => $period) {
-                    $previousEnd = $timeline[$i - 1]['end'] ?? $period['start']->startOfDay();
-                    $nextStart = $timeline[$i + 1]['start'] ?? $period['end']->addDay()->startOfDay();
-                    if (($type === 'I' && $time >= $previousEnd && $time < $period['end'])
-                        || ($type === 'O' && $time > $period['start'] && $time <= $nextStart)) {
-                        $target = $i;
-                        break;
+                if (!in_array($type, ['I', 'O'], true)) {
+                    continue;
+                }
+                if ($target === null) {
+                    foreach ($timeline as $i => $period) {
+                        $previousEnd = $timeline[$i - 1]['end'] ?? $period['start']->startOfDay();
+                        $nextStart = $timeline[$i + 1]['start'] ?? $period['end']->addDay()->startOfDay();
+                        if (($type === 'I' && $time >= $previousEnd && $time < $period['end'])
+                            || ($type === 'O' && $time > $period['start'] && $time <= $nextStart)) {
+                            $target = $i;
+                            break;
+                        }
                     }
                 }
-            }
-            if ($target === null || !$timeline[$target]['current']) {
-                continue;
-            }
-            $key = $type === 'I' ? 'in' : 'out';
-            $existing = $timeline[$target][$key];
-            if (!$existing || ($type === 'I' ? $time < $existing : $time > $existing)) {
-                $timeline[$target][$key] = $time;
+                if ($target === null || !$timeline[$target]['current']) {
+                    continue;
+                }
+                $key = $type === 'I' ? 'in' : 'out';
+                $existing = $timeline[$target][$key];
+                if (!$existing || ($type === 'I' ? $time < $existing : $time > $existing)) {
+                    $timeline[$target][$key] = $time;
+                }
             }
         }
 

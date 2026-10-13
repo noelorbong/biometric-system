@@ -19,6 +19,7 @@ class OfficeShift extends Model
         'grace_after_minutes',
         'grace_checkin_before_minutes', 'grace_checkin_after_minutes',
         'grace_checkout_before_minutes', 'grace_checkout_after_minutes',
+        'enable_auto_correction',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class OfficeShift extends Model
         'grace_after_minutes' => 'integer',
         'grace_checkin_before_minutes' => 'integer', 'grace_checkin_after_minutes' => 'integer',
         'grace_checkout_before_minutes' => 'integer', 'grace_checkout_after_minutes' => 'integer',
+        'enable_auto_correction' => 'boolean',
     ];
 
     public function users()

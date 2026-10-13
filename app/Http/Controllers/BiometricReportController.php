@@ -34,7 +34,7 @@ class BiometricReportController extends Controller
                 'profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
                 'inChargeUser:id,name,in_charge_user_id',
                 'inChargeUser.profile:id,user_id,display_name,first_name,middle_name,last_name,name_extension',
-        'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes',
+        'officeShift:id,name,schedule,is_flexible,grace_enabled,grace_before_minutes,grace_after_minutes,grace_checkin_before_minutes,grace_checkin_after_minutes,grace_checkout_before_minutes,grace_checkout_after_minutes,enable_auto_correction',
                 'officeShift.schedules:id,office_shift_id,sequence,time_in,time_out,is_next_day',
                 'departmentRef:id,department_name',
                 'collegeRef:id,college_short,college_long',
@@ -213,7 +213,47 @@ class BiometricReportController extends Controller
             return $candidates[0]['type'];
         };
 
-        $buildDayRecord = function (array $punches, $scheduledMinutes, $officeShift) use ($toTimeLabel, $minutesBetween, $resolveGraceCorrectedType) {
+        $buildDayRecord = function (array $punches, $scheduledMinutes, $officeShift, $date = null) use ($toTimeLabel, $minutesBetween, $resolveGraceCorrectedType) {
+            if ($officeShift && !empty($officeShift->enable_auto_correction)) {
+                $schedules = $officeShift->schedules ?? collect();
+                if ($schedules->isNotEmpty()) {
+                    $corrected = (new \App\Services\BiometricAutoCorrectionService())->correct(
+                        $punches,
+                        $schedules->toArray(),
+                        $date
+                    );
+                    $amIn = $corrected[0]['in'] ?? null;
+                    $amOut = $corrected[0]['out'] ?? null;
+                    $pmIn = $corrected[1]['in'] ?? null;
+                    $pmOut = $corrected[1]['out'] ?? null;
+
+                    $workedMinutes =
+                        $minutesBetween($amIn, $amOut) +
+                        $minutesBetween($pmIn, $pmOut);
+
+                    $undertimeMinutes = null;
+                    if ($scheduledMinutes !== null && $workedMinutes > 0) {
+                        $undertimeMinutes = max(0, $scheduledMinutes - $workedMinutes);
+                    }
+
+                    $undertimeHrs = '';
+                    $undertimeMin = '';
+                    if ($undertimeMinutes !== null && $undertimeMinutes > 0) {
+                        $undertimeHrs = (string) floor($undertimeMinutes / 60);
+                        $undertimeMin = str_pad((string) ($undertimeMinutes % 60), 2, '0', STR_PAD_LEFT);
+                    }
+
+                    return [
+                        'am_in' => $toTimeLabel($amIn),
+                        'am_out' => $toTimeLabel($amOut),
+                        'pm_in' => $toTimeLabel($pmIn),
+                        'pm_out' => $toTimeLabel($pmOut),
+                        'undertimeHrs' => $undertimeHrs,
+                        'undertimeMin' => $undertimeMin,
+                    ];
+                }
+            }
+
             usort($punches, fn ($a, $b) => strtotime((string) $a['checktime']) <=> strtotime((string) $b['checktime']));
 
             $normalized = [];
@@ -306,7 +346,7 @@ class BiometricReportController extends Controller
                 if ($scheduledMinutes !== null) {
                     $scheduledMinutes = max(0, $scheduledMinutes - ($profileForDate['_holiday_credit_minutes'] ?? 0));
                 }
-                $dayRecord = $buildDayRecord($punches, $scheduledMinutes, $dateShift);
+                $dayRecord = $buildDayRecord($punches, $scheduledMinutes, $dateShift, $date);
                 $attendanceRecords[] = array_merge(['date' => $date], $dayRecord);
             }
 
