@@ -257,15 +257,20 @@ class AppSettingController extends Controller
             return $this->forbiddenResponse();
         }
 
-        $commands = [
-            'storage:link',
+        // NativePHP rewrites storage paths to its per-user AppData directory;
+        // storage:link expects normal filesystem paths and is not needed for
+        // the desktop bundle.
+        $commands = config('nativephp-internal.running')
+            ? []
+            : ['storage:link'];
+        $commands = array_merge($commands, [
             'config:clear',
             'cache:clear',
             'route:clear',
             'view:clear',
             'optimize:clear',
             'migrate --force',
-        ];
+        ]);
 
         $results = [];
 

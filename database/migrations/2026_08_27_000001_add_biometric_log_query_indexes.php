@@ -8,12 +8,17 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        $originalSqlMode = DB::selectOne('SELECT @@SESSION.sql_mode AS mode')->mode ?? '';
+        $usesSqlMode = in_array(DB::getDriverName(), ['mysql', 'mariadb'], true);
+        $originalSqlMode = $usesSqlMode
+            ? (DB::selectOne('SELECT @@SESSION.sql_mode AS mode')->mode ?? '')
+            : null;
 
         try {
             // Some legacy device imports contain MySQL's zero datetime. Temporarily
             // relax this session only so MySQL can build an index over existing rows.
-            DB::statement("SET SESSION sql_mode = ''");
+            if ($usesSqlMode) {
+                DB::statement("SET SESSION sql_mode = ''");
+            }
             Schema::table('checkinout', function (Blueprint $table) {
                 $table->index('CHECKTIME', 'checkinout_checktime_idx');
                 $table->index('CHECKTYPE', 'checkinout_checktype_idx');
@@ -21,7 +26,9 @@ return new class extends Migration {
                 $table->index('sn', 'checkinout_sn_idx');
             });
         } finally {
-            DB::statement('SET SESSION sql_mode = ?', [$originalSqlMode]);
+            if ($usesSqlMode) {
+                DB::statement('SET SESSION sql_mode = ?', [$originalSqlMode]);
+            }
         }
     }
 

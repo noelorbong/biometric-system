@@ -12,6 +12,18 @@ use Illuminate\Support\Str;
 
 class MediaFileController extends Controller
 {
+    public function desktopUpload(string $path)
+    {
+        abort_unless(config('nativephp-internal.running'), 404);
+
+        $root = realpath(Storage::disk('uploads')->path(''));
+        $file = $root ? realpath($root.DIRECTORY_SEPARATOR.$path) : false;
+        abort_unless($root && $file && is_file($file)
+            && str_starts_with($file, $root.DIRECTORY_SEPARATOR), 404);
+
+        return response()->file($file, ['X-Content-Type-Options' => 'nosniff']);
+    }
+
     public function upload(Request $request)
     {
         $request->validate([
@@ -20,7 +32,7 @@ class MediaFileController extends Controller
 
         // $disk = 'uploads';
 
-        $disk = 'public';
+        $disk = config('nativephp-internal.running') ? 'uploads' : 'public';
 
         $year  = date('Y');
         $month = date('m');

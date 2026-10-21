@@ -8,6 +8,16 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        // NativePHP uses SQLite for the desktop database. The SQL mode
+        // statements below are MySQL-specific and must not run there.
+        if (DB::getDriverName() !== 'mysql' && DB::getDriverName() !== 'mariadb') {
+            Schema::table('checkinout', function (Blueprint $table) {
+                $table->index(['CHECKTIME', 'id'], 'checkinout_checktime_id_idx');
+            });
+
+            return;
+        }
+
         $originalSqlMode = DB::selectOne('SELECT @@SESSION.sql_mode AS mode')->mode ?? '';
 
         try {

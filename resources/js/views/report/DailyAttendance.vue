@@ -114,7 +114,7 @@ const cards = computed(() => [
       class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold dark:text-white">Daily Attendance Monitoring</h1>
+          <h1 class="text-lg font-semibold dark:text-white">Daily Attendance</h1>
           <!-- <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Review arrivals, departures, and attendance issues by work period.</p> -->
         </div>
         <div class="flex items-center gap-3">
@@ -215,6 +215,7 @@ const cards = computed(() => [
                     class="max-w-[150px] truncate text-left font-medium text-sky-700 hover:underline dark:text-sky-300">{{ row.name }}</button>
                 </td>
                 <td class="whitespace-nowrap px-3 py-3">{{ row.shift_name }}<span
+                    v-if="row.schedule_name && row.schedule_name !== row.shift_name"
                     class="block text-[10px] text-slate-500">{{ row.schedule_name }}</span></td>
                 <template v-for="(period, index) in row.cells" :key="index">
                   <td v-for="direction in ['in', 'out']" :key="direction"
