@@ -24,6 +24,7 @@ const { isLoading, text } = storeToRefs(loadingStore)
 const l_college = ref()
 const isUserAddModal = ref(false);
 const l_user = ref({});
+const saveError = ref('');
 
 onMounted(async() => {
   // await userStore.profileUser(user.value);
@@ -59,12 +60,15 @@ const roleMap = {
 }
 
 const saveUser = async (event) => {
-  isUserAddModal.value = false;
+  saveError.value = '';
   isLoading.value = true;
   text.value = 'Updating User..';
   var result = await userStore.updateUser(event);
   if (result.success) {
+    isUserAddModal.value = false;
     toastResult('Updated Successfully');
+  } else {
+    saveError.value = result.data?.response?.data?.message || result.data?.message || 'Unable to update user. The changes could not be saved to the database.';
   }
 
   isLoading.value = false;
@@ -72,6 +76,7 @@ const saveUser = async (event) => {
 
 const editUser = (event) => {
 
+  saveError.value = '';
   isUserAddModal.value = true;
   l_user.value = {
     id: event.id,
@@ -190,7 +195,7 @@ const selectedCollege = (event) => {
       <ProfileCard :user="user" />
     </section>
 
-    <ModalUser :authUser="authStore.user" :isEditUser="true" :user="l_user" :users="users" v-if="isUserAddModal" @save="saveUser"
+    <ModalUser :authUser="authStore.user" :isEditUser="true" :user="l_user" :users="users" :saveError="saveError" v-if="isUserAddModal" @save="saveUser"
       @close="isUserAddModal = false" :edit_type="2" :campuses="[]" :colleges="[]"/>
   </div>
 </template>

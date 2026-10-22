@@ -73,7 +73,7 @@
         </p>
       </div>
 
-      <div :style="web_layout.bodyWidth > 928 && web_layout.bodyWidth < 1500 ? { width: (web_layout.bodyWidth-50) + 'px' } : {}" class="hidden max-w-full overflow-x-auto custom-scrollbar md:block">
+      <div :style="web_layout.bodyWidth > 928 && web_layout.bodyWidth < 1500 ? { width: (web_layout.bodyWidth-50) + 'px' } : {}" class="hidden max-w-full overflow-x-auto custom-scrollbar pb-32 md:block">
         <table class="min-w-full border-collapse">
           <thead>
             <tr class="bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] text-white dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)]">
@@ -180,7 +180,8 @@
 
                     <div
                       v-if="isActionMenuOpen(_user.id)"
-                      class="absolute left-0 top-full z-30 mt-2 w-44 rounded-2xl border border-slate-200 bg-white p-2 text-left shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                      class="absolute left-0 z-30 w-44 rounded-2xl border border-slate-200 bg-white p-2 text-left shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                      :class="'top-full mt-2'"
                     >
                     <button
                          @click="$emit('machineAction', _user)"

@@ -106,6 +106,7 @@ const rawLogModalDate = ref('')
 const rawLogRows = ref([])
 const isUserEditModalOpen = ref(false)
 const userEditSaving = ref(false)
+const userEditSaveError = ref('')
 const editableUser = ref(null)
 
 const formatRangeModelValue = (dateFrom, dateTo) => {
@@ -1421,6 +1422,7 @@ const openEditUserModal = async () => {
     image: selectedUser.value?.image ?? selectedUser.value?.profile?.image ?? '',
     thumbnail: selectedUser.value?.thumbnail ?? selectedUser.value?.profile?.thumbnail ?? '',
   }
+  userEditSaveError.value = ''
   isUserEditModalOpen.value = true
 }
 
@@ -1430,15 +1432,12 @@ const saveEditedUser = async (payload) => {
   }
 
   userEditSaving.value = true
+  userEditSaveError.value = ''
   const result = await userStore.updateUser(payload)
   userEditSaving.value = false
 
   if (!result.success) {
-    await Swal.fire({
-      icon: 'error',
-      title: 'Unable to update user',
-      text: result?.data?.response?.data?.message || 'Please check the user details and try again.',
-    })
+    userEditSaveError.value = result?.data?.response?.data?.message || result?.data?.message || 'Unable to update user. The changes could not be saved to the database.'
     return
   }
 
@@ -1959,6 +1958,7 @@ const saveEditedUser = async (payload) => {
         :officeShifts="userStore.officeShifts"
         :departments="userStore.departments"
         :colleges="userStore.colleges"
+        :saveError="userEditSaveError"
         :edit_type="1"
         @save="saveEditedUser"
         @close="isUserEditModalOpen = false"

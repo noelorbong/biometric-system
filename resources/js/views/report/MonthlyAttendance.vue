@@ -1,4 +1,5 @@
 <script setup>
+import { finishPrintWindow } from '@/utils/printPreview'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
@@ -436,7 +437,7 @@ function printReport() {
   </style></head><body><h1>Monthly Tardiness and Undertime — ${escape(report.value.month_label)}</h1><p>${escape(selectedShiftName.value)} · ${rows.value.length} employees · Generated ${escape(report.value.generated_at)} (${escape(report.value.timezone)})</p>${printGrid.outerHTML}<p>${escape(reportNote.value)}</p></body></html>`)
   preview.document.close()
   preview.focus()
-  setTimeout(() => { if (!preview.closed) preview.print() }, 300)
+  void finishPrintWindow(preview)
 }
 </script>
 

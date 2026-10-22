@@ -256,16 +256,8 @@ const { user } = storeToRefs(authStore)
 import {
   ChevronDownIcon,
   HorizontalDots,
-  LayoutDashboardIcon,
   DashboardIcon,
-  PlugInIcon,
   TaskIcon,
-  TableIcon,
-  SettingsIcon,
-  UserCircleIcon,
-  UserGroupIcon,
-  BuildingIcon,
-  WorkIcon,
   LogoutIcon,
   BookSheIfcon,
   ClockIcon,
@@ -328,7 +320,7 @@ const menuAdminGroups = [
       },
       {
         icon: HierarchicalIcon,
-        name: "Organizational Settings",
+        name: "Org. Settings",
         subItems: [
           { name: "Departments", path: "/main/departments" },
           { name: "Colleges", path: "/main/colleges" },
@@ -351,7 +343,7 @@ const menuUserGroups = computed(() => [
     items: [
       { icon: DashboardIcon, name: "Dashboard", path: "/main/dashboard" },
       { icon: UserIcon, name: "Profile", path: "/main/user/profile" },
-      { icon: TaskIcon, name: "My Biometric", path: `/main/users/${Number(user.value?.id || 0)}` },
+      { icon: TaskIcon, name: "My Bio", path: `/main/users/${Number(user.value?.id || 0)}` },
     ],
   },
 ])

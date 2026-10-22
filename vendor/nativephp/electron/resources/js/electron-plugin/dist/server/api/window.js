@@ -166,7 +166,7 @@ router.post('/open', (req, res) => {
         trafficLightPosition,
         vibrancy,
         focusable,
-        autoHideMenuBar }, (process.platform === 'linux' ? { icon: state.icon } : {})), { webPreferences: Object.assign(Object.assign({}, webPreferences), defaultWebPreferences), fullscreen,
+        autoHideMenuBar }, (['linux', 'win32'].includes(process.platform) ? { icon: state.icon } : {})), { webPreferences: Object.assign(Object.assign({}, webPreferences), defaultWebPreferences), fullscreen,
         fullscreenable,
         kiosk }));
     if ((process.env.NODE_ENV === 'development' || showDevTools === true) && showDevTools !== false) {

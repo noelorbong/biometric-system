@@ -2,6 +2,15 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/desktop/updater/status', [App\Http\Controllers\DesktopUpdaterBridgeController::class, 'handle']);
+    Route::post('/desktop/updater/{action}', [App\Http\Controllers\DesktopUpdaterBridgeController::class, 'handle'])
+        ->where('action', 'check|download|install')->middleware('throttle:10,1');
+    Route::get('/desktop/version', [App\Http\Controllers\DesktopUpdateController::class, 'version']);
+    Route::post('/desktop/check-updates', [App\Http\Controllers\DesktopUpdateController::class, 'check'])->middleware('throttle:6,1');
+    Route::post('/desktop/open-release', [App\Http\Controllers\DesktopUpdateController::class, 'openRelease'])->middleware('throttle:6,1');
+});
 use App\Models\User;
 
 use App\Http\Controllers\AcademicYearController;

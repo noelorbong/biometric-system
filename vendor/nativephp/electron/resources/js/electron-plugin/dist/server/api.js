@@ -1,3 +1,4 @@
+import manualUpdaterRoutes from "./api/manualUpdater";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -42,6 +43,7 @@ function startAPIServer(randomSecret) {
             httpServer.use(bodyParser.json());
             httpServer.use("/api/clipboard", clipboardRoutes);
             httpServer.use("/api/app", appRoutes);
+        httpServer.use("/api/manual-updater", manualUpdaterRoutes);
             httpServer.use("/api/screen", screenRoutes);
             httpServer.use("/api/dialog", dialogRoutes);
             httpServer.use("/api/system", systemRoutes);

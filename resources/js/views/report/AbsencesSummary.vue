@@ -1,4 +1,6 @@
 <script setup>
+import { printTable } from '@/utils/printPreview'
+const printGrid = ref(null)
 import { computed, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import flatPickr from 'vue-flatpickr-component'
@@ -74,7 +76,7 @@ function exportCsv() {
                 </div>
                 <div class="flex gap-2"><button type="button" @click="load" :disabled="loading" class="action-button">{{
                     loading ? 'Loading...' : 'Refresh' }}</button><button type="button" @click="exportCsv"
-                        :disabled="!report" class="action-button">Export CSV</button></div>
+                        :disabled="!report" class="action-button">Export CSV</button><button type="button" :disabled="loading || !report" @click="printTable(printGrid, `Absences, Tardiness and Undertimes — ${report.month_label || month}`)" class="action-button">Print</button></div>
             </div>
             <div class="mt-4 flex flex-wrap items-end gap-3"><label class="label">Month<flat-pickr v-model="month"
                         :config="pickerConfig" class="filter-input mt-1 block" /></label><label class="label">Office
@@ -88,7 +90,7 @@ function exportCsv() {
         <section
             class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
             <div class="overflow-auto">
-                <table class="summary-table">
+                <table ref="printGrid" class="summary-table">
                     <thead>
                         <tr>
                             <th rowspan="2">Employee name</th>

@@ -24,13 +24,22 @@ class NativeAppServiceProvider implements ProvidesPhpIni
 
     public function boot(): void
     {
+        try {
+            app(\App\Services\DesktopDatabaseStartup::class)->migrate();
+        } catch (\Throwable $exception) {
+            report($exception);
+            Window::open()->title('Biometric System')->url('/desktop-startup')->width(720)->height(480);
+
+            return;
+        }
+
         Window::open()
+            ->title('Biometric System')
             ->width(1200) // Provide a fallback size
             ->height(800)
             // ->showDevTools(false)
             // ->frameless()
             // ->titleBarHidden()
-            ->icon(public_path('images/logo/logo.png')) // Use the PNG here
             ->maximized()  // Call maximized AFTER setting frameless
             ->hideUntilRendered();
     }

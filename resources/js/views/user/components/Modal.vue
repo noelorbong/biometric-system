@@ -21,6 +21,10 @@
                         </p>
                     </div>
 
+                    <div v-if="props.saveError" role="alert" class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                        {{ props.saveError }}
+                    </div>
+
                     <form class="flex flex-col gap-y-5" @submit.prevent="submitForm">
                         <section class="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
                             <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Account</h5>
@@ -294,6 +298,10 @@ const props = defineProps({
     edit_type: {
         type: Number,
         default: 1,
+    },
+    saveError: {
+        type: String,
+        default: '',
     },
 })
 

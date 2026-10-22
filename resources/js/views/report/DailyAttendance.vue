@@ -1,4 +1,6 @@
 <script setup>
+import { printTable } from '@/utils/printPreview'
+const printGrid = ref(null)
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import flatPickr from 'vue-flatpickr-component'
@@ -118,6 +120,7 @@ const cards = computed(() => [
           <!-- <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Review arrivals, departures, and attendance issues by work period.</p> -->
         </div>
         <div class="flex items-center gap-3">
+          <button type="button" :disabled="loading || !report" @click="printTable(printGrid, `Daily Attendance — ${date}`)" class="rounded-md border px-3 py-1.5 text-xs">Print</button>
           <label class="flex items-center gap-1.5 text-xs"><input v-model="issuesOnly" type="checkbox"
               class="rounded border-slate-300" /> Issues only</label>
           <button type="button" @click="load" :disabled="loading" aria-label="Refresh attendance"
@@ -189,7 +192,7 @@ const cards = computed(() => [
       :aria-busy="loading">
 
       <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-xs">
+        <table ref="printGrid" class="min-w-full text-left text-xs">
           <thead class="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
             <tr>
               <th rowspan="2" class="px-3 py-2">Name</th>

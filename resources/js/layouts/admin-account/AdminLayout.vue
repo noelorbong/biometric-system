@@ -1,4 +1,5 @@
 <script setup>
+import DesktopUpdateNotice from '@/components/common/DesktopUpdateNotice.vue'
 import { ref, watch, nextTick, onMounted } from "vue";
 import { storeToRefs } from 'pinia'
 import moment from 'moment'
@@ -59,6 +60,7 @@ let myEventHandler = (e) => {
 
 <template>
   <div class="min-h-screen xl:flex vl-parent ">
+    <DesktopUpdateNotice />
     <loading :enforce-focus="true" :active="loadingStore.isLoading" :can-cancel="false"
       :is-full-page="loadingStore.fullPage" :loader="loadingStore.loader" :color="loadingStore.loaderColor">
       <div class="text-center" >

@@ -55,6 +55,7 @@ const enrollmentMayBeActive = ref(false)
 const enrollmentClosing = ref(false)
 
 const isEditUser = ref(false)
+const saveError = ref('')
 const search_user = ref('')
 const user = ref({ name: '' })
 
@@ -118,6 +119,7 @@ const toastResult = (message, icon)=>{
 }
 
 const saveUser = async (event) => {
+  saveError.value = '';
   isLoading.value = true;
   if (isEditUser.value) {
     text.value = 'Updating User..';
@@ -126,6 +128,7 @@ const saveUser = async (event) => {
       toastResult('Updated Successfully', 'success');
       isUserAddModal.value = false;
     } else {
+      saveError.value = result.data?.response?.data?.message || result.data?.message || 'Unable to update user. The changes could not be saved to the database.';
       toastResult('Unable to update user', 'error');
     }
   } else {
@@ -135,6 +138,7 @@ const saveUser = async (event) => {
       toastResult('Stored Successfully', 'success');
       isUserAddModal.value = false;
     } else {
+      saveError.value = result.data?.response?.data?.message || result.data?.message || 'Unable to create user. The user could not be saved to the database.';
       toastResult('Unable to create user', 'error');
     }
   }
@@ -143,6 +147,7 @@ const saveUser = async (event) => {
 }
 
 const addUser = () => {
+  saveError.value = '';
   isUserAddModal.value = true;
   isEditUser.value = false;
   user.value = {
@@ -1196,7 +1201,7 @@ const closeEnrollModal = () => {
       :colleges="colleges"
       :web_layout="web_layout"
     />
-    <ModalUser :authUser="authStore.user" :isEditUser="isEditUser" :user="user" :users="users" :officeShifts="officeShifts" :departments="departments" :colleges="colleges" v-if="isUserAddModal" @save="saveUser"
+    <ModalUser :authUser="authStore.user" :isEditUser="isEditUser" :user="user" :users="users" :officeShifts="officeShifts" :departments="departments" :colleges="colleges" :saveError="saveError" v-if="isUserAddModal" @save="saveUser"
       @close="isUserAddModal = false" :edit_type="1"/>
     <ModalDelete head="User" :data="user" :text="user.name" v-if="isDeleteModal" @save="saveUser" @close="isDeleteModal = false"
       @delete="deleteUser" />

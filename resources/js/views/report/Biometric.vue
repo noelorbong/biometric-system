@@ -1,4 +1,5 @@
 <script setup>
+import { finishPrintWindow } from '@/utils/printPreview'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import Swal from 'sweetalert2'
 import 'sweetalert2/src/sweetalert2.scss'
@@ -467,6 +468,7 @@ const printReport = async () => {
   }
 
   const win = window.open('', '_blank')
+  if (!win) { toastResult('Allow pop-ups to open the print preview', 'info'); return }
   win.document.write(`
     <!doctype html>
     <html>
@@ -482,35 +484,7 @@ const printReport = async () => {
   `)
   win.document.close()
 
-  const printWhenReady = () => {
-    win.focus()
-    win.print()
-    win.close()
-  }
-
-  const images = Array.from(win.document.images || [])
-  if (!images.length) {
-    printWhenReady()
-    return
-  }
-
-  let remaining = images.length
-  const finish = () => {
-    remaining -= 1
-    if (remaining <= 0) {
-      printWhenReady()
-    }
-  }
-
-  images.forEach((img) => {
-    if (img.complete) {
-      finish()
-      return
-    }
-
-    img.addEventListener('load', finish, { once: true })
-    img.addEventListener('error', finish, { once: true })
-  })
+  void finishPrintWindow(win, { closeAfterPrint: true })
 }
 
 onMounted(async () => {

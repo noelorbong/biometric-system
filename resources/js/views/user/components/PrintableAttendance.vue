@@ -195,6 +195,7 @@
 </template>
 
 <script setup>
+import { finishPrintWindow } from '@/utils/printPreview'
 import { computed, ref } from 'vue'
 
 const printContainer = ref(null)
@@ -688,6 +689,7 @@ const handlePrint = () => {
         }
 
     const win = window.open('', '_blank')
+    if (!win) { window.alert('Allow pop-ups to open the print preview.'); return }
     win.document.write(`
     <!DOCTYPE html>
     <html>
@@ -705,35 +707,7 @@ const handlePrint = () => {
   `)
     win.document.close()
 
-    const printWhenReady = () => {
-        win.focus()
-        win.print()
-        win.close()
-    }
-
-    const images = Array.from(win.document.images || [])
-    if (!images.length) {
-        printWhenReady()
-        return
-    }
-
-    let remaining = images.length
-    const finish = () => {
-        remaining -= 1
-        if (remaining <= 0) {
-            printWhenReady()
-        }
-    }
-
-    images.forEach((img) => {
-        if (img.complete) {
-            finish()
-            return
-        }
-
-        img.addEventListener('load', finish, { once: true })
-        img.addEventListener('error', finish, { once: true })
-    })
+    void finishPrintWindow(win, { closeAfterPrint: true })
 }
 
 defineExpose({ getPrintPayload, getPrintContent })

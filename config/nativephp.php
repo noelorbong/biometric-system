@@ -1,10 +1,66 @@
 <?php
 
+$excludedFiles = [
+    'content',
+    'storage/framework/sessions/*',
+    'storage/framework/testing/*',
+    'storage/framework/cache/*',
+    'storage/logs/*',
+    'storage/app/private/*',
+    'storage/app/public/*',
+    'docs',
+    '.agents',
+    '.editorconfig',
+    '.env-dev',
+    '.env-orig',
+    '.env-sqlite',
+    '.env.bckp',
+    '.env.example',
+    '.gitattributes',
+    '.gitignore',
+    '.phpunit.result.cache',
+    'resources/css',
+    'resources/fonts',
+    'resources/js',
+    'resources/sass',
+    'resources/views/auth',
+    'resources/views/home.blade.php',
+    'resources/views/welcome.blade.php',
+    'public/uploads/*',
+    'tests',
+    'package.json',
+    'package-lock.json',
+    'composer.lock',
+    'electron.vite.config.js',
+    'electron-builder.json',
+    'tailwind.config.js',
+    'postcss.config.js',
+    'vite.config.js',
+    'ubuntu-supervisor',
+    'build-output.log',
+    'phpunit.xml',
+    '.phpunit.cache',
+    'ReadMe.md',
+];
+
 return [
     'icon' => public_path('images/logo/logo.png'),
 
     'builder' => [
         'config' => [
+            // This NativePHP version does not run native:minify during builds.
+            // Exclude files from the Laravel subtree at Electron packaging time.
+            'files' => array_merge([
+                '**/*',
+                '!**/.vscode/*',
+                '!src/*',
+                '!electron.vite.config.{js,ts,mjs,cjs}',
+                '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}',
+                '!{.env,.env.*,.npmrc,pnpm-lock.yaml}',
+                '!resources/app/vendor/spatie/laravel-package-tools/src/Commands/Concerns/AskToStarRepoOnGitHub.php',
+                // Keep NativePHP's directory markers; omit runtime contents.
+                '!resources/app/storage/{framework/{sessions,testing,cache},logs}/**/!(_native.json)',
+            ], array_map(fn ($path) => '!resources/app/'.$path.'{,/**}', $excludedFiles)),
             'productName' => 'Biometric System',
             'description' => 'Biometric System built with NativePHP and Laravel.',
             'win' => [
@@ -74,11 +130,7 @@ return [
      * final app before it is bundled for production.
      * You may use glob / wildcard patterns here.
      */
-    'cleanup_exclude_files' => [
-        'content',
-        'storage/app/framework/{sessions,testing,cache}',
-        'storage/logs/laravel.log',
-    ],
+    'cleanup_exclude_files' => $excludedFiles,
 
     /**
      * The NativePHP updater configuration.
@@ -89,7 +141,8 @@ return [
          * updater will only work when your application is bundled
          * for production.
          */
-        'enabled' => env('NATIVEPHP_UPDATER_ENABLED', true),
+        // The application checks releases itself; downloading is user initiated.
+        'enabled' => false,
 
         /**
          * The updater provider to use.

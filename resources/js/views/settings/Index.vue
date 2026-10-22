@@ -1,4 +1,5 @@
 <script setup>
+import DesktopUpdates from '@/views/settings/DesktopUpdates.vue'
 import { onMounted, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import Swal from 'sweetalert2'
@@ -391,6 +392,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-3">
+    <DesktopUpdates />
 
 
     <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-3 shadow-sm md:-mr-6">
