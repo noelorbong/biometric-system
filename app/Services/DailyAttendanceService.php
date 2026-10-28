@@ -65,7 +65,8 @@ class DailyAttendanceService
         } else {
             foreach ($punches as $punch) {
                 $time = CarbonImmutable::parse($punch['time'], $now->timezone);
-                if ($time > $now) {
+                // Saved manual additions and overrides are visible immediately.
+                if ($time > $now && empty($punch['corrected'])) {
                     continue;
                 }
                 $type = strtoupper($punch['type']);

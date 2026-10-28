@@ -43,8 +43,8 @@ class BiometricAutoCorrectionService
                 continue;
             }
 
-            // Exclude future punches if $now is given
-            if ($now !== null && $time > $now) {
+            // Saved manual additions and overrides are visible immediately.
+            if ($now !== null && $time > $now && empty($p['corrected'])) {
                 continue;
             }
 

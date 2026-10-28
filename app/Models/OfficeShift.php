@@ -10,6 +10,8 @@ class OfficeShift extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $hidden = ['active_name'];
+
     protected $fillable = [
         'name',
         'schedule',

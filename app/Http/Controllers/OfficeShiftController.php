@@ -73,7 +73,7 @@ class OfficeShiftController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:office_shifts,name'],
+            'name' => ['required', 'string', 'max:100', Rule::unique('office_shifts', 'name')->withoutTrashed()],
             'schedule' => ['nullable', 'string', 'max:255'],
             'is_flexible' => ['nullable', 'boolean'],
             'grace_enabled' => ['nullable', 'boolean'],
@@ -133,7 +133,7 @@ class OfficeShiftController extends Controller
     {
         $validated = $request->validate([
             'id' => ['required', 'integer', 'exists:office_shifts,id'],
-            'name' => ['required', 'string', 'max:100', Rule::unique('office_shifts', 'name')->ignore($request->id)],
+            'name' => ['required', 'string', 'max:100', Rule::unique('office_shifts', 'name')->withoutTrashed()->ignore($request->id)],
             'schedule' => ['nullable', 'string', 'max:255'],
             'is_flexible' => ['nullable', 'boolean'],
             'grace_enabled' => ['nullable', 'boolean'],
