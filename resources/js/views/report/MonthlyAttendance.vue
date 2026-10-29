@@ -451,7 +451,7 @@ function printReport() {
       <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
       <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
     </nav>
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <div>
           <h1 class="text-lg font-semibold dark:text-white">Monthly Tardiness and Undertime</h1>
           <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">A monthly grid of late arrivals and early
