@@ -55,6 +55,7 @@ class BiometricAutoCorrectionService
                 'ts' => $time->timestamp,
                 'time_str' => $time->format('h:i A'),
                 'minutes' => ($time->hour * 60) + $time->minute,
+                'seconds' => ($time->hour * 3600) + ($time->minute * 60) + $time->second,
                 'type' => in_array($rawType, ['I', 'O'], true) ? $rawType : null,
                 'raw_punch' => $p,
             ];
@@ -273,8 +274,9 @@ class BiometricAutoCorrectionService
                 $last = $punchesInSession[$count - 1];
                 $spanSeconds = $last['ts'] - $first['ts'];
 
-                $calcDistIn = fn ($p) => min(abs($p['minutes'] - $s['in_min']), 1440 - abs($p['minutes'] - $s['in_min']));
-                $calcDistOut = fn ($p) => min(abs($p['minutes'] - $s['out_min']), 1440 - abs($p['minutes'] - $s['out_min']));
+                // Preserve seconds: 15:00:49 is after the 13:00–17:00 midpoint.
+                $calcDistIn = fn ($p) => min(abs($p['seconds'] - $s['in_min'] * 60), 86400 - abs($p['seconds'] - $s['in_min'] * 60));
+                $calcDistOut = fn ($p) => min(abs($p['seconds'] - $s['out_min'] * 60), 86400 - abs($p['seconds'] - $s['out_min'] * 60));
 
                 // A cluster occurs when repeated scans occur within 10 minutes (600s)
                 $isCluster = ($spanSeconds <= 600);
