@@ -297,6 +297,10 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
         } else if (iPunches.length > 0 && oPunches.length > 0 && inCandidates.length === 0) {
           inPunch = iPunches[0]
           outPunch = oPunches[oPunches.length - 1]
+        } else if (inCandidates.length === 0) {
+          // Distinct late punches form a session; duplicate clusters were handled above.
+          inPunch = first
+          outPunch = last
         } else {
           if (inCandidates.length > 0) {
             inPunch = inCandidates[0] // Earliest arrival

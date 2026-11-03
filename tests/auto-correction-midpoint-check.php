@@ -32,3 +32,19 @@ if ($service->correct([$added[3]], $schedule, '2026-11-02', $now)[1]['out'] !== 
     throw new RuntimeException('Lone midpoint punch behavior changed.');
 }
 echo "Auto-correction midpoint checks passed.\n";
+$lateSchedule = [
+    ['sequence' => 1, 'time_in' => '10:15', 'time_out' => '12:00'],
+    ['sequence' => 2, 'time_in' => '12:15', 'time_out' => '18:30'],
+];
+$latePunches = array_map(fn ($time) => ['time' => '2026-11-02 '.$time, 'type' => 'O', 'corrected' => true],
+    ['11:13:00', '12:02:00', '12:09:00', '17:12:00']);
+$late = $service->correct($latePunches, $lateSchedule, '2026-11-02', $now);
+if ([$late[0]['in'], $late[0]['out'], $late[1]['in'], $late[1]['out']] !== array_column($latePunches, 'time')) {
+    throw new RuntimeException('Late morning arrival was lost.');
+}
+$cluster = array_map(fn ($time) => ['time' => '2026-11-02 '.$time, 'type' => 'O'], ['11:55:00', '11:59:00']);
+if ($service->correct($cluster, $lateSchedule, '2026-11-02', $now)[0]['in'] !== null
+    || $service->correct([$latePunches[0]], $lateSchedule, '2026-11-02', $now)[0]['in'] !== null) {
+    throw new RuntimeException('Cluster or single-punch behavior changed.');
+}
+echo "Late-arrival and duplicate-cluster checks passed.\n";

@@ -325,6 +325,11 @@ class BiometricAutoCorrectionService
                         // All after midpoint, but explicit I and O present
                         $in = $iPunches[0];
                         $out = end($oPunches);
+                    } elseif (empty($inCandidates)) {
+                        // Distinct late punches can still form a session despite incorrect device types.
+                        // The ten-minute duplicate-cluster check above has already excluded repeated scans.
+                        $in = $first;
+                        $out = $last;
                     } else {
                         if (!empty($inCandidates)) {
                             $in = $inCandidates[0]; // Earliest arrival
