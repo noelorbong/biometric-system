@@ -30,6 +30,7 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
       time: `${itemDateStr} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
       ts: d.getTime(),
       minutes,
+      seconds: minutes * 60 + d.getSeconds(),
       type: rawType === 'I' || rawType === 'O' ? rawType : null,
       action: p?._override_action || p?.action || null,
       raw_punch: p,
@@ -230,12 +231,12 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
     let outPunch = null
 
     const calcDistIn = (p) => {
-      const d = Math.abs(p.minutes - s.in_min)
-      return Math.min(d, 1440 - d)
+      const d = Math.abs(p.seconds - s.in_min * 60)
+      return Math.min(d, 86400 - d)
     }
     const calcDistOut = (p) => {
-      const d = Math.abs(p.minutes - s.out_min)
-      return Math.min(d, 1440 - d)
+      const d = Math.abs(p.seconds - s.out_min * 60)
+      return Math.min(d, 86400 - d)
     }
 
     if (count === 1) {
@@ -279,7 +280,8 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
         for (const p of punchesInSession) {
           const dIn = calcDistIn(p)
           const dOut = calcDistOut(p)
-          if (dIn <= dOut) {
+          // A midpoint punch closes an existing arrival; alone it remains an arrival.
+          if (dIn < dOut || (dIn === dOut && inCandidates.length === 0)) {
             inCandidates.push(p)
           } else {
             outCandidates.push(p)

@@ -262,8 +262,8 @@ class BiometricAutoCorrectionService
 
             if ($count === 1) {
                 $p = $punchesInSession[0];
-                $distIn = min(abs($p['minutes'] - $s['in_min']), 1440 - abs($p['minutes'] - $s['in_min']));
-                $distOut = min(abs($p['minutes'] - $s['out_min']), 1440 - abs($p['minutes'] - $s['out_min']));
+                $distIn = min(abs($p['seconds'] - $s['in_min'] * 60), 86400 - abs($p['seconds'] - $s['in_min'] * 60));
+                $distOut = min(abs($p['seconds'] - $s['out_min'] * 60), 86400 - abs($p['seconds'] - $s['out_min'] * 60));
                 if ($distIn <= $distOut) {
                     $in = $p;
                 } else {
@@ -305,7 +305,8 @@ class BiometricAutoCorrectionService
                     foreach ($punchesInSession as $p) {
                         $dIn = $calcDistIn($p);
                         $dOut = $calcDistOut($p);
-                        if ($dIn <= $dOut) {
+                        // A midpoint punch closes an existing arrival; alone it remains an arrival.
+                        if ($dIn < $dOut || ($dIn === $dOut && empty($inCandidates))) {
                             $inCandidates[] = $p;
                         } else {
                             $outCandidates[] = $p;
