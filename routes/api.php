@@ -63,6 +63,9 @@ Route::post('/report/monthly-attendance', [MonthlyAttendanceController::class, '
 Route::post('/attendance/absence/store', [AttendanceAbsenceController::class, 'store'])->middleware('auth:sanctum');
 Route::post('/attendance/absence/delete', [AttendanceAbsenceController::class, 'delete'])->middleware('auth:sanctum');
 Route::post('/biometric/logs', [BiometricLogController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/biometric/logs/delete', [BiometricLogController::class, 'delete'])->middleware('auth:sanctum');
+Route::post('/biometric/logs/restore', [BiometricLogController::class, 'restore'])->middleware('auth:sanctum');
+Route::post('/biometric/logs/deleted-for-day', [BiometricLogController::class, 'deletedForDay'])->middleware('auth:sanctum');
 Route::post('/user/office-shift/update', [UserController::class, 'updateOfficeShift'])->middleware('auth:sanctum');
 Route::post('/user/affiliation/update', [UserController::class, 'updateAffiliation'])->middleware('auth:sanctum');
 Route::post('/office-shifts', [OfficeShiftController::class, 'index'])->middleware('auth:sanctum');

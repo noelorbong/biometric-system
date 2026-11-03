@@ -104,6 +104,8 @@ const checkinoutLoading = ref(false)
 const rawLogModalOpen = ref(false)
 const rawLogModalDate = ref('')
 const rawLogRows = ref([])
+const rawLogSaving = ref(false)
+const rawLogError = ref('')
 const isUserEditModalOpen = ref(false)
 const userEditSaving = ref(false)
 const userEditSaveError = ref('')
@@ -1055,10 +1057,49 @@ const formatLogDateTime = (value) => {
   })
 }
 
-const openRawLogs = (date) => {
+const refreshRawLogs = async () => {
+  const date = rawLogModalDate.value
+  const selectedId = userId.value
+  rawLogError.value = ''
+  rawLogRows.value = [...(rawLogsByDate.value.get(date) || [])]
+  if (!isSuperAdmin.value) return
+  try {
+    const { data } = await axios.post('/api/biometric/logs/deleted-for-day', { user_id: selectedId, date })
+    if (!rawLogModalOpen.value || rawLogModalDate.value !== date || userId.value !== selectedId) return
+    rawLogRows.value = [...(rawLogsByDate.value.get(date) || []), ...data.logs]
+      .sort((a, b) => new Date(a.CHECKTIME) - new Date(b.CHECKTIME))
+  } catch (error) {
+    rawLogError.value = error.response?.data?.message || 'Unable to load deleted punches.'
+  }
+}
+
+const changeRawLog = async (log) => {
+  if (!isSuperAdmin.value || rawLogSaving.value) return
+  const restoring = Boolean(log._deleted)
+  const confirmation = await Swal.fire({
+    title: restoring ? 'Restore biometric log?' : 'Delete biometric log?',
+    text: restoring ? 'Include this punch in attendance again?' : 'Exclude this punch from attendance? You can restore it here later.',
+    icon: 'warning', showCancelButton: true, focusCancel: true,
+    confirmButtonText: restoring ? 'Restore' : 'Yes, delete',
+    confirmButtonColor: restoring ? '#059669' : '#e11d48',
+  })
+  if (!confirmation.isConfirmed) return
+  rawLogSaving.value = true
+  try {
+    await axios.post(`/api/biometric/logs/${restoring ? 'restore' : 'delete'}`, { id: log.id })
+    await refreshCheckinoutState()
+  } catch (error) {
+    await Swal.fire({ icon: 'error', title: 'Unable to update log', text: error.response?.data?.message || 'Please try again.' })
+  } finally {
+    rawLogSaving.value = false
+  }
+}
+
+const openRawLogs = async (date) => {
   rawLogModalDate.value = date
   rawLogRows.value = [...(rawLogsByDate.value.get(date) || [])]
   rawLogModalOpen.value = true
+  await refreshRawLogs()
 }
 
 const closeRawLogs = () => {
@@ -1103,7 +1144,7 @@ const refreshCheckinoutState = async (payload = {}) => {
   if (filterMode.value === 'custom') {
     await loadCheckinouts()
     if (rawLogModalOpen.value && rawLogModalDate.value) {
-      rawLogRows.value = [...(rawLogsByDate.value.get(rawLogModalDate.value) || [])]
+      await refreshRawLogs()
     }
     return
   }
@@ -1121,7 +1162,7 @@ const refreshCheckinoutState = async (payload = {}) => {
     checkinoutOverrides.value = resp?.data?.overrides || []
     attendanceAbsences.value = resp?.data?.absences || []
     if (rawLogModalOpen.value && rawLogModalDate.value) {
-      rawLogRows.value = [...(rawLogsByDate.value.get(rawLogModalDate.value) || [])]
+      await refreshRawLogs()
     }
   } catch (error) {
     console.log(error)
@@ -1869,6 +1910,7 @@ const saveEditedUser = async (payload) => {
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                      <tr v-if="rawLogError"><td :colspan="isSuperAdmin ? 4 : 3" class="px-4 py-2 text-sm text-rose-600">{{ rawLogError }}</td></tr>
                       <tr v-if="!rawLogRows.length">
                         <td :colspan="isSuperAdmin ? 4 : 3" class="px-4 py-8 text-center text-sm text-slate-400">No biometric logs for this day.</td>
                       </tr>
@@ -1889,6 +1931,7 @@ const saveEditedUser = async (payload) => {
                             >
                               {{ log.CHECKTYPE === 'I' ? 'IN' : log.CHECKTYPE === 'O' ? 'OUT' : log.CHECKTYPE || '-' }}
                             </span>
+                                <span v-if="log._deleted" class="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">DELETED</span>
                                 <span v-if="log._override_action" class="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                   {{ log._override_action === 'add' ? 'added' : log._override_action }}
                                 </span>
@@ -1898,13 +1941,14 @@ const saveEditedUser = async (payload) => {
                         <td v-if="isSuperAdmin" class="px-4 py-2.5 text-right">
                           <div class="flex justify-end gap-2">
                             <button
-                              v-if="!log._override_id"
+                              v-if="!log._override_id && !log._deleted"
                               type="button"
                               @click="openOverrideBiometricLog(log)"
                               class="rounded-md border border-sky-200 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"
                             >
                               Override
                             </button>
+                            <button v-if="!log._override_id" type="button" :disabled="rawLogSaving" @click="changeRawLog(log)" class="rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-50" :class="log._deleted ? 'border-emerald-300 text-emerald-600' : 'border-rose-300 text-rose-600'">{{ log._deleted ? 'Restore' : 'Delete' }}</button>
                             <button
                               v-if="log._override_id"
                               type="button"

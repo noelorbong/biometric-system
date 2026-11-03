@@ -48,3 +48,12 @@ if ($service->correct($cluster, $lateSchedule, '2026-11-02', $now)[0]['in'] !== 
     throw new RuntimeException('Cluster or single-punch behavior changed.');
 }
 echo "Late-arrival and duplicate-cluster checks passed.\n";
+$missingArrival = array_map(fn ($time) => ['time' => '2026-09-01 '.$time, 'type' => 'O'], ['12:01:59', '12:55:00', '17:08:04']);
+$missing = $service->correct($missingArrival, $lateSchedule, '2026-09-01', $now);
+if ([$missing[0]['in'], $missing[0]['out'], $missing[1]['in'], $missing[1]['out']] !== [null, ...array_column($missingArrival, 'time')]) {
+    throw new RuntimeException('Morning checkout moved into afternoon.');
+}
+if ($service->correct([$missingArrival[0], $missingArrival[2]], $lateSchedule, '2026-09-01', $now)[0]['out'] !== null) {
+    throw new RuntimeException('Afternoon-only pair changed.');
+}
+echo "Missing morning arrival and afternoon-only checks passed.\n";

@@ -34,6 +34,11 @@ class BiometricLogOverride extends Model
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
+    public function scopeForAttendance($query)
+    {
+        return $query->where(fn ($query) => $query->whereNull('checkinout_id')->orWhereHas('checkinout'));
+    }
+
     public function checkinout()
     {
         return $this->belongsTo(Checkinout::class, 'checkinout_id', 'id');

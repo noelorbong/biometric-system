@@ -144,9 +144,11 @@ export function autoCorrectPunches(punches = [], schedules = [], baseDate = null
     } else if (breakPunches.length === 1) {
       const b = breakPunches[0]
       if (pre.length === 0 && post.length > 0) {
-        // Scenario 12: Reversed afternoon sequence, no morning punches -> Afternoon
-        sessionPunches[0] = []
-        sessionPunches[1] = [b, ...post]
+        // Preserve a morning checkout when a distinct afternoon pair already exists.
+        const hasAfternoonPair = post.length >= 2 && (post[post.length - 1].ts - post[0].ts) / 1000 > 600
+        const morningCheckout = b.type !== 'I' && Math.abs(b.seconds - e0 * 60) <= Math.abs(b.seconds - s1In * 60)
+        sessionPunches[0] = hasAfternoonPair && morningCheckout ? [b] : []
+        sessionPunches[1] = hasAfternoonPair && morningCheckout ? post : [b, ...post]
       } else if (pre.length > 0 && post.length === 0) {
         // Scenario 11: Reversed morning sequence, no afternoon punches -> Morning
         sessionPunches[0] = [...pre, b]

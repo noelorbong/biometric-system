@@ -953,7 +953,7 @@ class UserController extends Controller
             ->orderBy('CHECKTIME', 'desc')
             ->get();
 
-        $overrides = BiometricLogOverride::query()
+        $overrides = BiometricLogOverride::forAttendance()
             ->with(['createdBy:id,name', 'updatedBy:id,name'])
             ->where('user_id', $userId)
             ->where(function ($query) use ($start, $end) {
@@ -1440,7 +1440,7 @@ class UserController extends Controller
             ->get()
             ->groupBy(fn ($row) => (int) $row->USERID);
 
-        $overridesByUser = BiometricLogOverride::query()
+        $overridesByUser = BiometricLogOverride::forAttendance()
             ->with(['createdBy:id,name', 'updatedBy:id,name'])
             ->whereIn('user_id', $userIds)
             ->where(function ($query) use ($start, $end) {

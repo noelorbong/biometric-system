@@ -1,8 +1,16 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import axios from 'axios'
+import Swal from 'sweetalert2'
 import { ChevronDownIcon, FilterIcon } from '@/icons'
 
 const logs = ref([])
+const activeTab = ref('logs')
+const overrideView = ref('corrections')
+const showingCorrections = computed(() => activeTab.value === 'overrides' && overrideView.value === 'corrections')
+const saving = ref(false)
+const notice = ref('')
+let requestId = 0
 const loading = ref(false)
 const error = ref('')
 const page = ref(1)
@@ -14,24 +22,66 @@ const perPage = ref(25)
 const showMobileFilters = ref(false)
 
 const loadLogs = async (cursor = null, requestedPage = 1) => {
+  const id = ++requestId
   loading.value = true
   error.value = ''
   try {
     const { data } = await axios.post('/api/biometric/logs', {
       ...filters,
+      tab: activeTab.value,
+      override_view: overrideView.value,
       cursor,
       sort_by: sort.by,
       sort_direction: sort.direction,
       per_page: perPage.value,
     })
+    if (id !== requestId) return
     logs.value = data.logs.data
     page.value = requestedPage
     nextCursor.value = data.logs.next_cursor
     previousCursor.value = data.logs.prev_cursor
   } catch (response) {
+    if (id !== requestId) return
     error.value = response.response?.data?.message || 'Unable to load biometric logs.'
   } finally {
-    loading.value = false
+    if (id === requestId) loading.value = false
+  }
+}
+
+const switchTab = (tab) => {
+  activeTab.value = tab
+  logs.value = []
+  notice.value = ''
+  loadLogs()
+}
+
+const changeLog = async (log) => {
+  if (showingCorrections.value) return
+  const restoring = activeTab.value === 'overrides'
+  if (!restoring) {
+    const result = await Swal.fire({
+      title: 'Delete biometric log?',
+      text: `Delete punch #${log.id} for ${log.user} at ${log.checktime}? It will be excluded from attendance and can be restored from Overrides.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#e11d48',
+      focusCancel: true,
+    })
+    if (!result.isConfirmed) return
+  }
+  saving.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    const { data } = await axios.post(`/api/biometric/logs/${restoring ? 'restore' : 'delete'}`, { id: log.id })
+    notice.value = data.message
+    await loadLogs()
+  } catch (response) {
+    error.value = response.response?.data?.message || 'Unable to update this log.'
+  } finally {
+    saving.value = false
   }
 }
 
@@ -59,7 +109,10 @@ onMounted(() => loadLogs(null, 1))
       <section>
         <div class="flex flex-wrap items-center gap-2.5">
           <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Logs</h1>
-          <span class="text-xs text-slate-500 dark:text-slate-400">Raw check-in and check-out records</span>
+          <div class="flex gap-1" aria-label="Log views">
+            <button v-for="tab in ['logs', 'overrides']" :key="tab" type="button" :disabled="saving" :aria-pressed="activeTab === tab" class="rounded px-3 py-1.5 text-xs font-semibold disabled:opacity-50" :class="activeTab === tab ? 'bg-cyan-600 text-white' : 'text-slate-300 hover:bg-white/10'" @click="switchTab(tab)">{{ tab === 'logs' ? 'Logs' : 'Overrides' }}</button>
+          </div>
+          <!-- <span class="text-xs text-slate-500 dark:text-slate-400">Raw check-in and check-out records</span> -->
           <!-- <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">Server pagination</span> -->
         </div>
       </section>
@@ -106,6 +159,16 @@ onMounted(() => loadLogs(null, 1))
 
     <section class="overflow-hidden rounded-none border border-slate-300 bg-white shadow-sm dark:border-slate-700 dark:bg-white/[0.03]">
       <p v-if="error" class="m-3 rounded-md bg-rose-50 p-2 text-xs text-rose-700">{{ error }}</p>
+      <p v-if="notice" role="status" class="m-3 rounded-md bg-emerald-50 p-2 text-xs text-emerald-800">{{ notice }}</p>
+      <div v-if="activeTab === 'overrides'" class="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
+        <label>Show
+          <select v-model="overrideView" :disabled="saving" class="ml-2 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" @change="loadLogs()">
+            <option value="corrections">Added / overridden punches</option>
+            <option value="deleted">Deleted raw punches</option>
+          </select>
+        </label>
+        <span class="text-slate-500">{{ showingCorrections ? 'Correction history, including removed corrections. Date and type filters match replacement values.' : 'Restore a deleted punch to include it and its linked correction in attendance again.' }}</span>
+      </div>
       <div class="overflow-x-auto">
         <table class="min-w-full border-collapse text-left text-xs">
           <thead class="bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_30%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] text-[11px] uppercase tracking-wide text-white dark:bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.96)_0%,_rgba(30,41,59,0.98)_40%,_rgba(15,118,110,0.92)_100%)]"><tr>
@@ -113,16 +176,27 @@ onMounted(() => loadLogs(null, 1))
             <th class="border-r border-white/15 px-3 py-2 font-semibold text-slate-100">User</th>
             <th class="border-r border-white/15 px-3 py-2"><button class="font-semibold text-slate-100 hover:text-white" @click="changeSort('CHECKTIME')">Check time {{ sortMark('CHECKTIME') }}</button></th>
             <th class="border-r border-white/15 px-3 py-2 font-semibold text-slate-100">Check type</th><th class="border-r border-white/15 px-3 py-2 font-semibold text-slate-100">Sensor ID</th><th class="px-3 py-2 font-semibold text-slate-100">SN</th>
+            <th class="px-3 py-2 font-semibold text-slate-100">Actions</th>
+            <template v-if="showingCorrections">
+              <th class="px-3 py-2">Change / status</th><th class="px-3 py-2">Original value</th><th class="px-3 py-2">Created / updated by</th><th class="px-3 py-2">Updated at</th>
+            </template>
           </tr></thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
-            <tr v-if="loading"><td colspan="6" class="px-3 py-8 text-center text-slate-500">Loading biometric logs...</td></tr>
-            <tr v-else-if="!logs.length"><td colspan="6" class="px-3 py-8 text-center text-slate-500">No logs match these filters.</td></tr>
+            <tr v-if="loading"><td :colspan="showingCorrections ? 11 : 7" class="px-3 py-8 text-center text-slate-500">Loading biometric logs...</td></tr>
+            <tr v-else-if="!logs.length"><td :colspan="showingCorrections ? 11 : 7" class="px-3 py-8 text-center text-slate-500">No logs match these filters.</td></tr>
             <tr v-for="log in logs" v-else :key="log.id" class="text-slate-700 hover:bg-slate-50/70 dark:text-slate-300 dark:hover:bg-white/[0.02]">
               <td class="whitespace-nowrap border-r border-slate-200 px-3 py-1.5 font-mono text-[11px] dark:border-slate-700">{{ log.id }}</td>
               <td class="whitespace-nowrap border-r border-slate-200 px-3 py-1.5 dark:border-slate-700"><span class="font-medium text-slate-900 dark:text-white">{{ log.user }}</span><span class="ml-1.5 text-[10px] text-slate-400">#{{ log.user_id }}</span></td>
               <td class="whitespace-nowrap border-r border-slate-200 px-3 py-1.5 font-mono text-[11px] dark:border-slate-700">{{ log.checktime }}</td>
               <td class="border-r border-slate-200 px-3 py-1.5 dark:border-slate-700"><span class="rounded bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-200">{{ log.checktype || '—' }}</span></td>
               <td class="whitespace-nowrap border-r border-slate-200 px-3 py-1.5 dark:border-slate-700">{{ log.sensorid || '—' }}</td><td class="whitespace-nowrap px-3 py-1.5">{{ log.sn || '—' }}</td>
+              <td class="px-3 py-1.5"><span v-if="showingCorrections">—</span><button v-else type="button" :disabled="saving || loading" class="rounded border px-2 py-1 text-xs font-semibold disabled:opacity-50" :class="activeTab === 'overrides' ? 'border-emerald-300 text-emerald-600' : 'border-rose-300 text-rose-600'" @click="changeLog(log)">{{ activeTab === 'overrides' ? 'Restore' : 'Delete' }}</button></td>
+              <template v-if="showingCorrections">
+                <td class="whitespace-nowrap px-3 py-1.5">{{ log.action_type === 'add' ? 'Added' : 'Override' }} · {{ log.status }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5">{{ log.old_checktime || '—' }} {{ log.old_checktype || '' }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5">{{ log.created_by || '—' }} / {{ log.updated_by || '—' }}</td>
+                <td class="whitespace-nowrap px-3 py-1.5">{{ log.updated_at || '—' }}</td>
+              </template>
             </tr>
           </tbody>
         </table>

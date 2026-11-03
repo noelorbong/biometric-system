@@ -37,3 +37,9 @@ const cluster = ['11:55:00', '11:59:00'].map(time => ({ CHECKTIME: `2026-11-02 $
 assert.equal(autoCorrectPunches(cluster, lateSchedule, '2026-11-02')[0].in, null);
 assert.equal(autoCorrectPunches([latePunches[0]], lateSchedule, '2026-11-02')[0].in, null);
 console.log('Frontend late-arrival and duplicate-cluster checks passed.');
+const missingArrival = ['12:01:59', '12:55:00', '17:08:04'].map(time => ({ CHECKTIME: `2026-09-01 ${time}`, CHECKTYPE: 'O' }));
+assert.deepEqual(autoCorrectPunches(missingArrival, lateSchedule, '2026-09-01').flatMap(s => [s.in, s.out]),
+  [null, ...missingArrival.map(p => p.CHECKTIME)]);
+const afternoonOnly = [missingArrival[0], missingArrival[2]];
+assert.equal(autoCorrectPunches(afternoonOnly, lateSchedule, '2026-09-01')[0].out, null);
+console.log('Missing morning arrival and afternoon-only checks passed.');

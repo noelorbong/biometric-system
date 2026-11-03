@@ -174,9 +174,11 @@ class BiometricAutoCorrectionService
             } elseif (count($break) === 1) {
                 $b = $break[0];
                 if (empty($pre) && !empty($post)) {
-                    // Scenario 12: Reversed afternoon sequence, no morning punches -> Afternoon
-                    $sessionPunches[0] = [];
-                    $sessionPunches[1] = array_merge([$b], $post);
+                    // Preserve a morning checkout when a distinct afternoon pair already exists.
+                    $hasAfternoonPair = count($post) >= 2 && ($post[count($post) - 1]['ts'] - $post[0]['ts']) > 600;
+                    $morningCheckout = $b['type'] !== 'I' && abs($b['seconds'] - $e0 * 60) <= abs($b['seconds'] - $s1In * 60);
+                    $sessionPunches[0] = $hasAfternoonPair && $morningCheckout ? [$b] : [];
+                    $sessionPunches[1] = $hasAfternoonPair && $morningCheckout ? $post : array_merge([$b], $post);
                 } elseif (!empty($pre) && empty($post)) {
                     // Scenario 11: Reversed morning sequence, no afternoon punches -> Morning
                     $sessionPunches[0] = array_merge($pre, [$b]);

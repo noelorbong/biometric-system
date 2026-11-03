@@ -14,7 +14,7 @@ class AttendanceLogService
             ->where('CHECKTIME', '<', $end);
         $logs = (clone $logQuery)->get(['id', 'USERID', 'CHECKTIME', 'CHECKTYPE']);
         // Include overrides moved outside this range so their original punches stay suppressed.
-        $overrides = BiometricLogOverride::whereIn('user_id', $ids)
+        $overrides = BiometricLogOverride::forAttendance()->whereIn('user_id', $ids)
             ->where(function ($query) use ($start, $end, $logQuery) {
                 $query->where(function ($query) use ($start, $end) {
                     $query->where('new_checktime', '>=', $start)->where('new_checktime', '<', $end);
