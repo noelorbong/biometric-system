@@ -1199,7 +1199,7 @@ const syncAttendance = async (machine) => {
         </div>
         <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
         <button id="download-preview-import" type="button" class="mt-3 mr-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">Import ${Number(resp.data?.importable || 0)} Importable Record(s)</button>
-        ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white">Download Raw Diagnostic (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
+        ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white">Download Raw Attendance Payload (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
         ${resp.data?.diagnostic?.transfer ? `<details class="mt-3 text-left text-xs"><summary class="cursor-pointer font-semibold">Transfer diagnostics</summary><pre class="mt-2 max-h-40 overflow-auto rounded bg-slate-900 p-3 text-[10px] text-white">${escapeHtml(JSON.stringify(resp.data.diagnostic.transfer, null, 2))}</pre></details>` : ''}
         <p class="mt-2 text-xs text-gray-500">All ${Number(previewRows.length).toLocaleString()} downloaded records are available in this pagination.</p>`,
       confirmButtonText: 'Close',
@@ -1219,7 +1219,7 @@ const syncAttendance = async (machine) => {
           const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }))
           const link = document.createElement('a')
           link.href = url
-          link.download = diagnostic.filename || 'gt800_attendance_raw.bin'
+          link.download = diagnostic.filename || 'attendance_raw.bin'
           link.click()
           URL.revokeObjectURL(url)
         })

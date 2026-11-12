@@ -418,11 +418,12 @@ class MachineController extends Controller
                 'preview_limited' => false,
                 'valid_decoded' => $validDecodedRows,
                 'decoded_quality' => round($decodedQuality * 100, 1),
-                'diagnostic' => $isGt800 && $rawAttendancePayload !== '' ? [
-                    'filename' => 'GT800_' . ($machine->sn ?: $machine->ID) . '_attendance_raw.bin',
+                'diagnostic' => $rawAttendancePayload !== '' ? [
+                    'filename' => preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($machine->MachineAlias ?: $machine->ProductType ?: 'machine'))
+                        . '_' . ($machine->sn ?: $machine->ID) . '_attendance_raw.bin',
                     'content_base64' => base64_encode($rawAttendancePayload),
                     'bytes' => strlen($rawAttendancePayload),
-                    'transfer' => $bufferDiagnostics,
+                    'transfer' => $bufferDiagnostics !== [] ? $bufferDiagnostics : null,
                 ] : null,
                 'download_scope' => $downloadScope,
                 'download_date' => $downloadDate,
