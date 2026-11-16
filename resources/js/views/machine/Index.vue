@@ -1204,6 +1204,7 @@ const syncAttendance = async (machine) => {
       const rows = sorted.slice(start, start + previewPageSize).map((row) => `
         <tr class="border-b border-slate-200">
           <td class="px-2 py-1">${escapeHtml(row.uid)}</td>
+          <td class="px-2 py-1">${escapeHtml(row.user_name || 'Unmapped')}</td>
           <td class="px-2 py-1">${escapeHtml(row.pin)}</td>
           <td class="px-2 py-1">${escapeHtml(row.resolved_user_id || 'Unmapped')}</td>
           <td class="whitespace-nowrap px-2 py-1">${escapeHtml(row.check_time)}</td>
@@ -1215,7 +1216,7 @@ const syncAttendance = async (machine) => {
       const previous = document.getElementById('download-preview-previous')
       const next = document.getElementById('download-preview-next')
       const sortButton = document.getElementById('download-preview-sort')
-      if (body) body.innerHTML = rows || '<tr><td colspan="6" class="px-2 py-6 text-center">No decoded records.</td></tr>'
+      if (body) body.innerHTML = rows || '<tr><td colspan="7" class="px-2 py-6 text-center">No decoded records.</td></tr>'
       if (label) label.textContent = `Page ${previewPage} of ${totalPages}`
       if (previous) previous.disabled = previewPage <= 1
       if (next) next.disabled = previewPage >= totalPages
@@ -1234,7 +1235,7 @@ const syncAttendance = async (machine) => {
         </div>
         <p class="mb-2 text-left text-xs text-gray-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. Decode quality: ${Number(resp.data?.decoded_quality || 0)}%. No records were imported.</p>
         <div class="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 text-left text-xs">
-          <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
+          <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">Name</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
         </div>
         <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
         <button id="download-preview-import" type="button" class="mt-3 mr-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">Import ${Number(resp.data?.importable || 0)} Importable Record(s)</button>

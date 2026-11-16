@@ -403,6 +403,10 @@ class MachineController extends Controller
         }
 
         if ($action === 'preview') {
+            $userNames = User::with('profile')->get()->mapWithKeys(function ($user) {
+                $name = trim((string) ($user->profile?->display_name ?: $user->profile?->full_name ?: $user->name));
+                return [$user->id => $name];
+            });
             $previewRows = [];
             $importable = 0;
             $unmapped = 0;
@@ -419,6 +423,7 @@ class MachineController extends Controller
 
                 $previewRows[] = [
                     'uid' => $log['uid'] ?? null,
+                    'user_name' => $userNames->get($resolvedUserId),
                     'pin' => $pin,
                     'resolved_user_id' => $resolvedUserId,
                     'check_time' => $log['check_time'] ?? null,
