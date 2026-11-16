@@ -92,6 +92,7 @@ Route::post('/machine/discover', [MachineController::class, 'discover'])->middle
 Route::post('/machine/connect', [MachineController::class, 'testConnection'])->middleware('auth:sanctum');
 Route::post('/machine/auto-sync-status', [MachineController::class, 'autoSyncStatus'])->middleware('auth:sanctum');
 Route::post('/machine/sync-attendance', [MachineController::class, 'syncAttendance'])->middleware('auth:sanctum');
+Route::post('/machine/attendance-download-progress', [MachineController::class, 'attendanceDownloadProgress'])->middleware('auth:sanctum');
 Route::post('/machine/import-attendance-dat/preview', [MachineController::class, 'previewAttendanceDatImport'])->middleware('auth:sanctum');
 Route::post('/machine/import-attendance-dat', [MachineController::class, 'importAttendanceDat'])->middleware('auth:sanctum');
 Route::post('/machine/import-attendance-dat/progress', [MachineController::class, 'attendanceImportProgress'])->middleware('auth:sanctum');

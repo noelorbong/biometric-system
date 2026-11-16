@@ -1012,6 +1012,45 @@ const connectMachine = async (machine) => {
   })
 }
 
+const downloadAttendanceWithProgress = async (payload) => {
+  const progressKey = '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (digit) =>
+    (Number(digit) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(digit) / 4)))).toString(16))
+  let stopped = false
+  let timer = null
+  const render = (progress = {}) => {
+    const percent = progress.percent == null ? null : Math.max(0, Math.min(100, Number(progress.percent)))
+    return `<p class="mb-3 text-sm" role="status">${escapeHtml(progress.phase || 'Connecting to device')}</p>
+      <div class="h-3 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Attendance progress" ${percent == null ? '' : `aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"`}>
+        <div class="h-full rounded-full bg-emerald-600 ${percent == null ? 'animate-pulse' : ''}" style="width:${percent == null ? 35 : percent}%"></div>
+      </div><p class="mt-2 text-xs text-slate-500">${percent == null ? 'Waiting for device response…' : `${percent}% · ${Number(progress.processed || 0).toLocaleString()} / ${Number(progress.total || 0).toLocaleString()} records`}</p>`
+  }
+  const poll = async () => {
+    try {
+      const progress = await machineStore.attendanceDownloadProgress({ progress_key: progressKey })
+      if (!stopped) {
+        const body = document.getElementById('attendance-download-progress')
+        if (body) body.innerHTML = render(progress)
+      }
+    } catch { /* The main request reports errors; polling can recover next time. */ }
+    if (!stopped) timer = window.setTimeout(poll, 1000)
+  }
+  Swal.fire({
+    title: payload.action === 'preview' ? 'Downloading preview' : 'Downloading and importing',
+    html: `<div id="attendance-download-progress">${render()}</div>`,
+    showConfirmButton: false,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => { timer = window.setTimeout(poll, 500) },
+  })
+  try {
+    return await machineStore.syncAttendance({ ...payload, progress_key: progressKey })
+  } finally {
+    stopped = true
+    window.clearTimeout(timer)
+    Swal.close()
+  }
+}
+
 const syncAttendance = async (machine) => {
   const collectDownloadOptions = () => {
     const scope = document.getElementById('download-scope')?.value || 'today'
@@ -1079,7 +1118,7 @@ const syncAttendance = async (machine) => {
 
   syncingIds.value = new Set([...syncingIds.value, machine.ID])
 
-  const resp = await machineStore.syncAttendance({
+  const resp = await downloadAttendanceWithProgress({
     ID: machine.ID,
     ...(downloadChoice.value || {}),
     action: downloadChoice.isDenied ? 'preview' : 'import',
@@ -1127,7 +1166,7 @@ const syncAttendance = async (machine) => {
     Swal.close()
     syncingIds.value = new Set([...syncingIds.value, machine.ID])
 
-    const importResp = await machineStore.syncAttendance({
+    const importResp = await downloadAttendanceWithProgress({
       ID: machine.ID,
       ...(downloadChoice.value || {}),
       action: 'import',

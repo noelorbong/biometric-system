@@ -270,6 +270,14 @@ class MachineController extends Controller
     /**
      * Pull attendance logs from the device and store new records in checkinout.
      */
+    public function attendanceDownloadProgress(Request $request)
+    {
+        $validated = $request->validate(['progress_key' => ['required', 'uuid']]);
+        return response()->json(Cache::get('attendance-download:' . auth()->id() . ':' . $validated['progress_key'], [
+            'phase' => 'Connecting to device', 'percent' => null,
+        ]));
+    }
+
     public function syncAttendance(Request $request)
     {
         $validated = $request->validate([
@@ -278,7 +286,16 @@ class MachineController extends Controller
             'download_date' => ['nullable', 'date'],
             'user_filter' => ['nullable', 'string', Rule::in(['existing', 'all'])],
             'action' => ['nullable', 'string', Rule::in(['preview', 'import'])],
+            'progress_key' => ['nullable', 'uuid'],
         ]);
+
+        $reportProgress = function (string $phase, ?int $percent = null, int $processed = 0, int $total = 0) use ($validated) {
+            if (!empty($validated['progress_key'])) {
+                Cache::put('attendance-download:' . auth()->id() . ':' . $validated['progress_key'],
+                    compact('phase', 'percent', 'processed', 'total'), now()->addMinutes(30));
+            }
+        };
+        $reportProgress('Connecting to device');
 
         $machine = Machine::findOrFail($validated['ID']);
 
@@ -305,6 +322,7 @@ class MachineController extends Controller
                 || str_contains($deviceIdentity, 'VER 6.60 APR 27 2017');
             // GT800 ZMM220 returns the standard SSR 40-byte attendance layout.
             $preferredRecordSize = $isGt800 ? 40 : null;
+            $reportProgress('Downloading and decoding device logs');
             $logs = $zk->getAttendanceLogs($preferredRecordSize, $isGt800);
             $rawAttendancePayload = ($validated['action'] ?? 'import') === 'preview'
                 ? $zk->getLastAttendancePayload()
@@ -326,6 +344,7 @@ class MachineController extends Controller
         }
 
         $downloadScope = $validated['download_scope'] ?? 'today';
+        $reportProgress('Preparing downloaded records');
         $downloadDate = isset($validated['download_date'])
             ? Carbon::parse($validated['download_date'])->toDateString()
             : null;
@@ -388,7 +407,10 @@ class MachineController extends Controller
             $importable = 0;
             $unmapped = 0;
 
-            foreach ($logs as $log) {
+            foreach ($logs as $index => $log) {
+                if ($index % 100 === 0) {
+                    $reportProgress('Preparing preview', (int) floor($index * 100 / max(1, count($logs))), $index, count($logs));
+                }
                 [$resolvedUserId, $biometric, $pin] = $this->resolveAttendanceUser($log);
                 $isImportable = $resolvedUserId !== null
                     && $resolvedUserId > 0
@@ -406,6 +428,7 @@ class MachineController extends Controller
                 ];
             }
 
+            $reportProgress('Preview ready', 100, count($logs), count($logs));
             return response()->json([
                 'message' => 'Download preview complete',
                 'preview' => true,
@@ -431,7 +454,10 @@ class MachineController extends Controller
             ]);
         }
 
-        foreach ($logs as $log) {
+        foreach ($logs as $index => $log) {
+            if ($index % 100 === 0) {
+                $reportProgress('Importing records', (int) floor($index * 100 / max(1, count($logs))), $index, count($logs));
+            }
             [$resolvedUserId, $biometric, $pin] = $this->resolveAttendanceUser($log);
 
             if ($resolvedUserId === null || $resolvedUserId <= 0) {
@@ -466,6 +492,7 @@ class MachineController extends Controller
             $imported++;
         }
 
+        $reportProgress('Import complete', 100, count($logs), count($logs));
         return response()->json([
             'message'  => 'Download complete',
             'total'    => count($logs),

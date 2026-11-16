@@ -145,6 +145,11 @@ export const useMachineStore = defineStore('machines', {
       })
     },
 
+    async attendanceDownloadProgress(payload) {
+      const response = await axios.post('/api/machine/attendance-download-progress', payload)
+      return response.data
+    },
+
     async syncAttendance(payload) {
       const auth = useAuthStore()
 
