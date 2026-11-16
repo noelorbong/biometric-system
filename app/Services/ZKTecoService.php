@@ -1507,7 +1507,6 @@ class ZKTecoService
                 $payload = substr($payload, 4, min($declaredSize, strlen($payload) - 4));
             }
         }
-
         $recordSize = $this->detectAttendanceRecordSize($payload, $preferredRecordSize);
 
         if ($recordSize === null) {
@@ -1604,7 +1603,10 @@ class ZKTecoService
             $year = (int) substr($parsed['check_time'], 0, 4);
             $pin = $parsed['pin'];
 
-            if ($year >= 2000 && $year <= $maxYear && $pin !== '' && preg_match('/^[\x20-\x7e]+$/', $pin)) {
+            // Timestamp zero decodes to 2000-01-01, which is a common false
+            // positive when a larger record is interpreted using the wrong
+            // offsets. Real supported devices do not have valid logs from 2000.
+            if ($year > 2000 && $year <= $maxYear && $pin !== '' && $pin !== '0' && preg_match('/^[\x20-\x7e]+$/', $pin)) {
                 $valid++;
             }
         }

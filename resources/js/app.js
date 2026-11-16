@@ -56,27 +56,32 @@ const pinia = createPinia();
 pinia.use(({ store }) => {store.$router = markRaw(Router)})
 pinia.use(piniaPluginPersistedstate)
 
-let isHandlingUnauthorized = false
+let sessionCheck = null
 
 axios.defaults.baseURL = API_BASE_URL
 axios.defaults.withCredentials = true
 
 axios.interceptors.response.use(
 	(response) => response,
-	(error) => {
+	async (error) => {
 		const status = error.response?.status
 		const message = error.response?.data?.message
 		const isUnauthorized = status === 401 || message === 'Unauthenticated.'
 
-		if (isUnauthorized && !isHandlingUnauthorized) {
-			isHandlingUnauthorized = true
-
+		if (isUnauthorized && !error.config?.skipSessionCheck) {
 			const authStore = useAuthStore(pinia)
-			authStore.clearAccount()
-
-			setTimeout(() => {
-				isHandlingUnauthorized = false
-			}, 0)
+			if (authStore.authenticated) {
+				// Share one check across concurrent failures. Do not replay device
+				// requests: they can perform writes or start enrollment.
+				if (!sessionCheck) {
+					sessionCheck = axios.post('/api/user', {}, { skipSessionCheck: true })
+						.catch((sessionError) => {
+							if (sessionError.response?.status === 401) authStore.clearAccount()
+						})
+						.finally(() => { sessionCheck = null })
+				}
+				await sessionCheck
+			}
 		}
 
 		return Promise.reject(error)
