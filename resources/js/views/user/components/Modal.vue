@@ -30,7 +30,7 @@
                             <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-300">Account</h5>
                             <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 items-start">
                                 <div v-if="!props.isEditUser || authStore.user.role === 0 || authStore.user.role === 1" class="lg:col-span-1">
-                                    <input type="file" @change="uploadImage($event)" name="image" id="image" accept="image/png, image/gif, image/jpeg" hidden />
+                                    <input type="file" @change="uploadImage($event)" name="image" id="image" accept=".png,.gif,.jpg,.jpeg,.webp,image/png,image/gif,image/jpeg,image/webp" hidden />
                                     <label for="image" class="w-full h-32 group cursor-pointer grid items-center rounded bg-yellow-50/10 border-2 border-dashed border-yellow-300">
                                         <div v-if="!form_data.image" class="text-yellow-300 group-hover:scale-105 transition-all">
                                             <p class="text-center font-extralight text-2xl"><i class="fa-solid fa-plus"></i></p>
@@ -533,7 +533,7 @@ const uploadImage = async (event) => {
             },
         })
         form_data.value.image = response.data.path
-        form_data.value.thumbnail = response.data.data.thumbnail
+        form_data.value.thumbnail = response.data.data.thumbnail || response.data.path
     } catch (error) {
         console.error('Server Error:', error.response)
     }

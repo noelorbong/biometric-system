@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { encrypt, decrypt } from '../utils/crypto'
 import { useAuthStore } from './AuthStore'
+import { isDesktop } from '../utils/printPreview'
+
+const desktopMediaPath = (path) => isDesktop() && typeof path === 'string'
+  ? path.replace(/^\/(?:storage\/)?uploads\//, '/desktop-uploads/')
+  : path
 
 export const useAppSettingStore = defineStore('appSettings', {
   id: 'appSettings',
@@ -23,10 +28,16 @@ export const useAppSettingStore = defineStore('appSettings', {
     companySchoolName: 'Biometric System',
     companySchoolLogo: '',
     companySchoolLogoPrintEnabled: false,
+    biometricDtrHeaderAddress: '',
+    biometricDtrTemplate: 'default',
     biometricDtrSignatoryName: '',
+    biometricDtrTimekeeperName: '',
     biometricDtrSignatorySignature: '',
+    biometricDtrTimekeeperSignature: '',
     biometricDtrSignatoryUseDefault: true,
+    biometricDtrTimekeeperUseDefault: true,
     biometricDtrSignatorySignatureEnabled: false,
+    biometricDtrTimekeeperSignatureEnabled: false,
     machineAutoSyncStatusTimerEnabled: true,
     machineAutoSyncStatusTimerMs: 5000,
     machineRefreshTimerEnabled: true,
@@ -40,6 +51,10 @@ export const useAppSettingStore = defineStore('appSettings', {
       const app = this
       const auth = useAuthStore()
 
+      app.companySchoolLogo = desktopMediaPath(app.companySchoolLogo)
+      app.biometricDtrSignatorySignature = desktopMediaPath(app.biometricDtrSignatorySignature)
+      app.biometricDtrTimekeeperSignature = desktopMediaPath(app.biometricDtrTimekeeperSignature)
+
       if (app.loaded && !force) {
         return {
           success: true,
@@ -48,10 +63,16 @@ export const useAppSettingStore = defineStore('appSettings', {
               company_school_name: app.companySchoolName,
               company_school_logo: app.companySchoolLogo,
               company_school_logo_print_enabled: app.companySchoolLogoPrintEnabled,
+              biometric_dtr_header_address: app.biometricDtrHeaderAddress,
+              biometric_dtr_template: app.biometricDtrTemplate,
               biometric_dtr_signatory_name: app.biometricDtrSignatoryName,
+              biometric_dtr_timekeeper_name: app.biometricDtrTimekeeperName,
               biometric_dtr_signatory_signature: app.biometricDtrSignatorySignature,
+              biometric_dtr_timekeeper_signature: app.biometricDtrTimekeeperSignature,
               biometric_dtr_signatory_use_default: app.biometricDtrSignatoryUseDefault,
+              biometric_dtr_timekeeper_use_default: app.biometricDtrTimekeeperUseDefault,
               biometric_dtr_signatory_signature_enabled: app.biometricDtrSignatorySignatureEnabled,
+              biometric_dtr_timekeeper_signature_enabled: app.biometricDtrTimekeeperSignatureEnabled,
               machine_auto_sync_status_timer_enabled: app.machineAutoSyncStatusTimerEnabled,
               machine_auto_sync_status_timer_ms: app.machineAutoSyncStatusTimerMs,
               machine_refresh_timer_enabled: app.machineRefreshTimerEnabled,
@@ -67,10 +88,16 @@ export const useAppSettingStore = defineStore('appSettings', {
         app.companySchoolName = resp?.data?.settings?.company_school_name || 'Biometric System'
         app.companySchoolLogo = resp?.data?.settings?.company_school_logo || ''
         app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? false)
+        app.biometricDtrHeaderAddress = resp?.data?.settings?.biometric_dtr_header_address ?? ''
+        app.biometricDtrTemplate = resp?.data?.settings?.biometric_dtr_template === 'template2' ? 'template2' : 'default'
         app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name ?? ''
+        app.biometricDtrTimekeeperName = resp?.data?.settings?.biometric_dtr_timekeeper_name ?? ''
         app.biometricDtrSignatorySignature = resp?.data?.settings?.biometric_dtr_signatory_signature || ''
+        app.biometricDtrTimekeeperSignature = resp?.data?.settings?.biometric_dtr_timekeeper_signature || ''
         app.biometricDtrSignatoryUseDefault = Boolean(resp?.data?.settings?.biometric_dtr_signatory_use_default ?? true)
+        app.biometricDtrTimekeeperUseDefault = Boolean(resp?.data?.settings?.biometric_dtr_timekeeper_use_default ?? true)
         app.biometricDtrSignatorySignatureEnabled = Boolean(resp?.data?.settings?.biometric_dtr_signatory_signature_enabled ?? false)
+        app.biometricDtrTimekeeperSignatureEnabled = Boolean(resp?.data?.settings?.biometric_dtr_timekeeper_signature_enabled ?? false)
         app.machineAutoSyncStatusTimerEnabled = Boolean(resp?.data?.settings?.machine_auto_sync_status_timer_enabled ?? true)
         app.machineAutoSyncStatusTimerMs = Number(resp?.data?.settings?.machine_auto_sync_status_timer_ms || 5000)
         app.machineRefreshTimerEnabled = Boolean(resp?.data?.settings?.machine_refresh_timer_enabled ?? true)
@@ -95,10 +122,16 @@ export const useAppSettingStore = defineStore('appSettings', {
         app.companySchoolName = resp?.data?.settings?.company_school_name || app.companySchoolName
         app.companySchoolLogo = resp?.data?.settings?.company_school_logo || app.companySchoolLogo
         app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? app.companySchoolLogoPrintEnabled)
+        app.biometricDtrHeaderAddress = resp?.data?.settings?.biometric_dtr_header_address ?? ''
+        app.biometricDtrTemplate = resp?.data?.settings?.biometric_dtr_template === 'template2' ? 'template2' : 'default'
         app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name ?? app.biometricDtrSignatoryName
+        app.biometricDtrTimekeeperName = resp?.data?.settings?.biometric_dtr_timekeeper_name ?? app.biometricDtrTimekeeperName
         app.biometricDtrSignatorySignature = resp?.data?.settings?.biometric_dtr_signatory_signature || app.biometricDtrSignatorySignature
+        app.biometricDtrTimekeeperSignature = resp?.data?.settings?.biometric_dtr_timekeeper_signature || app.biometricDtrTimekeeperSignature
         app.biometricDtrSignatoryUseDefault = Boolean(resp?.data?.settings?.biometric_dtr_signatory_use_default ?? app.biometricDtrSignatoryUseDefault)
+        app.biometricDtrTimekeeperUseDefault = Boolean(resp?.data?.settings?.biometric_dtr_timekeeper_use_default ?? app.biometricDtrTimekeeperUseDefault)
         app.biometricDtrSignatorySignatureEnabled = Boolean(resp?.data?.settings?.biometric_dtr_signatory_signature_enabled ?? app.biometricDtrSignatorySignatureEnabled)
+        app.biometricDtrTimekeeperSignatureEnabled = Boolean(resp?.data?.settings?.biometric_dtr_timekeeper_signature_enabled ?? app.biometricDtrTimekeeperSignatureEnabled)
         app.machineAutoSyncStatusTimerEnabled = Boolean(resp?.data?.settings?.machine_auto_sync_status_timer_enabled ?? app.machineAutoSyncStatusTimerEnabled)
         app.machineAutoSyncStatusTimerMs = Number(resp?.data?.settings?.machine_auto_sync_status_timer_ms || app.machineAutoSyncStatusTimerMs)
         app.machineRefreshTimerEnabled = Boolean(resp?.data?.settings?.machine_refresh_timer_enabled ?? app.machineRefreshTimerEnabled)

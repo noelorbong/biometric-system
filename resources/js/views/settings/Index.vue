@@ -20,13 +20,19 @@ const licenseDaysLeft   = computed(() => licenseStore.licenseDaysLeft)
 const trialDaysLeft     = computed(() => licenseStore.trialDaysLeft)
 const trialExpiresAt    = computed(() => licenseStore.trialExpiresAt)
 const {
+  biometricDtrHeaderAddress,
+  biometricDtrTemplate,
   companySchoolName,
   companySchoolLogo,
   companySchoolLogoPrintEnabled,
   biometricDtrSignatoryName,
+  biometricDtrTimekeeperName,
   biometricDtrSignatorySignature,
+  biometricDtrTimekeeperSignature,
   biometricDtrSignatoryUseDefault,
+  biometricDtrTimekeeperUseDefault,
   biometricDtrSignatorySignatureEnabled,
+  biometricDtrTimekeeperSignatureEnabled,
   machineAutoSyncStatusTimerEnabled,
   machineAutoSyncStatusTimerMs,
   machineRefreshTimerEnabled,
@@ -39,10 +45,16 @@ const form = ref({
   company_school_name: '',
   company_school_logo: '',
   company_school_logo_print_enabled: false,
+  biometric_dtr_header_address: '',
+  biometric_dtr_template: 'default',
   biometric_dtr_signatory_name: '',
+  biometric_dtr_timekeeper_name: '',
   biometric_dtr_signatory_signature: '',
+  biometric_dtr_timekeeper_signature: '',
   biometric_dtr_signatory_use_default: true,
+  biometric_dtr_timekeeper_use_default: true,
   biometric_dtr_signatory_signature_enabled: false,
+  biometric_dtr_timekeeper_signature_enabled: false,
   machine_auto_sync_status_timer_enabled: true,
   machine_auto_sync_status_timer_ms: 5000,
   machine_refresh_timer_enabled: true,
@@ -51,6 +63,12 @@ const form = ref({
   machine_web_auto_fallback_timer_ms: 1000,
 })
 
+const uploadsInProgress = ref(0)
+const uploadErrorMessage = (error) => {
+  if (error?.response?.status === 413) return 'This image exceeds the upload size limit. Use an image smaller than 20 MB.'
+  return error?.response?.data?.errors?.file?.[0] || error?.response?.data?.message || 'Image upload failed. Please try again.'
+}
+const logoLoadFailed = ref(false)
 const saving = ref(false)
 const patching = ref(false)
 const patchResults = ref([])
@@ -151,6 +169,7 @@ const uploadLogo = async (event) => {
 
   const formData = new FormData()
   formData.append('file', files[0])
+  uploadsInProgress.value += 1
 
   try {
     const response = await axios.post('/api/media/upload', formData, {
@@ -160,15 +179,18 @@ const uploadLogo = async (event) => {
     })
 
     form.value.company_school_logo = response?.data?.path || ''
-    toastResult('Logo uploaded')
+    form.value.company_school_logo_print_enabled = Boolean(form.value.company_school_logo)
+    logoLoadFailed.value = false
+    toastResult('Logo uploaded. Save settings to use it in reports.')
   } catch (error) {
-    toastResult(error?.response?.data?.message || 'Unable to upload logo', 'error')
+    toastResult(uploadErrorMessage(error), 'error')
   } finally {
+    uploadsInProgress.value -= 1
     event.target.value = ''
   }
 }
 
-const uploadSignature = async (event) => {
+const uploadSignature = async (event, field = 'biometric_dtr_signatory_signature') => {
   const files = event?.target?.files
   if (!files || files.length <= 0) {
     return
@@ -176,6 +198,7 @@ const uploadSignature = async (event) => {
 
   const formData = new FormData()
   formData.append('file', files[0])
+  uploadsInProgress.value += 1
 
   try {
     const response = await axios.post('/api/media/upload', formData, {
@@ -184,11 +207,12 @@ const uploadSignature = async (event) => {
       },
     })
 
-    form.value.biometric_dtr_signatory_signature = response?.data?.path || ''
+    form.value[field] = response?.data?.path || ''
     toastResult('Signature uploaded')
   } catch (error) {
-    toastResult(error?.response?.data?.message || 'Unable to upload signature', 'error')
+    toastResult(uploadErrorMessage(error), 'error')
   } finally {
+    uploadsInProgress.value -= 1
     event.target.value = ''
   }
 }
@@ -200,13 +224,19 @@ const loadSettings = async () => {
     return
   }
 
+  form.value.biometric_dtr_header_address = biometricDtrHeaderAddress.value || ''
+  form.value.biometric_dtr_template = biometricDtrTemplate.value || 'default'
   form.value.company_school_name = companySchoolName.value || 'Biometric System'
   form.value.company_school_logo = companySchoolLogo.value || ''
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
   form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value ?? ''
+  form.value.biometric_dtr_timekeeper_name = biometricDtrTimekeeperName.value ?? ''
   form.value.biometric_dtr_signatory_signature = biometricDtrSignatorySignature.value || ''
+  form.value.biometric_dtr_timekeeper_signature = biometricDtrTimekeeperSignature.value || ''
   form.value.biometric_dtr_signatory_use_default = Boolean(biometricDtrSignatoryUseDefault.value)
+  form.value.biometric_dtr_timekeeper_use_default = Boolean(biometricDtrTimekeeperUseDefault.value)
   form.value.biometric_dtr_signatory_signature_enabled = Boolean(biometricDtrSignatorySignatureEnabled.value)
+  form.value.biometric_dtr_timekeeper_signature_enabled = Boolean(biometricDtrTimekeeperSignatureEnabled.value)
   form.value.machine_auto_sync_status_timer_enabled = Boolean(machineAutoSyncStatusTimerEnabled.value)
   form.value.machine_auto_sync_status_timer_ms = Number(machineAutoSyncStatusTimerMs.value || 5000)
   form.value.machine_refresh_timer_enabled = Boolean(machineRefreshTimerEnabled.value)
@@ -229,10 +259,16 @@ const saveSettings = async () => {
     company_school_name: form.value.company_school_name,
     company_school_logo: form.value.company_school_logo,
     company_school_logo_print_enabled: Boolean(form.value.company_school_logo_print_enabled),
+    biometric_dtr_header_address: form.value.biometric_dtr_header_address,
+    biometric_dtr_template: form.value.biometric_dtr_template,
     biometric_dtr_signatory_name: form.value.biometric_dtr_signatory_name,
+    biometric_dtr_timekeeper_name: form.value.biometric_dtr_timekeeper_name,
     biometric_dtr_signatory_signature: form.value.biometric_dtr_signatory_signature,
+    biometric_dtr_timekeeper_signature: form.value.biometric_dtr_timekeeper_signature,
     biometric_dtr_signatory_use_default: Boolean(form.value.biometric_dtr_signatory_use_default),
+    biometric_dtr_timekeeper_use_default: Boolean(form.value.biometric_dtr_timekeeper_use_default),
     biometric_dtr_signatory_signature_enabled: Boolean(form.value.biometric_dtr_signatory_signature_enabled),
+    biometric_dtr_timekeeper_signature_enabled: Boolean(form.value.biometric_dtr_timekeeper_signature_enabled),
     machine_auto_sync_status_timer_enabled: Boolean(form.value.machine_auto_sync_status_timer_enabled),
     machine_auto_sync_status_timer_ms: clampMs(form.value.machine_auto_sync_status_timer_ms, 5000),
     machine_refresh_timer_enabled: Boolean(form.value.machine_refresh_timer_enabled),
@@ -247,13 +283,19 @@ const saveSettings = async () => {
     return
   }
 
+  form.value.biometric_dtr_header_address = biometricDtrHeaderAddress.value || ''
+  form.value.biometric_dtr_template = biometricDtrTemplate.value || 'default'
   form.value.company_school_name = companySchoolName.value || form.value.company_school_name
   form.value.company_school_logo = companySchoolLogo.value || form.value.company_school_logo
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
   form.value.biometric_dtr_signatory_name = biometricDtrSignatoryName.value ?? form.value.biometric_dtr_signatory_name
+  form.value.biometric_dtr_timekeeper_name = biometricDtrTimekeeperName.value ?? form.value.biometric_dtr_timekeeper_name
   form.value.biometric_dtr_signatory_signature = biometricDtrSignatorySignature.value || form.value.biometric_dtr_signatory_signature
+  form.value.biometric_dtr_timekeeper_signature = biometricDtrTimekeeperSignature.value || form.value.biometric_dtr_timekeeper_signature
   form.value.biometric_dtr_signatory_use_default = Boolean(biometricDtrSignatoryUseDefault.value)
+  form.value.biometric_dtr_timekeeper_use_default = Boolean(biometricDtrTimekeeperUseDefault.value)
   form.value.biometric_dtr_signatory_signature_enabled = Boolean(biometricDtrSignatorySignatureEnabled.value)
+  form.value.biometric_dtr_timekeeper_signature_enabled = Boolean(biometricDtrTimekeeperSignatureEnabled.value)
   form.value.machine_auto_sync_status_timer_enabled = Boolean(machineAutoSyncStatusTimerEnabled.value)
   form.value.machine_auto_sync_status_timer_ms = Number(machineAutoSyncStatusTimerMs.value || 5000)
   form.value.machine_refresh_timer_enabled = Boolean(machineRefreshTimerEnabled.value)
@@ -601,31 +643,58 @@ onMounted(async () => {
           />
         </div>
 
-        <div class="mt-2.5">
-          <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Company / School Logo</label>
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            @change="uploadLogo"
-            class="block h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-700 file:mr-2 file:rounded file:border-0 file:bg-sky-100 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-sky-700 hover:file:bg-sky-200 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
-          />
-          <div v-if="form.company_school_logo" class="mt-1.5 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-700 dark:bg-slate-900/40">
-            <img :src="form.company_school_logo" alt="Company logo" class="h-10 w-10 rounded bg-white object-contain p-1" />
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-slate-800 dark:text-white">Logo ready</p>
-              <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.company_school_logo }}</p>
+        <div class="mt-5 space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900 dark:text-white">DTR print layout</h3>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Choose your template and customize the printed header. Save settings to apply changes.</p>
+            <p v-if="uploadsInProgress > 0" role="status" class="mt-2 text-xs text-sky-600 dark:text-sky-400">Uploading image, please wait...</p>
+          </div>
+          <div>
+            <label for="biometric-dtr-template" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Print template</label>
+            <select id="biometric-dtr-template" v-model="form.biometric_dtr_template" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white">
+              <option value="default">Original template (default)</option>
+              <option value="template2">Template 2 - two forms per A4 landscape sheet</option>
+            </select>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label for="dtr-header-address" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Office address</label>
+              <input id="dtr-header-address" v-model.trim="form.biometric_dtr_header_address" type="text" maxlength="255" placeholder="e.g. Pawing, Palo, Leyte" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white" />
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Template 2 uses each employee's department name automatically, followed by this address.</p>
+          </div>
+          <div class="border-t border-slate-200 pt-4 dark:border-slate-700">
+            <label for="dtr-logo" class="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Header logo</label>
+            <input id="dtr-logo" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" @change="uploadLogo" class="block w-full rounded-md border border-slate-300 p-2 text-xs text-slate-700 file:mr-3 file:rounded file:border-0 file:bg-sky-50 file:px-3 file:py-1.5 file:font-medium file:text-sky-700 dark:border-slate-600 dark:text-slate-300" />
+            <div v-if="form.company_school_logo" class="mt-3 flex items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+              <div class="flex h-24 w-24 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white p-2">
+                <img :key="form.company_school_logo" :src="form.company_school_logo" alt="Uploaded logo preview" class="max-h-full max-w-full object-contain" @load="logoLoadFailed = false" @error="logoLoadFailed = true" />
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-slate-800 dark:text-slate-100">Logo preview</p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ form.company_school_logo_print_enabled ? 'Included in printed reports' : 'Saved logo; hidden in printed reports' }}</p>
+              </div>
+            </div>
+            <label class="mt-3 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input v-model="form.company_school_logo_print_enabled" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-sky-600" />
+              Show logo in printed reports
+            </label>
+            <p v-if="!form.company_school_logo" class="mt-1 text-xs text-slate-500">Upload a logo to include it in the header.</p>
+            <p v-else-if="!form.company_school_logo_print_enabled" class="mt-1 text-xs text-amber-600 dark:text-amber-400">Logo is hidden. Enable the checkbox to print it.</p>
+            <p v-if="logoLoadFailed" role="alert" class="mt-2 text-xs text-red-600 dark:text-red-400">The saved logo could not be loaded. Upload the image again and save settings.</p>
+          </div>
+          <div v-if="form.biometric_dtr_template === 'template2'" class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+            <p class="mb-3 text-xs font-medium text-slate-500 dark:text-slate-400">Header preview</p>
+            <div class="flex items-center gap-3 rounded bg-white p-4 text-black">
+              <img v-if="form.company_school_logo && form.company_school_logo_print_enabled" :key="form.company_school_logo" :src="form.company_school_logo" alt="Header logo" class="h-14 w-14 shrink-0 object-contain" @load="logoLoadFailed = false" @error="logoLoadFailed = true" />
+              <div class="min-w-0 flex-1 break-words text-center text-xs leading-relaxed">
+                <p>Republic of the Philippines</p>
+                <p class="font-bold">{{ form.company_school_name }}</p>
+                <p class="font-bold">Employee department name</p>
+                <p v-if="form.biometric_dtr_header_address">{{ form.biometric_dtr_header_address }}</p>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div class="mt-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
-          <label class="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300">
-            <input v-model="form.company_school_logo_print_enabled" type="checkbox" class="h-3.5 w-3.5" />
-            Show logo in printed reports
-          </label>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            When enabled, the uploaded logo will appear in printable attendance forms.
-          </p>
         </div>
 
         <div class="mt-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
@@ -659,7 +728,7 @@ onMounted(async () => {
               <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">E-Signature</label>
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/jpg,image/webp"
+                accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                 @change="uploadSignature"
                 :disabled="!form.biometric_dtr_signatory_use_default"
                 class="block h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-700 file:mr-2 file:rounded file:border-0 file:bg-sky-100 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-sky-700 hover:file:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
@@ -684,6 +753,66 @@ onMounted(async () => {
             <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
               <input v-model="form.biometric_dtr_signatory_signature_enabled" type="checkbox" class="h-3.5 w-3.5" />
               Use e-signature in Biometric DTR
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-700 dark:text-slate-300">Biometric DTR Time Keeper</h3>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Enter the default time keeper name and optional e-signature used in Template 2.
+              </p>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input v-model="form.biometric_dtr_timekeeper_use_default" type="checkbox" class="h-3.5 w-3.5" />
+              Use as default in Template 2
+            </label>
+          </div>
+
+          <div class="mt-2.5 grid gap-2.5 lg:grid-cols-[1fr_1fr]">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Time Keeper Name (optional)</label>
+              <input
+                v-model.trim="form.biometric_dtr_timekeeper_name"
+                type="text"
+                placeholder="Optional"
+                :disabled="!form.biometric_dtr_timekeeper_use_default"
+                class="h-9 w-full rounded-md border border-slate-300 bg-transparent px-2.5 py-1.5 text-xs text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:text-white/90"
+              />
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">This name prints above the signature line when the default is enabled.</p>
+            </div>
+
+            <div>
+              <label class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">E-Signature</label>
+              <input
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                @change="uploadSignature($event, 'biometric_dtr_timekeeper_signature')"
+                :disabled="!form.biometric_dtr_timekeeper_use_default"
+                class="block h-9 w-full rounded-md border border-slate-300 bg-transparent px-2 py-1 text-xs text-slate-700 file:mr-2 file:rounded file:border-0 file:bg-sky-100 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-sky-700 hover:file:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:file:bg-sky-900/30 dark:file:text-sky-300"
+              />
+              <div v-if="form.biometric_dtr_timekeeper_signature" class="mt-2 flex items-center gap-2 rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-950/30">
+                <img :src="form.biometric_dtr_timekeeper_signature" alt="Time keeper signature" class="h-10 max-w-[140px] object-contain" />
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-slate-800 dark:text-white">Signature ready</p>
+                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.biometric_dtr_timekeeper_signature }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2.5 flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-400">
+            <div>
+              <p class="font-semibold text-slate-700 dark:text-slate-300">Print Preview</p>
+              <p class="mt-1">
+                {{ form.biometric_dtr_timekeeper_use_default ? (form.biometric_dtr_timekeeper_name || 'Blank') : 'Manual / default off' }}
+              </p>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <input v-model="form.biometric_dtr_timekeeper_signature_enabled" type="checkbox" class="h-3.5 w-3.5" />
+              Use e-signature in Template 2
             </label>
           </div>
         </div>
@@ -773,7 +902,7 @@ onMounted(async () => {
         </div>
 
         <div class="mt-2.5 flex justify-end">
-          <Button @click="saveSettings" size="sm" variant="primary" :className="'h-9 bg-sky-500 hover:bg-sky-600 text-white'" :disabled="saving">
+          <Button @click="saveSettings" size="sm" variant="primary" :className="'h-9 bg-sky-500 hover:bg-sky-600 text-white'" :disabled="saving || uploadsInProgress > 0">
             {{ saving ? 'Saving...' : 'Save Settings' }}
           </Button>
         </div>

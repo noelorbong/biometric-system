@@ -20,6 +20,12 @@ class AppSettingController extends Controller
         'company_school_name' => 'Biometric System',
         'company_school_logo' => '',
         'company_school_logo_print_enabled' => false,
+        'biometric_dtr_header_address' => '',
+        'biometric_dtr_template' => 'default',
+        'biometric_dtr_timekeeper_name' => '',
+        'biometric_dtr_timekeeper_signature' => '',
+        'biometric_dtr_timekeeper_use_default' => true,
+        'biometric_dtr_timekeeper_signature_enabled' => false,
         'biometric_dtr_signatory_name' => '',
         'biometric_dtr_signatory_signature' => '',
         'biometric_dtr_signatory_use_default' => true,
@@ -92,23 +98,49 @@ class AppSettingController extends Controller
         }
     }
 
+    private function resolveMediaPath(string $path): string
+    {
+        if (config('nativephp-internal.running')) {
+            foreach (['/uploads/', '/storage/uploads/'] as $prefix) {
+                if (str_starts_with($path, $prefix)) {
+                    return '/desktop-uploads/'.substr($path, strlen($prefix));
+                }
+            }
+        }
+
+        return $path;
+    }
+
     private function resolveGeneralSettings($settings): array
     {
         return [
             'company_school_name' => $settings['company_school_name'] ?? self::DEFAULT_SETTINGS['company_school_name'],
-            'company_school_logo' => $settings['company_school_logo'] ?? self::DEFAULT_SETTINGS['company_school_logo'],
+            'company_school_logo' => $this->resolveMediaPath((string) ($settings['company_school_logo'] ?? self::DEFAULT_SETTINGS['company_school_logo'])),
             'company_school_logo_print_enabled' => filter_var(
                 $settings['company_school_logo_print_enabled'] ?? self::DEFAULT_SETTINGS['company_school_logo_print_enabled'],
                 FILTER_VALIDATE_BOOLEAN
             ),
+            'biometric_dtr_header_address' => (string) ($settings['biometric_dtr_header_address'] ?? ''),
+            'biometric_dtr_template' => in_array($settings['biometric_dtr_template'] ?? '', ['default', 'template2'], true)
+                ? $settings['biometric_dtr_template'] : self::DEFAULT_SETTINGS['biometric_dtr_template'],
             'biometric_dtr_signatory_name' => (string) ($settings['biometric_dtr_signatory_name'] ?? self::DEFAULT_SETTINGS['biometric_dtr_signatory_name']),
-            'biometric_dtr_signatory_signature' => (string) ($settings['biometric_dtr_signatory_signature'] ?? self::DEFAULT_SETTINGS['biometric_dtr_signatory_signature']),
+            'biometric_dtr_signatory_signature' => $this->resolveMediaPath((string) ($settings['biometric_dtr_signatory_signature'] ?? self::DEFAULT_SETTINGS['biometric_dtr_signatory_signature'])),
             'biometric_dtr_signatory_use_default' => filter_var(
                 $settings['biometric_dtr_signatory_use_default'] ?? self::DEFAULT_SETTINGS['biometric_dtr_signatory_use_default'],
                 FILTER_VALIDATE_BOOLEAN
             ),
             'biometric_dtr_signatory_signature_enabled' => filter_var(
                 $settings['biometric_dtr_signatory_signature_enabled'] ?? self::DEFAULT_SETTINGS['biometric_dtr_signatory_signature_enabled'],
+                FILTER_VALIDATE_BOOLEAN
+            ),
+            'biometric_dtr_timekeeper_name' => (string) ($settings['biometric_dtr_timekeeper_name'] ?? self::DEFAULT_SETTINGS['biometric_dtr_timekeeper_name']),
+            'biometric_dtr_timekeeper_signature' => $this->resolveMediaPath((string) ($settings['biometric_dtr_timekeeper_signature'] ?? self::DEFAULT_SETTINGS['biometric_dtr_timekeeper_signature'])),
+            'biometric_dtr_timekeeper_use_default' => filter_var(
+                $settings['biometric_dtr_timekeeper_use_default'] ?? self::DEFAULT_SETTINGS['biometric_dtr_timekeeper_use_default'],
+                FILTER_VALIDATE_BOOLEAN
+            ),
+            'biometric_dtr_timekeeper_signature_enabled' => filter_var(
+                $settings['biometric_dtr_timekeeper_signature_enabled'] ?? self::DEFAULT_SETTINGS['biometric_dtr_timekeeper_signature_enabled'],
                 FILTER_VALIDATE_BOOLEAN
             ),
             'machine_auto_sync_status_timer_enabled' => filter_var(
@@ -212,6 +244,12 @@ class AppSettingController extends Controller
             'company_school_name' => ['required', 'string', 'max:255'],
             'company_school_logo' => ['nullable', 'string', 'max:255'],
             'company_school_logo_print_enabled' => ['required', 'boolean'],
+            'biometric_dtr_header_address' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'biometric_dtr_template' => ['sometimes', Rule::in(['default', 'template2'])],
+            'biometric_dtr_timekeeper_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'biometric_dtr_timekeeper_signature' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'biometric_dtr_timekeeper_use_default' => ['sometimes', 'boolean'],
+            'biometric_dtr_timekeeper_signature_enabled' => ['sometimes', 'boolean'],
             'biometric_dtr_signatory_name' => ['nullable', 'string', 'max:255'],
             'biometric_dtr_signatory_signature' => ['nullable', 'string', 'max:255'],
             'biometric_dtr_signatory_use_default' => ['required', 'boolean'],
@@ -239,6 +277,22 @@ class AppSettingController extends Controller
             'machine_web_auto_fallback_timer_enabled' => $validated['machine_web_auto_fallback_timer_enabled'] ? '1' : '0',
             'machine_web_auto_fallback_timer_ms' => (string) ($validated['machine_web_auto_fallback_timer_ms'] ?? self::DEFAULT_SETTINGS['machine_web_auto_fallback_timer_ms']),
         ];
+
+        foreach (['biometric_dtr_timekeeper_name', 'biometric_dtr_timekeeper_signature', 'biometric_dtr_timekeeper_use_default', 'biometric_dtr_timekeeper_signature_enabled'] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $pairs[$key] = is_bool($validated[$key]) ? ($validated[$key] ? '1' : '0') : (string) ($validated[$key] ?? '');
+            }
+        }
+
+        foreach (['biometric_dtr_header_address'] as $headerKey) {
+            if (array_key_exists($headerKey, $validated)) {
+                $pairs[$headerKey] = trim((string) ($validated[$headerKey] ?? ''));
+            }
+        }
+
+        if (array_key_exists('biometric_dtr_template', $validated)) {
+            $pairs['biometric_dtr_template'] = $validated['biometric_dtr_template'];
+        }
 
         $this->upsertSettings($pairs, $request->user()?->id);
 

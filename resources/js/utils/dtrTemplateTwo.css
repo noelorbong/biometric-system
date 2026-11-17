@@ -1,0 +1,26 @@
+.dtr-two { padding: 3mm; background: white; color: black; font: 8pt Arial, sans-serif; }
+.dtr-two-header { min-height: 12mm; position: relative; text-align: center; padding: 0 13mm; line-height: 1.3; }
+.dtr-two-header img { position: absolute; left: 4mm; top: 0; width: 11mm; height: 11mm; object-fit: contain; }
+.dtr-two-header strong { display: block; }
+.dtr-two h1 { text-align: center; font-size: 13pt; margin: 3mm 0; font-weight: bold; }
+.dtr-two-info { display: flex; justify-content: space-between; gap: 3mm; margin: 4mm 0; font-size: 7pt; }
+.dtr-two-info strong { border-bottom: 1px solid black; }
+.dtr-two table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.dtr-two th, .dtr-two td { border: 0.25mm solid black; text-align: center; padding: 0.35mm 0.1mm; font-size: 6pt; line-height: 1.15; overflow-wrap: anywhere; }
+.dtr-two th { font-weight: bold; }
+.dtr-two tbody tr { height: 3.35mm; }
+.dtr-two .dtr-two-total { height: auto; }
+.dtr-two-total td { text-align: left; }
+.dtr-two-certification, .dtr-two-dated { font-style: italic; font-size: 7pt; line-height: 1.2; margin: 1mm 0; }
+.dtr-two-employee { width: 48%; margin: 3mm 0 1mm auto; text-align: center; font-size: 7pt; }
+.dtr-two-employee strong { display: block; border-bottom: 1px solid black; }
+.dtr-two-employee div { font-style: italic; }
+.dtr-two-footer { display: grid; grid-template-columns: 42% 48%; justify-content: space-between; font-size: 7pt; }
+.dtr-two-approved { display: flex; flex-direction: column; justify-content: flex-end; }
+.dtr-two-signature { height: 10mm; border-bottom: 1px solid black; display: flex; align-items: center; justify-content: flex-end; flex-direction: column; position: relative; }
+.dtr-two-signature img { position: absolute; bottom: 2mm; max-height: 9mm; max-width: 30mm; object-fit: contain; }
+.dtr-two-signature strong { position: relative; }
+.dtr-two-keeper-signature { height: 7mm; position: relative; display: flex; align-items: center; justify-content: flex-end; flex-direction: column; text-align: center; }
+.dtr-two-keeper-signature img { position: absolute; bottom: 2mm; max-height: 9mm; max-width: 30mm; object-fit: contain; }
+.dtr-two-keeper-signature strong { position: relative; }
+.dtr-two-keeper { margin-top: 0; border-top: 1px solid black; text-align: center; font-style: italic; }

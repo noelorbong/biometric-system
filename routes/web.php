@@ -5,6 +5,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/desktop-startup', [App\Http\Controllers\DesktopStartupController::class, 'show']);
 Route::post('/desktop-startup', [App\Http\Controllers\DesktopStartupController::class, 'retry']);
 
+Route::get('/desktop-uploads/{path}', [App\Http\Controllers\MediaFileController::class, 'desktopUpload'])
+    ->where('path', '.*');
+
 Route::get('/uploads/{path}', [App\Http\Controllers\MediaFileController::class, 'desktopUpload'])
     ->where('path', '.*');
 

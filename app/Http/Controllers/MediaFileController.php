@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class MediaFileController extends Controller
 {
@@ -16,12 +17,18 @@ class MediaFileController extends Controller
     {
         abort_unless(config('nativephp-internal.running'), 404);
 
-        $root = realpath(Storage::disk('uploads')->path(''));
-        $file = $root ? realpath($root.DIRECTORY_SEPARATOR.$path) : false;
-        abort_unless($root && $file && is_file($file)
-            && str_starts_with($file, $root.DIRECTORY_SEPARATOR), 404);
+        // Older desktop versions saved files under the bundled public folder.
+        // Prefer persistent uploads, but keep those existing images accessible.
+        foreach ([Storage::disk('uploads')->path(''), public_path('uploads')] as $directory) {
+            $root = realpath($directory);
+            $file = $root ? realpath($root.DIRECTORY_SEPARATOR.$path) : false;
+            if ($root && $file && is_file($file)
+                && str_starts_with($file, $root.DIRECTORY_SEPARATOR)) {
+                return response()->file($file, ['X-Content-Type-Options' => 'nosniff']);
+            }
+        }
 
-        return response()->file($file, ['X-Content-Type-Options' => 'nosniff']);
+        abort(404);
     }
 
     public function upload(Request $request)
@@ -40,7 +47,7 @@ class MediaFileController extends Controller
 
         $mainFolder      = 'library_files';
         $thumbnailFolder = 'thumbnails';
-        $main_folder = '/uploads/';
+        $main_folder = config('nativephp-internal.running') ? '/desktop-uploads/' : '/uploads/';
         // $main_folder = '/storage/uploads/';
 
         $uploadedFile = $request->file('file');
@@ -73,37 +80,23 @@ class MediaFileController extends Controller
         $relativePath = "{$directory}/{$fileName}";
 
         // 🖼 Thumbnail for images
+        // Preserve originals when the desktop GD build cannot decode a format.
+        $contents = File::get($uploadedFile);
+        abort_unless(Storage::disk($disk)->put($relativePath, $contents), 500,
+            'Unable to save the uploaded file. Check available disk space and try again.');
+
         $thumbnailPath = null;
-
         if ($type === 'photo') {
-            $thumbDirectory = "{$thumbnailFolder}/{$year}/{$month}/{$day}";
-            Storage::disk($disk)->makeDirectory($thumbDirectory);
-
-            $thumbnailName = 'thumb_' . $fileName;
-            $thumbnailPath = "{$thumbDirectory}/{$thumbnailName}";
-
-            $manager = new ImageManager(new Driver());
-
-            $image = $manager
-                ->read(File::get($uploadedFile))
-                ->resize(300, 300, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                });
-
-            Storage::disk($disk)->put(
-                $thumbnailPath,
-                (string) $image->encode()
-            );
+            try {
+                $thumbnailPath = $this->createThumbnail($disk, $contents, "{$thumbnailFolder}/{$year}/{$month}/{$day}", $fileName);
+            } catch (\Throwable $exception) {
+                Log::warning('Upload thumbnail could not be generated; original file retained.', [
+                    'extension' => $extension,
+                    'reason' => $exception->getMessage(),
+                ]);
+            }
         }
 
-        // 💾 Store original file
-        Storage::disk($disk)->put(
-            $relativePath,
-            File::get($uploadedFile)
-        );
-
-        // 🗄 Save DB record
         $media = MediaFile::create([
             'file_type'           => $type,
             'file_extension'      => $extension,
@@ -122,4 +115,19 @@ class MediaFileController extends Controller
             'data'    => $media,
         ]);
     }
+
+    protected function createThumbnail(string $disk, string $contents, string $directory, string $fileName): ?string
+    {
+        $dimensions = @getimagesizefromstring($contents);
+        // Bound decoding memory for large source images.
+        if (!$dimensions || $dimensions[0] * $dimensions[1] > 16000000) {
+            return null;
+        }
+
+        $manager = new ImageManager(new Driver());
+        $image = $manager->read($contents)->scaleDown(width: 300, height: 300);
+        $path = $directory.'/thumb_'.pathinfo($fileName, PATHINFO_FILENAME).'.png';
+        return Storage::disk($disk)->put($path, (string) $image->toPng()) ? $path : null;
+    }
+
 }

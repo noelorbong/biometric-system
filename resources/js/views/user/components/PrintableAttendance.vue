@@ -30,6 +30,13 @@
         <!-- Print Layout -->
         <div ref="printContainer"
             style="background: white; padding: 0px; border: 1px solid #d1d5db; border-radius: 8px; color: #111827;">
+            <DtrTemplateTwo v-if="isTemplateTwo" :user="user" :company-name="companyName" :company-logo="showLogo ? companyLogo : ''"
+                :header-address="appSettings.biometricDtrHeaderAddress"
+                :month-year="monthYearDisplay" :days="totalDaysInMonth" :record-value="getRecordValue" :undertime-value="getUndertimeValue"
+                :timekeeper-name="appSettings.biometricDtrTimekeeperUseDefault ? appSettings.biometricDtrTimekeeperName : ''"
+                :timekeeper-signature="appSettings.biometricDtrTimekeeperUseDefault && appSettings.biometricDtrTimekeeperSignatureEnabled ? appSettings.biometricDtrTimekeeperSignature : ''"
+                :signatory-name="signatoryName" :signatory-signature="signatorySignatureEnabled ? signatorySignature : ''" />
+            <template v-else>
             <!-- Header Section -->
               <div style="margin-top: 10px; border-bottom: 2px solid #111827; position: relative;">
                 <div
@@ -190,6 +197,7 @@
                     </div>
                 </div>
             </div>
+            </template>
         </div>
     </div>
 </template>
@@ -197,6 +205,12 @@
 <script setup>
 import { finishPrintWindow } from '@/utils/printPreview'
 import { computed, ref } from 'vue'
+import { useAppSettingStore } from '@/store/AppSettingStore'
+import DtrTemplateTwo from './DtrTemplateTwo.vue'
+import { templateTwoPrintStyles } from '@/utils/dtrTemplates'
+
+const appSettings = useAppSettingStore()
+const isTemplateTwo = computed(() => appSettings.biometricDtrTemplate === 'template2')
 
 const printContainer = ref(null)
 const copies = ref(4)
@@ -568,7 +582,7 @@ const getPrintContent = () => {
 
 const buildPrintBodyHtml = (content, copiesCount) => {
     const n = copiesCount || 1
-    const perRow = 4
+    const perRow = isTemplateTwo.value ? 2 : 4
 
     let bodyHtml = ''
     for (let i = 0; i < n; i += perRow) {
@@ -678,7 +692,8 @@ const getPrintPayload = (copiesCount = copies.value || 1) => {
 
         return {
                 bodyHtml: buildPrintBodyHtml(content, copiesCount),
-                styles: printStyles,
+                styles: isTemplateTwo.value ? templateTwoPrintStyles : printStyles,
+                formsPerPage: isTemplateTwo.value ? 2 : 4,
         }
 }
 

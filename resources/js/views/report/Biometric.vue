@@ -460,7 +460,7 @@ const printReport = async () => {
     return
   }
 
-  const perRow = 4
+  const perRow = firstPayload?.formsPerPage || 4
   let formsHtml = ''
   for (let i = 0; i < allCopies.length; i += perRow) {
     const rowInner = allCopies.slice(i, i + perRow).join('')
