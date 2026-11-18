@@ -99,7 +99,7 @@
                     <thead>
                         <tr style="background: #f3f4f6;">
                             <th rowspan="2"
-                                style="font-size: 8.5pt; border: 1px solid #111827; padding: 8px; text-align: center; vertical-align: middle; font-weight: 700; color: #111827; ">
+                                style="font-size: 8.5pt; border: 1px solid #111827; padding: 8px 0; text-align: center; vertical-align: middle; white-space: nowrap; font-weight: 700; color: #111827; ">
                                 DAY
                             </th>
                             <th colspan="2"
