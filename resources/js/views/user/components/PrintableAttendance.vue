@@ -31,10 +31,10 @@
         <div ref="printContainer"
             style="background: white; padding: 0px; border: 1px solid #d1d5db; border-radius: 8px; color: #111827;">
             <DtrTemplateTwo v-if="isTemplateTwo" :user="user" :company-name="companyName" :company-logo="showLogo ? companyLogo : ''"
-                :header-address="appSettings.biometricDtrHeaderAddress"
+                :header-address="dtrSettings.biometricDtrHeaderAddress" :layout-settings="dtrSettings"
                 :month-year="monthYearDisplay" :days="totalDaysInMonth" :record-value="getRecordValue" :undertime-value="getUndertimeValue"
-                :timekeeper-name="appSettings.biometricDtrTimekeeperUseDefault ? appSettings.biometricDtrTimekeeperName : ''"
-                :timekeeper-signature="appSettings.biometricDtrTimekeeperUseDefault && appSettings.biometricDtrTimekeeperSignatureEnabled ? appSettings.biometricDtrTimekeeperSignature : ''"
+                :timekeeper-name="dtrSettings.biometricDtrTimekeeperUseDefault ? dtrSettings.biometricDtrTimekeeperName : ''"
+                :timekeeper-signature="dtrSettings.biometricDtrTimekeeperUseDefault && dtrSettings.biometricDtrTimekeeperSignatureEnabled ? dtrSettings.biometricDtrTimekeeperSignature : ''"
                 :signatory-name="signatoryName" :signatory-signature="signatorySignatureEnabled ? signatorySignature : ''" />
             <template v-else>
             <!-- Header Section -->
@@ -91,7 +91,11 @@
 
             <!-- Time Record Table -->
             <div style="overflow: visible; margin-bottom: 20px;">
-                <table style="width: 100%; border-collapse: collapse; border: 1px solid #111827; font-size: 14px;">
+                <table style="width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #111827; font-size: 14px;">
+                    <colgroup>
+                        <col style="width: 10%" />
+                        <col v-for="column in 6" :key="column" style="width: 15%" />
+                    </colgroup>
                     <thead>
                         <tr style="background: #f3f4f6;">
                             <th rowspan="2"
@@ -210,13 +214,16 @@ import DtrTemplateTwo from './DtrTemplateTwo.vue'
 import { templateTwoPrintStyles } from '@/utils/dtrTemplates'
 
 const appSettings = useAppSettingStore()
-const isTemplateTwo = computed(() => appSettings.biometricDtrTemplate === 'template2')
+// A draft can drive the settings preview without changing saved report defaults.
+const dtrSettings = computed(() => props.settingsOverride ?? appSettings)
+const isTemplateTwo = computed(() => dtrSettings.value.biometricDtrTemplate === 'template2')
 
 const printContainer = ref(null)
 const copies = ref(4)
 const useCalculatedUndertime = ref(false)
 
 const props = defineProps({
+    settingsOverride: { type: Object, default: null },
     user: Object,
     selectedYear: Number,
     selectedMonth: Number,

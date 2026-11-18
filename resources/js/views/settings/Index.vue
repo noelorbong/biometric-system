@@ -1,4 +1,5 @@
 <script setup>
+import DtrSettingsPreview from './DtrSettingsPreview.vue'
 import DesktopUpdates from '@/views/settings/DesktopUpdates.vue'
 import { onMounted, ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -47,6 +48,27 @@ const form = ref({
   company_school_logo_print_enabled: false,
   biometric_dtr_header_address: '',
   biometric_dtr_template: 'default',
+  biometric_dtr_template2_logo_position: 'left',
+  biometric_dtr_template2_logo_left: 0,
+  biometric_dtr_template2_logo_width: 15,
+  biometric_dtr_template2_logo_height: 15,
+  biometric_dtr_template2_logo_right: 4,
+  biometric_dtr_template2_logo_top: 0,
+  biometric_dtr_template2_logo_bottom: 3,
+  biometric_dtr_template2_font_size: 8,
+  biometric_dtr_template2_name_font_size: 10,
+  biometric_dtr_template2_company_font_size: 8,
+  biometric_dtr_template2_republic_font_size: 8,
+  biometric_dtr_template2_department_font_size: 8,
+  biometric_dtr_template2_address_font_size: 8,
+  biometric_dtr_template2_title_font_size: 13,
+  biometric_dtr_template2_approved_font_size: 10,
+  biometric_dtr_template2_timekeeper_font_size: 10,
+  biometric_dtr_template2_employee_font_size: 10,
+  biometric_dtr_template2_month_font_size: 10,
+  biometric_dtr_template2_table_header_font_size: 7,
+  biometric_dtr_template2_table_content_font_size: 7,
+
   biometric_dtr_signatory_name: '',
   biometric_dtr_timekeeper_name: '',
   biometric_dtr_signatory_signature: '',
@@ -218,7 +240,7 @@ const uploadSignature = async (event, field = 'biometric_dtr_signatory_signature
 }
 
 const loadSettings = async () => {
-  const resp = await appSettingStore.loadSettings()
+  const resp = await appSettingStore.loadSettings(true)
   if (!resp.success) {
     toastResult('Unable to load settings', 'error')
     return
@@ -226,6 +248,27 @@ const loadSettings = async () => {
 
   form.value.biometric_dtr_header_address = biometricDtrHeaderAddress.value || ''
   form.value.biometric_dtr_template = biometricDtrTemplate.value || 'default'
+  form.value.biometric_dtr_template2_logo_position = appSettingStore.biometricDtrTemplate2LogoPosition === 'center' ? 'top' : (appSettingStore.biometricDtrTemplate2LogoPosition ?? 'left')
+  form.value.biometric_dtr_template2_logo_left = appSettingStore.biometricDtrTemplate2LogoLeft ?? 0
+  form.value.biometric_dtr_template2_logo_width = appSettingStore.biometricDtrTemplate2LogoWidth ?? 15
+  form.value.biometric_dtr_template2_logo_height = appSettingStore.biometricDtrTemplate2LogoHeight ?? 15
+  form.value.biometric_dtr_template2_logo_right = appSettingStore.biometricDtrTemplate2LogoRight ?? 4
+  form.value.biometric_dtr_template2_logo_top = appSettingStore.biometricDtrTemplate2LogoTop ?? 0
+  form.value.biometric_dtr_template2_logo_bottom = appSettingStore.biometricDtrTemplate2LogoBottom ?? 3
+  form.value.biometric_dtr_template2_font_size = appSettingStore.biometricDtrTemplate2FontSize ?? 8
+  form.value.biometric_dtr_template2_name_font_size = appSettingStore.biometricDtrTemplate2NameFontSize ?? 10
+  form.value.biometric_dtr_template2_company_font_size = appSettingStore.biometricDtrTemplate2CompanyFontSize ?? 8
+  form.value.biometric_dtr_template2_republic_font_size = appSettingStore.biometricDtrTemplate2RepublicFontSize ?? 8
+  form.value.biometric_dtr_template2_department_font_size = appSettingStore.biometricDtrTemplate2DepartmentFontSize ?? 8
+  form.value.biometric_dtr_template2_address_font_size = appSettingStore.biometricDtrTemplate2AddressFontSize ?? 8
+  form.value.biometric_dtr_template2_title_font_size = appSettingStore.biometricDtrTemplate2TitleFontSize ?? 13
+  form.value.biometric_dtr_template2_approved_font_size = appSettingStore.biometricDtrTemplate2ApprovedFontSize ?? 10
+  form.value.biometric_dtr_template2_timekeeper_font_size = appSettingStore.biometricDtrTemplate2TimekeeperFontSize ?? 10
+  form.value.biometric_dtr_template2_employee_font_size = appSettingStore.biometricDtrTemplate2EmployeeFontSize ?? 10
+  form.value.biometric_dtr_template2_month_font_size = appSettingStore.biometricDtrTemplate2MonthFontSize ?? 10
+  form.value.biometric_dtr_template2_table_header_font_size = appSettingStore.biometricDtrTemplate2TableHeaderFontSize ?? 7
+  form.value.biometric_dtr_template2_table_content_font_size = appSettingStore.biometricDtrTemplate2TableContentFontSize ?? 7
+
   form.value.company_school_name = companySchoolName.value || 'Biometric System'
   form.value.company_school_logo = companySchoolLogo.value || ''
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
@@ -261,6 +304,27 @@ const saveSettings = async () => {
     company_school_logo_print_enabled: Boolean(form.value.company_school_logo_print_enabled),
     biometric_dtr_header_address: form.value.biometric_dtr_header_address,
     biometric_dtr_template: form.value.biometric_dtr_template,
+    biometric_dtr_template2_logo_position: form.value.biometric_dtr_template2_logo_position,
+    biometric_dtr_template2_logo_left: form.value.biometric_dtr_template2_logo_left,
+    biometric_dtr_template2_logo_width: form.value.biometric_dtr_template2_logo_width,
+    biometric_dtr_template2_logo_height: form.value.biometric_dtr_template2_logo_height,
+    biometric_dtr_template2_logo_right: form.value.biometric_dtr_template2_logo_right,
+    biometric_dtr_template2_logo_top: form.value.biometric_dtr_template2_logo_top,
+    biometric_dtr_template2_logo_bottom: form.value.biometric_dtr_template2_logo_bottom,
+    biometric_dtr_template2_font_size: form.value.biometric_dtr_template2_font_size,
+    biometric_dtr_template2_name_font_size: form.value.biometric_dtr_template2_name_font_size,
+    biometric_dtr_template2_company_font_size: form.value.biometric_dtr_template2_company_font_size,
+    biometric_dtr_template2_republic_font_size: form.value.biometric_dtr_template2_republic_font_size,
+    biometric_dtr_template2_department_font_size: form.value.biometric_dtr_template2_department_font_size,
+    biometric_dtr_template2_address_font_size: form.value.biometric_dtr_template2_address_font_size,
+    biometric_dtr_template2_title_font_size: form.value.biometric_dtr_template2_title_font_size,
+    biometric_dtr_template2_approved_font_size: form.value.biometric_dtr_template2_approved_font_size,
+    biometric_dtr_template2_timekeeper_font_size: form.value.biometric_dtr_template2_timekeeper_font_size,
+    biometric_dtr_template2_employee_font_size: form.value.biometric_dtr_template2_employee_font_size,
+    biometric_dtr_template2_month_font_size: form.value.biometric_dtr_template2_month_font_size,
+    biometric_dtr_template2_table_header_font_size: form.value.biometric_dtr_template2_table_header_font_size,
+    biometric_dtr_template2_table_content_font_size: form.value.biometric_dtr_template2_table_content_font_size,
+
     biometric_dtr_signatory_name: form.value.biometric_dtr_signatory_name,
     biometric_dtr_timekeeper_name: form.value.biometric_dtr_timekeeper_name,
     biometric_dtr_signatory_signature: form.value.biometric_dtr_signatory_signature,
@@ -285,6 +349,27 @@ const saveSettings = async () => {
 
   form.value.biometric_dtr_header_address = biometricDtrHeaderAddress.value || ''
   form.value.biometric_dtr_template = biometricDtrTemplate.value || 'default'
+  form.value.biometric_dtr_template2_logo_position = appSettingStore.biometricDtrTemplate2LogoPosition === 'center' ? 'top' : (appSettingStore.biometricDtrTemplate2LogoPosition ?? 'left')
+  form.value.biometric_dtr_template2_logo_left = appSettingStore.biometricDtrTemplate2LogoLeft ?? 0
+  form.value.biometric_dtr_template2_logo_width = appSettingStore.biometricDtrTemplate2LogoWidth ?? 15
+  form.value.biometric_dtr_template2_logo_height = appSettingStore.biometricDtrTemplate2LogoHeight ?? 15
+  form.value.biometric_dtr_template2_logo_right = appSettingStore.biometricDtrTemplate2LogoRight ?? 4
+  form.value.biometric_dtr_template2_logo_top = appSettingStore.biometricDtrTemplate2LogoTop ?? 0
+  form.value.biometric_dtr_template2_logo_bottom = appSettingStore.biometricDtrTemplate2LogoBottom ?? 3
+  form.value.biometric_dtr_template2_font_size = appSettingStore.biometricDtrTemplate2FontSize ?? 8
+  form.value.biometric_dtr_template2_name_font_size = appSettingStore.biometricDtrTemplate2NameFontSize ?? 10
+  form.value.biometric_dtr_template2_company_font_size = appSettingStore.biometricDtrTemplate2CompanyFontSize ?? 8
+  form.value.biometric_dtr_template2_republic_font_size = appSettingStore.biometricDtrTemplate2RepublicFontSize ?? 8
+  form.value.biometric_dtr_template2_department_font_size = appSettingStore.biometricDtrTemplate2DepartmentFontSize ?? 8
+  form.value.biometric_dtr_template2_address_font_size = appSettingStore.biometricDtrTemplate2AddressFontSize ?? 8
+  form.value.biometric_dtr_template2_title_font_size = appSettingStore.biometricDtrTemplate2TitleFontSize ?? 13
+  form.value.biometric_dtr_template2_approved_font_size = appSettingStore.biometricDtrTemplate2ApprovedFontSize ?? 10
+  form.value.biometric_dtr_template2_timekeeper_font_size = appSettingStore.biometricDtrTemplate2TimekeeperFontSize ?? 10
+  form.value.biometric_dtr_template2_employee_font_size = appSettingStore.biometricDtrTemplate2EmployeeFontSize ?? 10
+  form.value.biometric_dtr_template2_month_font_size = appSettingStore.biometricDtrTemplate2MonthFontSize ?? 10
+  form.value.biometric_dtr_template2_table_header_font_size = appSettingStore.biometricDtrTemplate2TableHeaderFontSize ?? 7
+  form.value.biometric_dtr_template2_table_content_font_size = appSettingStore.biometricDtrTemplate2TableContentFontSize ?? 7
+
   form.value.company_school_name = companySchoolName.value || form.value.company_school_name
   form.value.company_school_logo = companySchoolLogo.value || form.value.company_school_logo
   form.value.company_school_logo_print_enabled = Boolean(companySchoolLogoPrintEnabled.value)
@@ -627,8 +712,8 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <div v-if="activeSettingsTab === 'general' || activeSettingsTab === 'timers'" class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+    <section :class="activeSettingsTab === 'general' ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]' : 'grid gap-2.5'">
+      <div v-if="activeSettingsTab === 'general' || activeSettingsTab === 'timers'" class="min-w-0 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
         <template v-if="activeSettingsTab === 'general'">
         <h2 class="text-base font-semibold text-slate-900 dark:text-white">General</h2>
         <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Display name appears in generated printable reports.</p>
@@ -683,18 +768,7 @@ onMounted(async () => {
             <p v-else-if="!form.company_school_logo_print_enabled" class="mt-1 text-xs text-amber-600 dark:text-amber-400">Logo is hidden. Enable the checkbox to print it.</p>
             <p v-if="logoLoadFailed" role="alert" class="mt-2 text-xs text-red-600 dark:text-red-400">The saved logo could not be loaded. Upload the image again and save settings.</p>
           </div>
-          <div v-if="form.biometric_dtr_template === 'template2'" class="rounded-md border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/40">
-            <p class="mb-3 text-xs font-medium text-slate-500 dark:text-slate-400">Header preview</p>
-            <div class="flex items-center gap-3 rounded bg-white p-4 text-black">
-              <img v-if="form.company_school_logo && form.company_school_logo_print_enabled" :key="form.company_school_logo" :src="form.company_school_logo" alt="Header logo" class="h-14 w-14 shrink-0 object-contain" @load="logoLoadFailed = false" @error="logoLoadFailed = true" />
-              <div class="min-w-0 flex-1 break-words text-center text-xs leading-relaxed">
-                <p>Republic of the Philippines</p>
-                <p class="font-bold">{{ form.company_school_name }}</p>
-                <p class="font-bold">Employee department name</p>
-                <p v-if="form.biometric_dtr_header_address">{{ form.biometric_dtr_header_address }}</p>
-              </div>
-            </div>
-          </div>
+
         </div>
 
         <div class="mt-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-700 dark:bg-slate-900/40">
@@ -737,8 +811,7 @@ onMounted(async () => {
                 <img :src="form.biometric_dtr_signatory_signature" alt="Signatory signature" class="h-10 max-w-[140px] object-contain" />
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-slate-800 dark:text-white">Signature ready</p>
-                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.biometric_dtr_signatory_signature }}</p>
-                </div>
+                  </div>
               </div>
             </div>
           </div>
@@ -797,8 +870,7 @@ onMounted(async () => {
                 <img :src="form.biometric_dtr_timekeeper_signature" alt="Time keeper signature" class="h-10 max-w-[140px] object-contain" />
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-slate-800 dark:text-white">Signature ready</p>
-                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ form.biometric_dtr_timekeeper_signature }}</p>
-                </div>
+                  </div>
               </div>
             </div>
           </div>
@@ -907,6 +979,8 @@ onMounted(async () => {
           </Button>
         </div>
       </div>
+
+      <DtrSettingsPreview v-if="activeSettingsTab === 'general'" :form="form" @update-field="(key, value) => form[key] = value" />
 
       <SettingsSidebar
         v-if="activeSettingsTab === 'notes'"

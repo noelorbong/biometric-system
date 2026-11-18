@@ -22,6 +22,26 @@ class AppSettingController extends Controller
         'company_school_logo_print_enabled' => false,
         'biometric_dtr_header_address' => '',
         'biometric_dtr_template' => 'default',
+        'biometric_dtr_template2_logo_position' => 'left',
+        'biometric_dtr_template2_logo_left' => 0,
+        'biometric_dtr_template2_logo_width' => 15,
+        'biometric_dtr_template2_logo_height' => 15,
+        'biometric_dtr_template2_logo_right' => 4,
+        'biometric_dtr_template2_logo_top' => 0,
+        'biometric_dtr_template2_logo_bottom' => 3,
+        'biometric_dtr_template2_font_size' => 8,
+        'biometric_dtr_template2_name_font_size' => 10,
+        'biometric_dtr_template2_company_font_size' => 8,
+        'biometric_dtr_template2_republic_font_size' => 8,
+        'biometric_dtr_template2_department_font_size' => 8,
+        'biometric_dtr_template2_address_font_size' => 8,
+        'biometric_dtr_template2_title_font_size' => 13,
+        'biometric_dtr_template2_approved_font_size' => 10,
+        'biometric_dtr_template2_timekeeper_font_size' => 10,
+        'biometric_dtr_template2_employee_font_size' => 10,
+        'biometric_dtr_template2_month_font_size' => 10,
+        'biometric_dtr_template2_table_header_font_size' => 7,
+        'biometric_dtr_template2_table_content_font_size' => 7,
         'biometric_dtr_timekeeper_name' => '',
         'biometric_dtr_timekeeper_signature' => '',
         'biometric_dtr_timekeeper_use_default' => true,
@@ -120,6 +140,26 @@ class AppSettingController extends Controller
                 $settings['company_school_logo_print_enabled'] ?? self::DEFAULT_SETTINGS['company_school_logo_print_enabled'],
                 FILTER_VALIDATE_BOOLEAN
             ),
+            'biometric_dtr_template2_logo_position' => in_array($settings['biometric_dtr_template2_logo_position'] ?? '', ['top', 'left', 'right', 'bottom'], true) ? $settings['biometric_dtr_template2_logo_position'] : (($settings['biometric_dtr_template2_logo_position'] ?? '') === 'center' ? 'top' : 'left'),
+            'biometric_dtr_template2_logo_left' => max(0, min(30, (float) ($settings['biometric_dtr_template2_logo_left'] ?? 0))),
+            'biometric_dtr_template2_logo_width' => max(1, min(50, (float) ($settings['biometric_dtr_template2_logo_width'] ?? 15))),
+            'biometric_dtr_template2_logo_height' => max(1, min(50, (float) ($settings['biometric_dtr_template2_logo_height'] ?? 15))),
+            'biometric_dtr_template2_logo_right' => max(0, min(30, (float) ($settings['biometric_dtr_template2_logo_right'] ?? 4))),
+            'biometric_dtr_template2_logo_top' => max(0, min(30, (float) ($settings['biometric_dtr_template2_logo_top'] ?? 0))),
+            'biometric_dtr_template2_logo_bottom' => max(0, min(30, (float) ($settings['biometric_dtr_template2_logo_bottom'] ?? 3))),
+            'biometric_dtr_template2_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_font_size'] ?? 8))),
+            'biometric_dtr_template2_name_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_name_font_size'] ?? 10))),
+            'biometric_dtr_template2_company_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_company_font_size'] ?? 8))),
+            'biometric_dtr_template2_republic_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_republic_font_size'] ?? 8))),
+            'biometric_dtr_template2_department_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_department_font_size'] ?? 8))),
+            'biometric_dtr_template2_address_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_address_font_size'] ?? 8))),
+            'biometric_dtr_template2_title_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_title_font_size'] ?? 13))),
+            'biometric_dtr_template2_approved_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_approved_font_size'] ?? 10))),
+            'biometric_dtr_template2_timekeeper_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_timekeeper_font_size'] ?? 10))),
+            'biometric_dtr_template2_employee_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_employee_font_size'] ?? 10))),
+            'biometric_dtr_template2_month_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_month_font_size'] ?? 10))),
+            'biometric_dtr_template2_table_header_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_table_header_font_size'] ?? 7))),
+            'biometric_dtr_template2_table_content_font_size' => max(1, min(18, (float) ($settings['biometric_dtr_template2_table_content_font_size'] ?? 7))),
             'biometric_dtr_header_address' => (string) ($settings['biometric_dtr_header_address'] ?? ''),
             'biometric_dtr_template' => in_array($settings['biometric_dtr_template'] ?? '', ['default', 'template2'], true)
                 ? $settings['biometric_dtr_template'] : self::DEFAULT_SETTINGS['biometric_dtr_template'],
@@ -246,6 +286,27 @@ class AppSettingController extends Controller
             'company_school_logo_print_enabled' => ['required', 'boolean'],
             'biometric_dtr_header_address' => ['sometimes', 'nullable', 'string', 'max:255'],
             'biometric_dtr_template' => ['sometimes', Rule::in(['default', 'template2'])],
+            'biometric_dtr_template2_logo_position' => ['sometimes', Rule::in(['top', 'left', 'right', 'bottom'])],
+            'biometric_dtr_template2_logo_left' => ['sometimes', 'numeric', 'min:0', 'max:30'],
+            'biometric_dtr_template2_logo_width' => ['sometimes', 'numeric', 'min:1', 'max:50'],
+            'biometric_dtr_template2_logo_height' => ['sometimes', 'numeric', 'min:1', 'max:50'],
+            'biometric_dtr_template2_logo_right' => ['sometimes', 'numeric', 'min:0', 'max:30'],
+            'biometric_dtr_template2_logo_top' => ['sometimes', 'numeric', 'min:0', 'max:30'],
+            'biometric_dtr_template2_logo_bottom' => ['sometimes', 'numeric', 'min:0', 'max:30'],
+            'biometric_dtr_template2_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_name_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_company_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_republic_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_department_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_address_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_title_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_approved_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_timekeeper_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_employee_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_month_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_table_header_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+            'biometric_dtr_template2_table_content_font_size' => ['sometimes', 'numeric', 'min:1', 'max:18'],
+
             'biometric_dtr_timekeeper_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'biometric_dtr_timekeeper_signature' => ['sometimes', 'nullable', 'string', 'max:255'],
             'biometric_dtr_timekeeper_use_default' => ['sometimes', 'boolean'],
@@ -292,6 +353,12 @@ class AppSettingController extends Controller
 
         if (array_key_exists('biometric_dtr_template', $validated)) {
             $pairs['biometric_dtr_template'] = $validated['biometric_dtr_template'];
+        }
+
+        foreach (['biometric_dtr_template2_logo_position', 'biometric_dtr_template2_logo_left', 'biometric_dtr_template2_logo_width', 'biometric_dtr_template2_logo_height', 'biometric_dtr_template2_logo_right', 'biometric_dtr_template2_logo_top', 'biometric_dtr_template2_logo_bottom', 'biometric_dtr_template2_font_size', 'biometric_dtr_template2_name_font_size', 'biometric_dtr_template2_company_font_size', 'biometric_dtr_template2_republic_font_size', 'biometric_dtr_template2_department_font_size', 'biometric_dtr_template2_address_font_size', 'biometric_dtr_template2_title_font_size', 'biometric_dtr_template2_approved_font_size', 'biometric_dtr_template2_timekeeper_font_size', 'biometric_dtr_template2_employee_font_size', 'biometric_dtr_template2_month_font_size', 'biometric_dtr_template2_table_header_font_size', 'biometric_dtr_template2_table_content_font_size'] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $pairs[$key] = (string) $validated[$key];
+            }
         }
 
         $this->upsertSettings($pairs, $request->user()?->id);

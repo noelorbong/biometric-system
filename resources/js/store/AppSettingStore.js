@@ -30,6 +30,27 @@ export const useAppSettingStore = defineStore('appSettings', {
     companySchoolLogoPrintEnabled: false,
     biometricDtrHeaderAddress: '',
     biometricDtrTemplate: 'default',
+    biometricDtrTemplate2LogoPosition: 'left',
+    biometricDtrTemplate2LogoLeft: 0,
+    biometricDtrTemplate2LogoWidth: 15,
+    biometricDtrTemplate2LogoHeight: 15,
+    biometricDtrTemplate2LogoRight: 4,
+    biometricDtrTemplate2LogoTop: 0,
+    biometricDtrTemplate2LogoBottom: 3,
+    biometricDtrTemplate2FontSize: 8,
+    biometricDtrTemplate2NameFontSize: 10,
+    biometricDtrTemplate2CompanyFontSize: 8,
+    biometricDtrTemplate2RepublicFontSize: 8,
+    biometricDtrTemplate2DepartmentFontSize: 8,
+    biometricDtrTemplate2AddressFontSize: 8,
+    biometricDtrTemplate2TitleFontSize: 13,
+    biometricDtrTemplate2ApprovedFontSize: 10,
+    biometricDtrTemplate2TimekeeperFontSize: 10,
+    biometricDtrTemplate2EmployeeFontSize: 10,
+    biometricDtrTemplate2MonthFontSize: 10,
+    biometricDtrTemplate2TableHeaderFontSize: 7,
+    biometricDtrTemplate2TableContentFontSize: 7,
+
     biometricDtrSignatoryName: '',
     biometricDtrTimekeeperName: '',
     biometricDtrSignatorySignature: '',
@@ -65,6 +86,27 @@ export const useAppSettingStore = defineStore('appSettings', {
               company_school_logo_print_enabled: app.companySchoolLogoPrintEnabled,
               biometric_dtr_header_address: app.biometricDtrHeaderAddress,
               biometric_dtr_template: app.biometricDtrTemplate,
+              biometric_dtr_template2_logo_position: app.biometricDtrTemplate2LogoPosition,
+              biometric_dtr_template2_logo_left: app.biometricDtrTemplate2LogoLeft,
+              biometric_dtr_template2_logo_width: app.biometricDtrTemplate2LogoWidth,
+              biometric_dtr_template2_logo_height: app.biometricDtrTemplate2LogoHeight,
+              biometric_dtr_template2_logo_right: app.biometricDtrTemplate2LogoRight,
+              biometric_dtr_template2_logo_top: app.biometricDtrTemplate2LogoTop,
+              biometric_dtr_template2_logo_bottom: app.biometricDtrTemplate2LogoBottom,
+              biometric_dtr_template2_font_size: app.biometricDtrTemplate2FontSize,
+              biometric_dtr_template2_name_font_size: app.biometricDtrTemplate2NameFontSize,
+              biometric_dtr_template2_company_font_size: app.biometricDtrTemplate2CompanyFontSize,
+              biometric_dtr_template2_republic_font_size: app.biometricDtrTemplate2RepublicFontSize,
+              biometric_dtr_template2_department_font_size: app.biometricDtrTemplate2DepartmentFontSize,
+              biometric_dtr_template2_address_font_size: app.biometricDtrTemplate2AddressFontSize,
+              biometric_dtr_template2_title_font_size: app.biometricDtrTemplate2TitleFontSize,
+              biometric_dtr_template2_approved_font_size: app.biometricDtrTemplate2ApprovedFontSize,
+              biometric_dtr_template2_timekeeper_font_size: app.biometricDtrTemplate2TimekeeperFontSize,
+              biometric_dtr_template2_employee_font_size: app.biometricDtrTemplate2EmployeeFontSize,
+              biometric_dtr_template2_month_font_size: app.biometricDtrTemplate2MonthFontSize,
+              biometric_dtr_template2_table_header_font_size: app.biometricDtrTemplate2TableHeaderFontSize,
+              biometric_dtr_template2_table_content_font_size: app.biometricDtrTemplate2TableContentFontSize,
+
               biometric_dtr_signatory_name: app.biometricDtrSignatoryName,
               biometric_dtr_timekeeper_name: app.biometricDtrTimekeeperName,
               biometric_dtr_signatory_signature: app.biometricDtrSignatorySignature,
@@ -90,6 +132,27 @@ export const useAppSettingStore = defineStore('appSettings', {
         app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? false)
         app.biometricDtrHeaderAddress = resp?.data?.settings?.biometric_dtr_header_address ?? ''
         app.biometricDtrTemplate = resp?.data?.settings?.biometric_dtr_template === 'template2' ? 'template2' : 'default'
+        app.biometricDtrTemplate2LogoPosition = resp?.data?.settings?.biometric_dtr_template2_logo_position ?? 'left'
+        app.biometricDtrTemplate2LogoLeft = resp?.data?.settings?.biometric_dtr_template2_logo_left ?? 0
+        app.biometricDtrTemplate2LogoWidth = resp?.data?.settings?.biometric_dtr_template2_logo_width ?? 15
+        app.biometricDtrTemplate2LogoHeight = resp?.data?.settings?.biometric_dtr_template2_logo_height ?? 15
+        app.biometricDtrTemplate2LogoRight = resp?.data?.settings?.biometric_dtr_template2_logo_right ?? 4
+        app.biometricDtrTemplate2LogoTop = resp?.data?.settings?.biometric_dtr_template2_logo_top ?? 0
+        app.biometricDtrTemplate2LogoBottom = resp?.data?.settings?.biometric_dtr_template2_logo_bottom ?? 3
+        app.biometricDtrTemplate2FontSize = resp?.data?.settings?.biometric_dtr_template2_font_size ?? 8
+        app.biometricDtrTemplate2NameFontSize = resp?.data?.settings?.biometric_dtr_template2_name_font_size ?? 10
+        app.biometricDtrTemplate2CompanyFontSize = resp?.data?.settings?.biometric_dtr_template2_company_font_size ?? 8
+        app.biometricDtrTemplate2RepublicFontSize = resp?.data?.settings?.biometric_dtr_template2_republic_font_size ?? 8
+        app.biometricDtrTemplate2DepartmentFontSize = resp?.data?.settings?.biometric_dtr_template2_department_font_size ?? 8
+        app.biometricDtrTemplate2AddressFontSize = resp?.data?.settings?.biometric_dtr_template2_address_font_size ?? 8
+        app.biometricDtrTemplate2TitleFontSize = resp?.data?.settings?.biometric_dtr_template2_title_font_size ?? 13
+        app.biometricDtrTemplate2ApprovedFontSize = resp?.data?.settings?.biometric_dtr_template2_approved_font_size ?? 10
+        app.biometricDtrTemplate2TimekeeperFontSize = resp?.data?.settings?.biometric_dtr_template2_timekeeper_font_size ?? 10
+        app.biometricDtrTemplate2EmployeeFontSize = resp?.data?.settings?.biometric_dtr_template2_employee_font_size ?? 10
+        app.biometricDtrTemplate2MonthFontSize = resp?.data?.settings?.biometric_dtr_template2_month_font_size ?? 10
+        app.biometricDtrTemplate2TableHeaderFontSize = resp?.data?.settings?.biometric_dtr_template2_table_header_font_size ?? 7
+        app.biometricDtrTemplate2TableContentFontSize = resp?.data?.settings?.biometric_dtr_template2_table_content_font_size ?? 7
+
         app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name ?? ''
         app.biometricDtrTimekeeperName = resp?.data?.settings?.biometric_dtr_timekeeper_name ?? ''
         app.biometricDtrSignatorySignature = resp?.data?.settings?.biometric_dtr_signatory_signature || ''
@@ -124,6 +187,27 @@ export const useAppSettingStore = defineStore('appSettings', {
         app.companySchoolLogoPrintEnabled = Boolean(resp?.data?.settings?.company_school_logo_print_enabled ?? app.companySchoolLogoPrintEnabled)
         app.biometricDtrHeaderAddress = resp?.data?.settings?.biometric_dtr_header_address ?? ''
         app.biometricDtrTemplate = resp?.data?.settings?.biometric_dtr_template === 'template2' ? 'template2' : 'default'
+        app.biometricDtrTemplate2LogoPosition = resp?.data?.settings?.biometric_dtr_template2_logo_position ?? 'left'
+        app.biometricDtrTemplate2LogoLeft = resp?.data?.settings?.biometric_dtr_template2_logo_left ?? 0
+        app.biometricDtrTemplate2LogoWidth = resp?.data?.settings?.biometric_dtr_template2_logo_width ?? 15
+        app.biometricDtrTemplate2LogoHeight = resp?.data?.settings?.biometric_dtr_template2_logo_height ?? 15
+        app.biometricDtrTemplate2LogoRight = resp?.data?.settings?.biometric_dtr_template2_logo_right ?? 4
+        app.biometricDtrTemplate2LogoTop = resp?.data?.settings?.biometric_dtr_template2_logo_top ?? 0
+        app.biometricDtrTemplate2LogoBottom = resp?.data?.settings?.biometric_dtr_template2_logo_bottom ?? 3
+        app.biometricDtrTemplate2FontSize = resp?.data?.settings?.biometric_dtr_template2_font_size ?? 8
+        app.biometricDtrTemplate2NameFontSize = resp?.data?.settings?.biometric_dtr_template2_name_font_size ?? 10
+        app.biometricDtrTemplate2CompanyFontSize = resp?.data?.settings?.biometric_dtr_template2_company_font_size ?? 8
+        app.biometricDtrTemplate2RepublicFontSize = resp?.data?.settings?.biometric_dtr_template2_republic_font_size ?? 8
+        app.biometricDtrTemplate2DepartmentFontSize = resp?.data?.settings?.biometric_dtr_template2_department_font_size ?? 8
+        app.biometricDtrTemplate2AddressFontSize = resp?.data?.settings?.biometric_dtr_template2_address_font_size ?? 8
+        app.biometricDtrTemplate2TitleFontSize = resp?.data?.settings?.biometric_dtr_template2_title_font_size ?? 13
+        app.biometricDtrTemplate2ApprovedFontSize = resp?.data?.settings?.biometric_dtr_template2_approved_font_size ?? 10
+        app.biometricDtrTemplate2TimekeeperFontSize = resp?.data?.settings?.biometric_dtr_template2_timekeeper_font_size ?? 10
+        app.biometricDtrTemplate2EmployeeFontSize = resp?.data?.settings?.biometric_dtr_template2_employee_font_size ?? 10
+        app.biometricDtrTemplate2MonthFontSize = resp?.data?.settings?.biometric_dtr_template2_month_font_size ?? 10
+        app.biometricDtrTemplate2TableHeaderFontSize = resp?.data?.settings?.biometric_dtr_template2_table_header_font_size ?? 7
+        app.biometricDtrTemplate2TableContentFontSize = resp?.data?.settings?.biometric_dtr_template2_table_content_font_size ?? 7
+
         app.biometricDtrSignatoryName = resp?.data?.settings?.biometric_dtr_signatory_name ?? app.biometricDtrSignatoryName
         app.biometricDtrTimekeeperName = resp?.data?.settings?.biometric_dtr_timekeeper_name ?? app.biometricDtrTimekeeperName
         app.biometricDtrSignatorySignature = resp?.data?.settings?.biometric_dtr_signatory_signature || app.biometricDtrSignatorySignature
