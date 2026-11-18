@@ -66,7 +66,7 @@
                     <p style="color: #4b5563; font-size: 7.5pt; white-space: nowrap; padding-right: 5px;">For the Month
                         of</p>
                     <p
-                        style="font-weight: 600; text-align: center; color: #111827; width: 100%; font-size: 8pt; border-bottom: 1px solid #111827;">
+                        style="font-weight: 600; text-align: center; color: #111827; width: 100%; font-size: 10pt; line-height: 1.2; border-bottom: 1px solid #111827;">
                         {{ monthYearDisplay }}</p>
                 </div>
                 <div style="line-height:2pt; display: flex; align-items: center;">
