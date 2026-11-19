@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/store/AuthStore'
 import { useLoadingStore } from '@/store/LoadingStore'
 
-import CommonGridShape from '../../components/common/CommonGridShape.vue'
+
 
 const loadingStore = useLoadingStore();
 const router = useRouter();
@@ -39,6 +39,7 @@ const handleSubmit = async() => {
   var login_account = {
     login: login.value.trim(),
     password: password.value,
+    remember: keepLoggedIn.value,
   };
   var result = await authStore.login(login_account);
   if(result.success){
@@ -55,263 +56,57 @@ const handleSubmit = async() => {
 }
 </script>
 <template>
-  <div class="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] z-1 dark:bg-[linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] vl-parent">
-    <loading :enforce-focus="true" :active="loadingStore.isLoading" :can-cancel="false"
-      :is-full-page="loadingStore.fullPage" :loader="loadingStore.loader" :color="loadingStore.loaderColor">
-      <div class="wrapper">
-        <div :style="'background-color:' + loadingStore.loaderColor" class="circle"></div>
-        <div :style="'background-color:' + loadingStore.loaderColor" class="circle"></div>
-        <div :style="'background-color:' + loadingStore.loaderColor" class="circle"></div>
-        <div class="shadow"></div>
-        <div class="shadow"></div>
-        <div class="shadow"></div>
-        <span :style="'color:' + loadingStore.loaderColor">{{ text }}</span>
-      </div>
-    </loading>
-      <div class="absolute inset-0 pointer-events-none">
-        <div class="absolute -left-24 top-0 h-72 w-72 rounded-full bg-sky-300/25 blur-3xl"></div>
-        <div class="absolute right-0 top-20 h-80 w-80 rounded-full bg-teal-300/20 blur-3xl"></div>
-        <div class="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-cyan-200/20 blur-3xl"></div>
-      </div>
-      <div
-        class="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col justify-center px-4 py-8 sm:px-6 lg:flex-row lg:items-stretch lg:px-8"
-      >
-        <div class="flex flex-col justify-center w-full lg:w-[47%] lg:pr-6 xl:pr-10">
-          <div class="w-full max-w-lg mx-auto">
-            <router-link
-              to="/"
-              class="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-            >
-              <svg
-                class="h-5 w-5 stroke-current"
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 20 20"
-                fill="none"
-              >
-                <path
-                  d="M12.7083 5L7.5 10.2083L12.7083 15.4167"
-                  stroke=""
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              Back to home
-            </router-link>
-            <div class="mt-8 overflow-hidden rounded-[30px] border border-slate-200/80 bg-white/85 shadow-[0_24px_80px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/70">
-              <div class="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_35%),linear-gradient(135deg,_#0f172a_0%,_#1e293b_48%,_#0f766e_100%)] px-6 py-7 text-white sm:px-8">
-                <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Secure Access</p>
-                <h1 class="mt-3 text-3xl font-semibold tracking-tight text-white">Sign In</h1>
-                <p class="mt-3 max-w-md text-sm leading-6 text-slate-200/90">
-                  Continue to the biometric operations workspace with your account credentials.
-                </p>
-                <div class="mt-5 grid grid-cols-2 gap-3 sm:max-w-md">
-                  <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                    <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Workspace</p>
-                    <p class="mt-2 text-lg font-semibold text-white">Biometric System</p>
-                    <p class="mt-1 text-xs text-slate-300">Attendance and machine control</p>
-                  </div>
-                  <div class="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                    <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Access</p>
-                    <p class="mt-2 text-lg font-semibold text-white">Protected</p>
-                    <p class="mt-1 text-xs text-slate-300">Authorized accounts only</p>
-                  </div>
+  <div class="relative flex min-h-screen items-center justify-center bg-slate-100 px-4 py-6 text-slate-800 dark:bg-slate-950 dark:text-slate-200">
+    <loading :enforce-focus="true" :active="isLoading" :can-cancel="false" :is-full-page="true" :loader="loadingStore.loader" :color="loadingStore.loaderColor" />
+    <div class="w-full max-w-[920px]">
+      <router-link to="/" class="mb-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-teal-700 dark:text-slate-400 dark:hover:text-teal-300">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg>
+        Back to home
+      </router-link>
+      <div class="grid overflow-hidden border border-slate-300 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 md:grid-cols-2">
+        <section class="min-w-0">
+          <div class="border-b border-white/10 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] px-6 py-5 text-white">
+            <p class="text-[10px] font-semibold uppercase tracking-widest text-teal-200">Biometric System</p>
+            <h1 class="mt-2 text-xl font-semibold">Sign In</h1>
+            <p class="mt-1 text-[11px] text-slate-300">Access your attendance workspace.</p>
+          </div>
+          <div class="px-6 py-5">
+            <p class="mb-4 text-xs text-slate-500 dark:text-slate-400">Enter your username or email and password.</p>
+            <p v-if="error" role="alert" class="mb-4 border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">Incorrect account details. Please try again.</p>
+            <form class="space-y-4" @submit.prevent="handleSubmit">
+              <div>
+                <label for="login" class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Username or email <span class="text-rose-500">*</span></label>
+                <input id="login" v-model="login" name="login" type="text" autocomplete="username" required placeholder="Username or email address" class="h-9 w-full min-w-0 border border-slate-300 bg-white px-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-950/50 dark:text-white" @input="error = false" />
+              </div>
+              <div>
+                <label for="password" class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Password <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                  <input id="password" v-model="password" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" required placeholder="Enter your password" class="h-9 w-full min-w-0 border border-slate-300 bg-white pl-3 pr-14 text-xs text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-950/50 dark:text-white" @input="error = false" />
+                  <button type="button" :aria-label="showPassword ? 'Hide password' : 'Show password'" :aria-pressed="showPassword" class="absolute inset-y-0 right-0 px-3 text-[11px] font-semibold text-teal-700 hover:text-teal-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 dark:text-teal-300" @click="togglePasswordVisibility">{{ showPassword ? 'Hide' : 'Show' }}</button>
                 </div>
               </div>
-
-              <div class="px-6 py-7 sm:px-8">
-                <div class="mb-6">
-                  <p class="text-sm text-slate-500 dark:text-slate-400">
-                    Enter your username or email and password to access the dashboard.
-                  </p>
-                  <p v-if="error" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
-                    Incorrect account details.
-                  </p>
-                </div>
-
-                <form @submit.prevent="handleSubmit">
-                  <div class="space-y-5">
-                    <div>
-                      <label
-                        for="login"
-                        class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
-                      >
-                        Username or email<span class="text-rose-500">*</span>
-                      </label>
-                      <input
-                        v-model="login"
-                        type="text"
-                        @input="error=false"
-                        id="login"
-                        name="login" autocomplete="username" required
-                        placeholder="Username or email address"
-                        class="h-12 w-full rounded-xl border border-slate-300 bg-slate-50/80 px-4 py-2.5 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
-                      />
-                    </div>
-
-                    <div>
-                      <div class="mb-2 flex items-center justify-between gap-3">
-                        <label
-                          for="password"
-                          class="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                        >
-                          Password<span class="text-rose-500">*</span>
-                        </label>
-                        <span class="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">
-                          Secure login
-                        </span>
-                      </div>
-                      <div class="relative">
-                        <input
-                          @input="error=false"
-                          v-model="password"
-                          :type="showPassword ? 'text' : 'password'"
-                          id="password"
-                          placeholder="Enter your password"
-                          class="h-12 w-full rounded-xl border border-slate-300 bg-slate-50/80 py-2.5 pl-4 pr-12 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
-                        />
-                        <span
-                          @click="togglePasswordVisibility"
-                          class="absolute z-30 text-slate-400 -translate-y-1/2 cursor-pointer right-4 top-1/2 transition hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                        >
-                          <svg
-                            v-if="!showPassword"
-                            class="fill-current"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              fill-rule="evenodd"
-                              clip-rule="evenodd"
-                              d="M10.0002 13.8619C7.23361 13.8619 4.86803 12.1372 3.92328 9.70241C4.86804 7.26761 7.23361 5.54297 10.0002 5.54297C12.7667 5.54297 15.1323 7.26762 16.0771 9.70243C15.1323 12.1372 12.7667 13.8619 10.0002 13.8619ZM10.0002 4.04297C6.48191 4.04297 3.49489 6.30917 2.4155 9.4593C2.3615 9.61687 2.3615 9.78794 2.41549 9.94552C3.49488 13.0957 6.48191 15.3619 10.0002 15.3619C13.5184 15.3619 16.5055 13.0957 17.5849 9.94555C17.6389 9.78797 17.6389 9.6169 17.5849 9.45932C16.5055 6.30919 13.5184 4.04297 10.0002 4.04297ZM9.99151 7.84413C8.96527 7.84413 8.13333 8.67606 8.13333 9.70231C8.13333 10.7286 8.96527 11.5605 9.99151 11.5605H10.0064C11.0326 11.5605 11.8646 10.7286 11.8646 9.70231C11.8646 8.67606 11.0326 7.84413 10.0064 7.84413H9.99151Z"
-                              fill="#98A2B3"
-                            />
-                          </svg>
-                          <svg
-                            v-else
-                            class="fill-current"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              fill-rule="evenodd"
-                              clip-rule="evenodd"
-                              d="M4.63803 3.57709C4.34513 3.2842 3.87026 3.2842 3.57737 3.57709C3.28447 3.86999 3.28447 4.34486 3.57737 4.63775L4.85323 5.91362C3.74609 6.84199 2.89363 8.06395 2.4155 9.45936C2.3615 9.61694 2.3615 9.78801 2.41549 9.94558C3.49488 13.0957 6.48191 15.3619 10.0002 15.3619C11.255 15.3619 12.4422 15.0737 13.4994 14.5598L15.3625 16.4229C15.6554 16.7158 16.1302 16.7158 16.4231 16.4229C16.716 16.13 16.716 15.6551 16.4231 15.3622L4.63803 3.57709ZM12.3608 13.4212L10.4475 11.5079C10.3061 11.5423 10.1584 11.5606 10.0064 11.5606H9.99151C8.96527 11.5606 8.13333 10.7286 8.13333 9.70237C8.13333 9.5461 8.15262 9.39434 8.18895 9.24933L5.91885 6.97923C5.03505 7.69015 4.34057 8.62704 3.92328 9.70247C4.86803 12.1373 7.23361 13.8619 10.0002 13.8619C10.8326 13.8619 11.6287 13.7058 12.3608 13.4212ZM16.0771 9.70249C15.7843 10.4569 15.3552 11.1432 14.8199 11.7311L15.8813 12.7925C16.6329 11.9813 17.2187 11.0143 17.5849 9.94561C17.6389 9.78803 17.6389 9.61696 17.5849 9.45938C16.5055 6.30925 13.5184 4.04303 10.0002 4.04303C9.13525 4.04303 8.30244 4.17999 7.52218 4.43338L8.75139 5.66259C9.1556 5.58413 9.57311 5.54303 10.0002 5.54303C12.7667 5.54303 15.1323 7.26768 16.0771 9.70249Z"
-                              fill="#98A2B3"
-                            />
-                          </svg>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
-                      <div>
-                        <label
-                          for="keepLoggedIn"
-                          class="flex items-center text-sm font-normal text-slate-700 cursor-pointer select-none dark:text-slate-300"
-                        >
-                          <div class="relative">
-                            <input
-                              v-model="keepLoggedIn"
-                              type="checkbox"
-                              id="keepLoggedIn"
-                              class="sr-only"
-                            />
-                            <div
-                              :class="
-                                keepLoggedIn
-                                  ? 'border-sky-500 bg-sky-500'
-                                  : 'bg-transparent border-slate-300 dark:border-slate-700'
-                              "
-                              class="mr-3 flex h-5 w-5 items-center justify-center rounded-md border-[1.25px]"
-                            >
-                              <span :class="keepLoggedIn ? '' : 'opacity-0'">
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 14 14"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    d="M11.6666 3.5L5.24992 9.91667L2.33325 7"
-                                    stroke="white"
-                                    stroke-width="1.94437"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                  />
-                                </svg>
-                              </span>
-                            </div>
-                          </div>
-                          Keep me logged in
-                        </label>
-                      </div>
-                      <span class="text-xs uppercase tracking-[0.22em] text-slate-400">Session</span>
-                    </div>
-
-                    <div>
-                      <button
-                        type="submit"
-                        class="flex h-12 w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_-18px_rgba(14,165,233,0.9)] transition hover:bg-sky-600"
-                      >
-                        Sign In
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
+              <label for="keepLoggedIn" class="inline-flex cursor-pointer items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                <input id="keepLoggedIn" v-model="keepLoggedIn" type="checkbox" class="h-3.5 w-3.5 rounded-none border-slate-300 text-teal-700 focus:ring-teal-500" />
+                Keep me logged in
+              </label>
+              <button type="submit" :disabled="isLoading" class="flex h-9 w-full items-center justify-center border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white transition hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">{{ isLoading ? 'Signing in...' : 'Sign In' }}</button>
+            </form>
           </div>
-        </div>
-        <div
-          class="relative hidden w-full overflow-hidden rounded-[32px] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.14),_transparent_30%),linear-gradient(145deg,_#0f172a_0%,_#1e293b_42%,_#0f766e_100%)] shadow-[0_30px_90px_-32px_rgba(15,23,42,0.45)] lg:grid lg:w-[53%]"
-        >
-          <div class="absolute inset-0 opacity-70">
-            <common-grid-shape />
+        </section>
+        <aside class="relative hidden min-w-0 flex-col justify-between gap-8 border-l border-white/10 bg-[linear-gradient(145deg,_#0f172a_0%,_#1e293b_50%,_#0f766e_100%)] p-7 text-white md:flex">
+          <div>
+            <img :src="'/images/logo/banner_white_mode.png'" alt="Biometric System" class="mb-7 w-full max-w-[280px]" />
+            <p class="text-[10px] font-semibold uppercase tracking-widest text-teal-200">Attendance management</p>
+            <h2 class="mt-3 text-2xl font-semibold leading-tight">Your attendance workspace,<br />in one place.</h2>
+            <p class="mt-3 text-xs leading-relaxed text-slate-300">Review attendance, manage biometric devices, and prepare daily time records.</p>
           </div>
-          <div class="relative z-10 flex h-full flex-col justify-between p-8 xl:p-10">
-            <div class="max-w-xl">
-              <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200/80">Attendance Control Deck</p>
-              <h2 class="mt-4 text-4xl font-semibold tracking-tight text-white xl:text-5xl">Stay aligned with the system design already used across your admin workspace.</h2>
-              <p class="mt-4 max-w-lg text-sm leading-7 text-slate-200/90">
-                Machine monitoring, attendance review, and user access now sit under one visual language so the public entry screen feels consistent with the rest of the app.
-              </p>
-            </div>
-
-            <div class="grid gap-4 xl:grid-cols-2">
-              <div class="rounded-[24px] border border-white/10 bg-white/10 p-5 backdrop-blur-sm">
-                <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Visual System</p>
-                <p class="mt-3 text-2xl font-semibold text-white">Slate + Cyan + Teal</p>
-                <p class="mt-2 text-sm leading-6 text-slate-200/85">Matches the dashboard, settings, machine, and profile pages you already approved.</p>
-              </div>
-              <div class="rounded-[24px] border border-white/10 bg-white/10 p-5 backdrop-blur-sm">
-                <p class="text-xs uppercase tracking-[0.24em] text-slate-300">Access Flow</p>
-                <p class="mt-3 text-2xl font-semibold text-white">Role-aware</p>
-                <p class="mt-2 text-sm leading-6 text-slate-200/85">Successful sign-in still routes both Super Admin and User accounts into the dashboard flow.</p>
-              </div>
-            </div>
-
-            <div class="flex flex-col items-center gap-5 rounded-[28px] border border-white/10 bg-white/10 px-8 py-8 backdrop-blur-sm">
-              <img class="w-full max-w-md" :src="'/images/logo/banner_white_mode.png'" alt="Logo" />
-              <div class="flex flex-wrap justify-center gap-2">
-                <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">Secure Authentication</span>
-                <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">Biometric Records</span>
-                <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">Machine Sync</span>
-              </div>
-            </div>
+          <div class="space-y-3 border-t border-white/15 pt-4 text-[11px] text-slate-200">
+            <p class="flex items-center gap-2"><span class="h-1 w-1 bg-teal-300"></span>Attendance records and reports</p>
+            <p class="flex items-center gap-2"><span class="h-1 w-1 bg-teal-300"></span>Biometric device management</p>
+            <p class="flex items-center gap-2"><span class="h-1 w-1 bg-teal-300"></span>Schedules and printable time records</p>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
+  </div>
 </template>
-
-
