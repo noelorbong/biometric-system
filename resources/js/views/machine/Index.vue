@@ -1199,23 +1199,21 @@ const syncAttendance = async (machine) => {
     let previewPage = 1
     let previewSortDirection = 'desc'
     const previewPageSize = 20
+    const sortedPreviewRows = [...previewRows].sort((a, b) => String(b.check_time || '').localeCompare(String(a.check_time || '')))
 
     const renderDownloadedPreview = () => {
-      const sorted = [...previewRows].sort((a, b) => {
-        const result = String(a.check_time || '').localeCompare(String(b.check_time || ''))
-        return previewSortDirection === 'asc' ? result : -result
-      })
+      const sorted = sortedPreviewRows
       const totalPages = Math.max(1, Math.ceil(sorted.length / previewPageSize))
       previewPage = Math.min(Math.max(1, previewPage), totalPages)
       const start = (previewPage - 1) * previewPageSize
       const rows = sorted.slice(start, start + previewPageSize).map((row) => `
         <tr class="border-b border-slate-200">
           <td class="px-2 py-1">${escapeHtml(row.uid)}</td>
-          <td class="px-2 py-1">${escapeHtml(row.user_name || 'Unmapped')}</td>
+          <td class="px-2 py-1"><span class="block w-[160px] truncate sm:w-[200px]" title="${escapeHtml(row.user_name || 'Unmapped')}">${escapeHtml(row.user_name || 'Unmapped')}</span></td>
           <td class="px-2 py-1">${escapeHtml(row.pin)}</td>
           <td class="px-2 py-1">${escapeHtml(row.resolved_user_id || 'Unmapped')}</td>
           <td class="whitespace-nowrap px-2 py-1">${escapeHtml(row.check_time)}</td>
-          <td class="px-2 py-1">${escapeHtml(row.check_type)}</td>
+          <td class="px-2 py-1"><span class="px-1.5 py-0.5 text-[10px] font-semibold ${row.check_type === 'I' ? 'bg-emerald-50 text-emerald-700' : row.check_type === 'O' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'}">${escapeHtml(row.check_type)}</span></td>
           <td class="px-2 py-1">${row.importable ? 'Yes' : 'No'}</td>
         </tr>`).join('')
       const body = document.getElementById('download-preview-body')
@@ -1227,34 +1225,39 @@ const syncAttendance = async (machine) => {
       if (label) label.textContent = `Page ${previewPage} of ${totalPages}`
       if (previous) previous.disabled = previewPage <= 1
       if (next) next.disabled = previewPage >= totalPages
-      if (sortButton) sortButton.textContent = `Check time ${previewSortDirection === 'asc' ? 'at' : 'at'}`
+      if (sortButton) sortButton.textContent = `Check time ${previewSortDirection === 'asc' ? '\u2191' : '\u2193'}`
     }
 
     await Swal.fire({
-      icon: resp.data?.unmapped ? 'warning' : 'info',
+      padding: 0,
+      buttonsStyling: false,
+      showCloseButton: true,
+      focusConfirm: false,
+      customClass: { popup: 'machine-push-confirm downloaded-attendance-preview', title: 'machine-push-title', htmlContainer: 'machine-push-body', actions: 'machine-push-actions', confirmButton: 'machine-push-cancel', closeButton: 'machine-push-close' },
       title: `Downloaded Preview — ${escapeHtml(resp.data?.model || 'Device')}`,
       width: 1050,
       html: `
-        <div class="mb-3 grid grid-cols-3 gap-2 text-sm">
-          <div>Total: <strong>${Number(resp.data?.total || 0)}</strong></div>
-          <div class="text-green-700">Importable: <strong>${Number(resp.data?.importable || 0)}</strong></div>
-          <div class="text-amber-700">Unmapped: <strong>${Number(resp.data?.unmapped || 0)}</strong></div>
+        <div class="mb-3 grid grid-cols-3 gap-2 text-left text-[11px]">
+          <div class="border border-slate-200 bg-slate-50 px-3 py-2"><p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Total records</p><strong class="mt-1 block text-base text-slate-800">${Number(resp.data?.total || 0).toLocaleString()}</strong></div>
+          <div class="border border-teal-200 bg-teal-50 px-3 py-2"><p class="text-[9px] font-semibold uppercase tracking-wider text-teal-600">Importable</p><strong class="mt-1 block text-base text-teal-800">${Number(resp.data?.importable || 0).toLocaleString()}</strong></div>
+          <div class="border border-amber-200 bg-amber-50 px-3 py-2"><p class="text-[9px] font-semibold uppercase tracking-wider text-amber-600">Unmapped</p><strong class="mt-1 block text-base text-amber-800">${Number(resp.data?.unmapped || 0).toLocaleString()}</strong></div>
         </div>
-        <p class="mb-2 text-left text-xs text-gray-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. Decode quality: ${Number(resp.data?.decoded_quality || 0)}%. No records were imported.</p>
-        <div class="max-h-[55vh] overflow-auto rounded-lg border border-slate-200 text-left text-xs">
-          <table class="min-w-full"><thead class="sticky top-0 bg-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">Name</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
+        <p class="mb-2 text-left text-[10px] text-slate-500">Decoder: ${resp.data?.record_size ? `${resp.data.record_size}-byte GT800 layout` : 'automatic layout'}. Decode quality: ${Number(resp.data?.decoded_quality || 0)}%. No records were imported.</p>
+        <div class="max-h-[45vh] w-full overflow-auto border border-slate-200 text-left text-[11px]">
+          <table class="w-max min-w-full border-collapse whitespace-nowrap"><thead class="sticky top-0 z-10 bg-slate-900 text-[10px] text-slate-100"><tr><th class="px-2 py-2">UID</th><th class="px-2 py-2">Name</th><th class="px-2 py-2">PIN</th><th class="px-2 py-2">User ID</th><th class="px-2 py-2"><button id="download-preview-sort" type="button" class="font-semibold">Check time</button></th><th class="px-2 py-2">Type</th><th class="px-2 py-2">Import?</th></tr></thead><tbody id="download-preview-body"></tbody></table>
         </div>
-        <div class="mt-3 flex items-center justify-between text-xs"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="rounded border px-3 py-1 disabled:opacity-40">Next</button></div></div>
-        <button id="download-preview-import" type="button" class="mt-3 mr-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white">Import ${Number(resp.data?.importable || 0)} Importable Record(s)</button>
-        ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white">Download Raw Attendance Payload (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
-        ${resp.data?.diagnostic?.transfer ? `<details class="mt-3 text-left text-xs"><summary class="cursor-pointer font-semibold">Transfer diagnostics</summary><pre class="mt-2 max-h-40 overflow-auto rounded bg-slate-900 p-3 text-[10px] text-white">${escapeHtml(JSON.stringify(resp.data.diagnostic.transfer, null, 2))}</pre></details>` : ''}
-        <p class="mt-2 text-xs text-gray-500">All ${Number(previewRows.length).toLocaleString()} downloaded records are available in this pagination.</p>`,
+        <div class="flex flex-wrap items-center justify-between gap-2 border-x border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-500"><span id="download-preview-page"></span><div class="flex gap-2"><button id="download-preview-previous" type="button" class="h-7 border border-slate-300 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-teal-500 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40">Previous</button><button id="download-preview-next" type="button" class="h-7 border border-slate-300 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:border-teal-500 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40">Next</button></div></div>
+        <button id="download-preview-import" type="button" class="mt-3 mr-2 min-h-7 border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 py-1 text-[11px] font-semibold text-white hover:bg-teal-700">Import ${Number(resp.data?.importable || 0)} Importable Record(s)</button>
+        ${resp.data?.diagnostic ? `<button id="download-preview-diagnostic" type="button" class="mt-3 min-h-7 border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50">Download Raw Attendance Payload (${Number(resp.data.diagnostic.bytes || 0).toLocaleString()} bytes)</button>` : ''}
+        ${resp.data?.diagnostic?.transfer ? `<details class="mt-3 text-left text-xs"><summary class="cursor-pointer font-semibold">Transfer diagnostics</summary><pre class="mt-2 max-h-40 overflow-auto bg-slate-900 p-3 text-[10px] text-white">${escapeHtml(JSON.stringify(resp.data.diagnostic.transfer, null, 2))}</pre></details>` : ''}
+        <p class="mt-2 text-[10px] text-slate-500">All ${Number(previewRows.length).toLocaleString()} downloaded records are available in this pagination.</p>`,
       confirmButtonText: 'Close',
       didOpen: () => {
         document.getElementById('download-preview-previous')?.addEventListener('click', () => { previewPage--; renderDownloadedPreview() })
         document.getElementById('download-preview-next')?.addEventListener('click', () => { previewPage++; renderDownloadedPreview() })
         document.getElementById('download-preview-sort')?.addEventListener('click', () => {
           previewSortDirection = previewSortDirection === 'asc' ? 'desc' : 'asc'
+          sortedPreviewRows.reverse()
           previewPage = 1
           renderDownloadedPreview()
         })
@@ -1327,7 +1330,7 @@ const rowVisibleForFilter = (plan, filter) => {
 
 const renderDeviceUserPreviewTable = (deviceUsers = []) => {
   if (!deviceUsers.length) {
-    return '<div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No device users returned.</div>'
+    return '<div class="rounded-none border border-slate-200 bg-slate-50 px-4 py-6 text-center text-[11px] text-slate-500">No device users returned.</div>'
   }
 
   const countByPlan = deviceUsers.reduce((acc, user) => {
@@ -1350,49 +1353,49 @@ const renderDeviceUserPreviewTable = (deviceUsers = []) => {
     const isSelectable = user.planned_action !== 'invalid'
     const isChecked = isSelectable && isDefaultSelectedPlan(user.planned_action)
     const checkboxHtml = isSelectable
-      ? `<input type="checkbox" class="sync-user-checkbox h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" data-user-id="${escapeHtml(user.resolved_user_id)}" data-plan="${escapeHtml(user.planned_action)}" ${isChecked ? 'checked' : ''} />`
-      : '<span class="text-xs text-slate-400">-</span>'
+      ? `<input type="checkbox" class="sync-user-checkbox h-3.5 w-3.5 rounded-none border-slate-300 text-teal-700 focus:ring-teal-500" data-user-id="${escapeHtml(user.resolved_user_id)}" data-plan="${escapeHtml(user.planned_action)}" ${isChecked ? 'checked' : ''} />`
+      : '<span class="text-[10px] text-slate-400">-</span>'
 
     return `<tr class="preview-row border-b border-slate-100 last:border-b-0" data-plan="${escapeHtml(user.planned_action)}">
-      <td class="px-3 py-2 text-sm">${checkboxHtml}</td>
-      <td class="px-3 py-2 text-xs text-slate-500">${index + 1}</td>
-      <td class="px-3 py-2 text-sm font-medium text-slate-700">${escapeHtml(user.uid)}</td>
-      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.resolved_user_id || '-')}</td>
-      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.pin || '-')}</td>
-      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.name || 'Unnamed')}</td>
-      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.privilege)}</td>
-      <td class="px-3 py-2 text-sm text-slate-700">${escapeHtml(user.card || '-')}</td>
-      <td class="px-3 py-2 text-right"><span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}">${escapeHtml(user.status_label || user.planned_action)}</span></td>
+      <td class="px-2 py-1.5 text-[11px]">${checkboxHtml}</td>
+      <td class="px-2 py-1.5 text-[10px] text-slate-500">${index + 1}</td>
+      <td class="px-2 py-1.5 text-[11px] font-medium text-slate-700">${escapeHtml(user.uid)}</td>
+      <td class="px-2 py-1.5 text-[11px] text-slate-700">${escapeHtml(user.resolved_user_id || '-')}</td>
+      <td class="px-2 py-1.5 text-[11px] text-slate-700">${escapeHtml(user.pin || '-')}</td>
+      <td class="px-2 py-1.5 text-[11px] text-slate-700"><span class="block w-[160px] truncate sm:w-[200px]" title="${escapeHtml(user.name || 'Unnamed')}">${escapeHtml(user.name || 'Unnamed')}</span></td>
+      <td class="px-2 py-1.5 text-[11px] text-slate-700">${escapeHtml(user.privilege)}</td>
+      <td class="px-2 py-1.5 text-[11px] text-slate-700">${escapeHtml(user.card || '-')}</td>
+      <td class="px-2 py-1.5 text-right"><span class="inline-flex rounded-none px-1.5 py-0.5 text-[10px] font-semibold ${statusClass}">${escapeHtml(user.status_label || user.planned_action)}</span></td>
     </tr>`
   }).join('')
 
   return `<div class="space-y-3">
-    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-        <input type="checkbox" class="sync-select-all h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+    <div class="flex flex-wrap items-center justify-between gap-2 rounded-none border border-slate-200 bg-slate-50 px-2 py-1.5">
+      <label class="inline-flex items-center gap-2 text-[11px] font-medium text-slate-700">
+        <input type="checkbox" class="sync-select-all h-3.5 w-3.5 rounded-none border-slate-300 text-teal-700 focus:ring-teal-500" />
         Select all visible rows
       </label>
       <div class="flex flex-wrap gap-1.5">
-        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="all">All (${deviceUsers.length})</button>
-        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="matched">Matched (${(countByPlan.create || 0) + (countByPlan.update || 0) + (countByPlan.restore || 0)})</button>
-        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="unmatched">Unmatched (${countByPlan.unmatched || 0})</button>
-        <button type="button" class="preview-filter-btn rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600" data-filter="invalid">Invalid (${countByPlan.invalid || 0})</button>
+        <button type="button" class="preview-filter-btn rounded-none border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600" data-filter="all">All (${deviceUsers.length})</button>
+        <button type="button" class="preview-filter-btn rounded-none border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600" data-filter="matched">Matched (${(countByPlan.create || 0) + (countByPlan.update || 0) + (countByPlan.restore || 0)})</button>
+        <button type="button" class="preview-filter-btn rounded-none border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600" data-filter="unmatched">Unmatched (${countByPlan.unmatched || 0})</button>
+        <button type="button" class="preview-filter-btn rounded-none border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600" data-filter="invalid">Invalid (${countByPlan.invalid || 0})</button>
       </div>
     </div>
-    <div class="overflow-hidden rounded-xl border border-slate-200">
-    <div class="max-h-80 overflow-auto">
-      <table class="min-w-full bg-white text-left">
-        <thead class="sticky top-0 bg-slate-50">
+    <div class="overflow-hidden rounded-none border border-slate-200">
+    <div class="max-h-[42vh] w-full overflow-auto overscroll-contain">
+      <table class="w-max min-w-full border-collapse whitespace-nowrap bg-white text-left">
+        <thead class="sticky top-0 z-10 bg-slate-900 text-white">
           <tr>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Sync</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">#</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">UID</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Local ID</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">PIN</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Privilege</th>
-            <th class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Card</th>
-            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Import Plan</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">Sync</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">#</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">UID</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">Local ID</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">PIN</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">Name</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">Privilege</th>
+            <th class="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-100">Card</th>
+            <th class="px-2 py-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-100">Import Plan</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -1441,9 +1444,10 @@ const wirePreviewTableInteractions = (container) => {
 
     filterBtns.forEach((btn) => {
       const selected = btn.getAttribute('data-filter') === activeFilter
-      btn.classList.toggle('bg-sky-100', selected)
-      btn.classList.toggle('text-sky-700', selected)
-      btn.classList.toggle('border-sky-200', selected)
+      btn.setAttribute('aria-pressed', String(selected))
+      btn.classList.toggle('bg-teal-50', selected)
+      btn.classList.toggle('text-teal-700', selected)
+      btn.classList.toggle('border-teal-400', selected)
     })
 
     refreshSelectAllState()
@@ -1607,39 +1611,44 @@ const downloadUsersFromDevice = async (machine) => {
   let selectionPayload = null
 
   const previewConfirm = await Swal.fire({
-    icon: total_device_users > 0 ? 'info' : 'warning',
-    title: `Preview Users from ${machine.MachineAlias || machine.IP}`,
+    padding: 0,
+    buttonsStyling: false,
+    showCloseButton: true,
+    focusConfirm: false,
+    reverseButtons: true,
+    customClass: { popup: 'machine-push-confirm device-users-preview', title: 'machine-push-title', htmlContainer: 'machine-push-body', actions: 'machine-push-actions', confirmButton: 'machine-push-save', cancelButton: 'machine-push-cancel', closeButton: 'machine-push-close' },
+    title: `Preview Users from ${escapeHtml(machine.MachineAlias || machine.IP)}`,
     width: '960px',
     html: `<div class="space-y-3 text-left">
-      <p class="text-sm text-gray-600">This is the live device data. Nothing has been imported yet.</p>
-      <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Device Users</p>
-          <p class="mt-1 text-lg font-semibold text-slate-800">${total_device_users}</p>
+      <p class="text-[11px] text-gray-600">This is the live device data. Nothing has been imported yet.</p>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div class="border border-slate-200 bg-slate-50 px-3 py-2">
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Device Users</p>
+          <p class="mt-1 text-base font-semibold text-slate-800">${total_device_users}</p>
         </div>
-        <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Will Create</p>
-          <p class="mt-1 text-lg font-semibold text-emerald-700">${planned_create}</p>
+        <div class="border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-emerald-700">Will Create</p>
+          <p class="mt-1 text-base font-semibold text-emerald-700">${planned_create}</p>
         </div>
-        <div class="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-sky-700">Will Update</p>
-          <p class="mt-1 text-lg font-semibold text-sky-700">${planned_update}</p>
+        <div class="border border-sky-200 bg-sky-50 px-3 py-2">
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-sky-700">Will Update</p>
+          <p class="mt-1 text-base font-semibold text-sky-700">${planned_update}</p>
         </div>
-        <div class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Will Restore</p>
-          <p class="mt-1 text-lg font-semibold text-indigo-700">${planned_restore || 0}</p>
+        <div class="border border-indigo-200 bg-indigo-50 px-3 py-2">
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-indigo-700">Will Restore</p>
+          <p class="mt-1 text-base font-semibold text-indigo-700">${planned_restore || 0}</p>
         </div>
-        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Unmatched</p>
-          <p class="mt-1 text-lg font-semibold text-amber-700">${Number(skipped_unmatched || 0)}</p>
+        <div class="border border-amber-200 bg-amber-50 px-3 py-2">
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-amber-700">Unmatched</p>
+          <p class="mt-1 text-base font-semibold text-amber-700">${Number(skipped_unmatched || 0)}</p>
         </div>
-        <div class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
-          <p class="text-[11px] font-semibold uppercase tracking-wide text-rose-700">Invalid</p>
-          <p class="mt-1 text-lg font-semibold text-amber-700">${Number(skipped_unmatched || 0) + Number(skipped_invalid || 0)}</p>
+        <div class="border border-rose-200 bg-rose-50 px-3 py-2">
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-rose-700">Invalid</p>
+          <p class="mt-1 text-base font-semibold text-amber-700">${Number(skipped_unmatched || 0) + Number(skipped_invalid || 0)}</p>
         </div>
       </div>
-      <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-        <input id="sync-include-templates" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" checked />
+      <label class="inline-flex items-center gap-2 border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700">
+        <input id="sync-include-templates" type="checkbox" class="h-3.5 w-3.5 rounded-none border-slate-300 text-teal-700 focus:ring-teal-500" checked />
         Download and import templates for selected users (slower)
       </label>
       ${renderDeviceUserPreviewTable(device_users || [])}
@@ -2621,4 +2630,21 @@ onUnmounted(() => {
 .machine-timer-dialog .swal2-input { box-sizing: border-box; height: 32px; min-width: 0; padding: 0 9px; border: 1px solid #cbd5e1; border-radius: 0; background: #fff; color: #0f172a; box-shadow: none; font-size: 12px; }
 .machine-timer-dialog .swal2-input:focus { border-color: #0d9488; outline: 2px solid rgb(20 184 166 / 20%); box-shadow: none; }
 .machine-timer-dialog .swal2-validation-message { margin: 0; font-size: 11px; }
+</style>
+
+<style>
+.swal2-popup.downloaded-attendance-preview { max-width: calc(100vw - 24px); max-height: 90vh; }
+.downloaded-attendance-preview .machine-push-title, .downloaded-attendance-preview .machine-push-actions { flex-shrink: 0; }
+.downloaded-attendance-preview .machine-push-body { min-width: 0; min-height: 0; margin: 0; overflow: auto; padding: 12px; }
+.downloaded-attendance-preview .machine-push-title { font-size: 14px; }
+.downloaded-attendance-preview .machine-push-body button:focus-visible { outline: 2px solid #14b8a6; outline-offset: 2px; }
+</style>
+
+<style>
+.swal2-popup.device-users-preview { max-width: calc(100vw - 24px); max-height: 90vh; }
+.device-users-preview .machine-push-title, .device-users-preview .machine-push-actions { flex-shrink: 0; }
+.device-users-preview .machine-push-title { overflow-wrap: anywhere; }
+.device-users-preview .machine-push-body { min-width: 0; min-height: 0; overflow: auto; padding: 12px; }
+.device-users-preview .preview-filter-btn[aria-pressed="true"] { background: #f0fdfa; color: #0f766e; border-color: #2dd4bf; }
+.device-users-preview .swal2-validation-message { margin: 0; padding: 10px 12px; font-size: 11px; }
 </style>
