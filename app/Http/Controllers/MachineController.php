@@ -533,6 +533,13 @@ class MachineController extends Controller
         $preview = [];
         $importable = 0;
         $unmapped = 0;
+        $userNames = [];
+        $userIds = collect($rows)->pluck('USERID')->filter(fn ($id) => (int) $id > 0)->unique();
+        foreach ($userIds->chunk(500) as $ids) {
+            foreach (User::with('profile:id,user_id,display_name')->whereIn('id', $ids)->get(['id', 'name']) as $user) {
+                $userNames[(int) $user->id] = trim((string) $user->profile?->display_name) ?: $user->name;
+            }
+        }
 
         foreach ($rows as $row) {
             if (($row['USERID'] ?? null) !== null && (int) $row['USERID'] > 0) {
@@ -542,6 +549,7 @@ class MachineController extends Controller
             }
 
             $preview[] = $row + [
+                'user_name' => $userNames[(int) ($row['USERID'] ?? 0)] ?? null,
                 'resolved' => ($row['USERID'] ?? null) !== null && (int) $row['USERID'] > 0,
             ];
         }

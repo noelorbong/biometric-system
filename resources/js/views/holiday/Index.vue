@@ -76,24 +76,24 @@ onMounted(async () => {
 <template>
   <div class="space-y-3">
     <div
-      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border p-3 pb-4 shadow-sm md:-mr-6 space-y-3">
+      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border px-2 py-1.5 pb-2 shadow-sm md:-mr-6 flex flex-wrap items-center justify-between gap-2">
       <section>
         <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Holidays</h1>
-            <span class="text-xs text-slate-500 dark:text-slate-400">{{ holidays.length }} configured</span>
+            <h1 class="text-base font-semibold text-slate-900 dark:text-white">Holidays</h1>
+            <span class="text-[10px] text-slate-500 dark:text-slate-400">{{ holidays.length }} configured</span>
           </div>
          
         </div>
       </section>
 
-      <section class="flex gap-x-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+      <section class="ml-auto flex min-w-0 flex-1 basis-[280px] items-stretch sm:max-w-[380px]">
         <input v-model="search" type="search" placeholder="Search holiday..."
-          class="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white/90" />
+          class="h-7 min-w-0 flex-1 rounded-none border border-r-0 border-white/15 bg-white px-2 text-[11px] text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white/90" />
       
         <Button @click="openCreate"
-            :className="'h-9 whitespace-nowrap rounded border border-cyan-600 bg-cyan-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 dark:border-cyan-500 dark:bg-cyan-500 dark:text-white'"
-            size="sm" variant="primary" :startIcon="PlusIcon">Add Holiday</Button>
+            :className="'h-7 !rounded-none !shrink-0 !gap-1 !py-1 !px-2 !text-[11px] whitespace-nowrap border border-cyan-300/30 !bg-teal-700 font-semibold text-white shadow-sm hover:!bg-teal-600'"
+            size="sm" variant="primary" :startIcon="PlusIcon" class="[&_svg]:h-3 [&_svg]:w-3">Add Holiday</Button>
         </section>
     </div>
 

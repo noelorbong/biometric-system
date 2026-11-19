@@ -1302,6 +1302,7 @@ class UserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'username' => $user->username,
             'display_name' => $profile?->display_name,
             'avatar' => $user->avatar,
             'thumbnail' => $profile?->thumbnail,
@@ -1637,6 +1638,31 @@ class UserController extends Controller
         ]);
     }
 
+    public function updateStatus(Request $request)
+    {
+        if (!$this->isSuperAdmin($request)) {
+            return $this->forbiddenResponse();
+        }
+
+        $validated = $request->validate([
+            'id' => ['required', 'integer', 'exists:users,id'],
+            'status' => ['required', 'boolean'],
+        ]);
+
+        $user = User::findOrFail($validated['id']);
+        $user->update([
+            'status' => $validated['status'],
+            'user_last_modify' => $request->user()?->id,
+        ]);
+
+        $mappedUser = $this->mapUser($this->queryUsers()->findOrFail($user->id));
+
+        return response()->json([
+            'message' => 'Success',
+            'user' => $mappedUser,
+        ]);
+    }
+
     public function updateOfficeShift(Request $request)
     {
         if (!$this->isSuperAdmin($request)) {
@@ -1711,7 +1737,8 @@ class UserController extends Controller
         }
 
         $validated = $request->validate([
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'username' => ['required_without:email', 'nullable', 'string', 'min:3', 'max:100', 'regex:/\A[a-zA-Z0-9._-]+\z/', 'unique:users,username'],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
             'role' => ['required', 'integer', 'min:0', 'max:6'],
             'status' => ['required', 'boolean'],
@@ -1780,7 +1807,8 @@ class UserController extends Controller
         $createdUser = DB::transaction(function () use ($request, $validated, $fullName, $contacts, $addresses, $departmentId, $departmentName) {
             $user = User::create([
                 'name' => $fullName,
-                'email' => $validated['email'],
+                'email' => $validated['email'] ?? null,
+                'username' => $validated['username'] ?? null,
                 'password' => $validated['password'],
                 'role' => $validated['role'],
                 'status' => $validated['status'],
@@ -1829,7 +1857,8 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'id' => ['required', 'integer', 'exists:users,id'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($request->id)],
+            'username' => ['required_without:email', 'nullable', 'string', 'min:3', 'max:100', 'regex:/\A[a-zA-Z0-9._-]+\z/', Rule::unique('users', 'username')->ignore($request->id)],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($request->id)],
             'password' => ['nullable', 'string', 'min:6'],
             'role' => ['required', 'integer', 'min:0', 'max:6'],
             'status' => ['required', 'boolean'],
@@ -1905,7 +1934,7 @@ class UserController extends Controller
             $addresses = $this->buildAddressesPayload($validated);
         } else {
             // remove private fields from validated to avoid accidental updates
-            unset($validated['email'], $validated['password'], $validated['image'], $validated['thumbnail']);
+            unset($validated['username'], $validated['email'], $validated['password'], $validated['image'], $validated['thumbnail']);
             $validated['contacts'] = [];
             $validated['addresses'] = [];
         }
@@ -1916,7 +1945,8 @@ class UserController extends Controller
             $userPayload = [
                 'name' => $fullName,
                 // allow email only when actor may edit private fields
-                'email' => $canEditPrivate ? ($validated['email'] ?? $user->email) : $user->email,
+                'email' => $canEditPrivate && array_key_exists('email', $validated) ? $validated['email'] : $user->email,
+                'username' => $canEditPrivate && array_key_exists('username', $validated) ? $validated['username'] : $user->username,
                 'role' => $isSuperAdmin ? $validated['role'] : $user->role,
                 'status' => $isSuperAdmin ? $validated['status'] : $user->status,
                 'office_shift_id' => $isSuperAdmin ? ($validated['office_shift_id'] ?? null) : $user->office_shift_id,
@@ -2027,7 +2057,7 @@ class UserController extends Controller
 
      public function user(Request $request) {
 
-        User::where('email',$request->user()->email)
+        User::whereKey($request->user()->id)
             ->update([
                 'last_ip' => $request->ip(),
                 'last_login' => Carbon::now(),

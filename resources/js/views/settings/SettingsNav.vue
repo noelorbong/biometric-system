@@ -1,22 +1,22 @@
 <template>
-  <section class=" pb-2 ">
-    <div class="flex flex-wrap items-center gap-2">
+  <section class="pb-0">
+    <div class="flex flex-wrap items-center gap-1">
       <RouterLink
         to="/main/settings"
-        class="inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold transition"
+        class="inline-flex h-7 items-center rounded-none border-b-2 px-2 text-[11px] font-semibold transition"
         :class="$route.path === '/main/settings'
-          ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
-          : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+          ? 'border-teal-400 bg-teal-400/10 text-teal-200'
+          : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'"
       >
         General Settings
       </RouterLink>
 
       <RouterLink
         to="/main/settings/database"
-        class="inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold transition"
+        class="inline-flex h-7 items-center rounded-none border-b-2 px-2 text-[11px] font-semibold transition"
         :class="$route.path === '/main/settings/database'
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
-          : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+          ? 'border-teal-400 bg-teal-400/10 text-teal-200'
+          : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'"
       >
         Database Settings
       </RouterLink>

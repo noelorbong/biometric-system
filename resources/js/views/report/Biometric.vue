@@ -1056,54 +1056,53 @@ const getPrintableRecords = (user) => {
 
 <template>
   <div class="space-y-3">
-    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
-      <div class="flex flex-col gap-3 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Biometric Report</h1>
-          <span class="text-xs text-slate-500 dark:text-slate-400">{{ periodLabel }}</span>
-          <span class="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ reportUsers.length }} users</span>
-          <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{{ selectedCount }} selected</span>
-          <span v-if="loading || preparingPrintData" class="text-xs font-medium text-amber-600 dark:text-amber-300">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h1 class="text-base font-semibold text-slate-900 dark:text-white">Biometric Report</h1>
+          <span class="rounded-none bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{{ reportUsers.length }} users</span>
+          <span class="rounded-none bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{{ selectedCount }} selected</span>
+          <span v-if="loading || preparingPrintData" class="text-[11px] font-medium text-amber-600 dark:text-amber-300">
             {{ loading ? 'Generating...' : 'Preparing print data...' }}
           </span>
         </div>
-        <div class="flex flex-wrap items-center gap-2 min-[800px]:justify-end">
-          <label class="flex h-8 items-center gap-2 rounded-md border border-slate-200 px-2 text-xs font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <label class="flex h-7 items-center gap-2 rounded-none border border-slate-200 px-2 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:text-slate-200">
             <input v-model="calculateUndertime" type="checkbox" class="h-3.5 w-3.5" />
             Calculate Undertime
           </label>
-          <label class="flex h-8 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+          <label class="flex h-7 items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
             Copies
-            <select v-model.number="copiesPerUser" class="h-8 rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
+            <select v-model.number="copiesPerUser" class="h-7 rounded-none border border-white/15 bg-slate-950/30 px-2 text-[11px] font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
               <option v-for="n in 10" :key="`copies-${n}`" :value="n" class="bg-white text-slate-900">{{ n }}</option>
             </select>
           </label>
           <button @click="printReport" type="button" :disabled="preparingPrintData"
-            class="inline-flex h-8 items-center justify-center rounded border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm transition hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-60">
+            class="inline-flex h-7 items-center justify-center rounded-none border border-white/15 bg-white/10 px-3 text-[11px] font-semibold text-white shadow-sm transition hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-60">
             {{ preparingPrintData ? 'Preparing...' : 'Print Selected' }}
           </button>
         </div>
       </div>
 
       <section
-        class="mt-3 border-t border-slate-200 sm:pt-3 dark:border-slate-800">
-        <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-end">
+        class="mt-2 border-t border-white/10 pt-2">
+        <div class="flex flex-col gap-2 md:flex-row md:items-end">
           <div class="shrink-0">
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mode</label>
-            <div class="inline-flex h-8 rounded border border-white/15 bg-slate-950/25 p-0.5 shadow-inner">
+            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Mode</label>
+            <div class="inline-flex h-7 rounded-none border border-white/15 bg-slate-950/25 p-0.5 shadow-inner">
               <button type="button" @click="filterMode = 'monthly'"
-                class="rounded-sm px-2.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300/40"
+                class="rounded-none px-2.5 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300/40"
                 :class="filterMode === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:bg-white/10 hover:text-white'">
                 Month
               </button>
               <button type="button" @click="filterMode = 'custom'"
-                class="rounded-sm px-2.5 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300/40"
+                class="rounded-none px-2.5 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-300/40"
                 :class="filterMode === 'custom' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-300 hover:bg-white/10 hover:text-white'">
                 Custom
               </button>
               <button
                 type="button"
-                class="inline-flex items-center justify-center gap-1 rounded-sm border-l border-white/20 px-2 text-[11px] font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+                class="inline-flex items-center justify-center gap-1 rounded-none border-l border-white/20 px-2 text-[11px] font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white md:hidden"
                 :aria-expanded="showMobileFilters"
                 aria-controls="active-biometric-report-filters"
                 :aria-label="showMobileFilters ? 'Hide report filters' : 'Show report filters'"
@@ -1116,48 +1115,48 @@ const getPrintableRecords = (user) => {
             </div>
           </div>
 
-          <div id="active-biometric-report-filters" class="flex-1 gap-2 grid-cols-2 lg:grid-cols-6" :class="showMobileFilters ? 'grid' : 'hidden lg:grid'">
+          <div id="active-biometric-report-filters" class="min-w-0 flex-1 gap-2 grid-cols-2 md:grid-cols-6" :class="showMobileFilters ? 'grid' : 'hidden md:grid'">
             <div v-if="filterMode === 'monthly'">
-              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
-              <select v-model.number="filters.year" class="h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
+              <select v-model.number="filters.year" class="h-7 w-full rounded-none border border-white/15 bg-slate-950/30 px-2 text-[11px] font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
                 <option v-for="year in yearOptions" :key="`year-${year}`" :value="year" class="bg-white text-slate-900">{{ year }}</option>
               </select>
             </div>
             <div v-if="filterMode === 'monthly'">
-              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
-              <select v-model.number="filters.month" class="h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
+              <select v-model.number="filters.month" class="h-7 w-full rounded-none border border-white/15 bg-slate-950/30 px-2 text-[11px] font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
                 <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value" class="bg-white text-slate-900">{{ month.label }}</option>
               </select>
             </div>
             <div v-if="filterMode === 'custom'" class="sm:col-span-2 lg:col-span-2">
-              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
               <flat-pickr v-model="customDateRange" :config="customRangePickerConfig"
-                class="h-8 w-full rounded-md border border-slate-300 bg-transparent px-2 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700"
+                class="h-7 w-full rounded-none border border-slate-300 bg-transparent px-2 text-[11px] focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700"
                 placeholder="Select date range" />
             </div>
             <div>
-              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
-              <select v-model="filters.office_shift_id" class="h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Office Shift</label>
+              <select v-model="filters.office_shift_id" class="h-7 w-full rounded-none border border-white/15 bg-slate-950/30 px-2 text-[11px] font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
                 <option value="" class="bg-white text-slate-900">All</option>
                 <option v-for="shift in officeShifts" :key="`report-shift-${shift.id}`" :value="String(shift.id)" class="bg-white text-slate-900">{{ shift.name }}</option>
               </select>
             </div>
             <div>
-              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
-              <select v-model="filters.department_id" class="h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Department</label>
+              <select v-model="filters.department_id" class="h-7 w-full rounded-none border border-white/15 bg-slate-950/30 px-2 text-[11px] font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
                 <option value="" class="bg-white text-slate-900">All</option>
                 <option v-for="department in departments" :key="`report-department-${department.id}`" :value="String(department.id)" class="bg-white text-slate-900">{{ department.department_name }}</option>
               </select>
             </div>
             <div>
-              <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
-              <select v-model="filters.college_id" class="h-8 w-full rounded border border-white/15 bg-slate-950/30 px-2 text-xs font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">College</label>
+              <select v-model="filters.college_id" class="h-7 w-full rounded-none border border-white/15 bg-slate-950/30 px-2 text-[11px] font-semibold text-white shadow-inner focus:border-cyan-300/60 focus:outline-none focus:ring-2 focus:ring-cyan-300/30">
                 <option value="" class="bg-white text-slate-900">All</option>
                 <option v-for="college in colleges" :key="`report-college-${college.id}`" :value="String(college.id)" class="bg-white text-slate-900">{{ college.college_long || college.college_short || `College #${college.id}` }}</option>
               </select>
             </div>
             <Button @click="generateReport" size="sm" variant="primary" :disabled="loading"
-            :className="'mt-auto h-8 rounded border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:opacity-60'">
+            :className="'mt-auto !py-1 !px-2 !text-[11px] h-7 rounded-none border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-[11px] font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40 disabled:opacity-60'">
             {{ loading ? 'Generating...' : 'Generate' }}
           </Button>
           </div>
@@ -1378,13 +1377,15 @@ const getPrintableRecords = (user) => {
               <td class="border-r border-slate-200 px-3 py-1.5 text-center text-xs dark:border-slate-700">
                 <input v-model="selectedUserIds" type="checkbox" :value="user.id" class="h-3.5 w-3.5" />
               </td>
-              <td class="border-r border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 dark:border-slate-700 dark:text-slate-100">{{ user.name }}</td>
-              <td class="border-r border-slate-200 px-3 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-200">{{ user.office_shift?.name || '-' }}</td>
+              <td class="border-r border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-800 dark:border-slate-700 dark:text-slate-100">
+                <span class="block w-[180px] truncate sm:max-w-[150px]" :title="user.name">{{ user.name }}</span>
+              </td>
+              <td class="whitespace-nowrap border-r border-slate-200 px-3 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-200">{{ user.office_shift?.name || '-' }}</td>
               <td class="border-r border-slate-200 px-3 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-200">{{ user.department || '-' }}</td>
               <td class="border-r border-slate-200 px-3 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-200">{{ user.college || '-' }}</td>
               <td class="px-3 py-1.5 text-xs">
                 <button @click="openBiometricLogs(user)" type="button"
-                  class="inline-flex h-7 items-center justify-center rounded border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:border-cyan-600 hover:bg-cyan-50 hover:text-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-cyan-500/70 dark:hover:bg-cyan-950/30 dark:hover:text-cyan-200">
+                  class="inline-flex h-7 whitespace-nowrap items-center justify-center rounded border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:border-cyan-600 hover:bg-cyan-50 hover:text-cyan-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-cyan-500/70 dark:hover:bg-cyan-950/30 dark:hover:text-cyan-200">
                   View All Logs
                 </button>
               </td>

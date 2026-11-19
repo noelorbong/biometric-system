@@ -122,6 +122,33 @@ export const useUserStore = defineStore('users',{
         return { success: false, data: resp };
       })
     },
+    async updateUserStatus(payload) {
+      let app = this;
+      const auth = useAuthStore();
+      return await axios.post('/api/user/status/update', payload).then(function (resp) {
+        const updatedUser = resp.data.user;
+        const index = app.users
+          .map((x) => x.id)
+          .indexOf(updatedUser.id);
+
+        if (index > -1) {
+          app.users.splice(index, 1, updatedUser);
+        }
+
+        if (updatedUser.id == auth.user.id) {
+          auth.user = updatedUser;
+        }
+
+        return { success: true, data: resp.data };
+      }).catch(function (resp) {
+        if (resp.response) {
+          if (resp.response.data.message == 'Unauthenticated.') {
+            auth.clearAccount()
+          }
+        }
+        return { success: false, data: resp };
+      })
+    },
     async updateUserOfficeShift(payload) {
       let app = this;
       const auth = useAuthStore();

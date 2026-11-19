@@ -113,64 +113,64 @@ const cards = computed(() => [
 <template>
   <div class="space-y-3 text-slate-800 dark:text-slate-200">
     <section
-      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
+      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 class="text-lg font-semibold dark:text-white">Daily Attendance</h1>
-          <!-- <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Review arrivals, departures, and attendance issues by work period.</p> -->
+          <h1 class="text-base font-semibold dark:text-white">Daily Attendance</h1>
+          <!-- <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Review arrivals, departures, and attendance issues by work period.</p> -->
         </div>
-        <div class="flex items-center gap-3">
-          <button type="button" :disabled="loading || !report" @click="printTable(printGrid, `Daily Attendance — ${date}`)" class="rounded-md border px-3 py-1.5 text-xs">Print</button>
-          <label class="flex items-center gap-1.5 text-xs"><input v-model="issuesOnly" type="checkbox"
-              class="rounded border-slate-300" /> Issues only</label>
+        <div class="flex items-center gap-2">
+          <button type="button" :disabled="loading || !report" @click="printTable(printGrid, `Daily Attendance — ${date}`)" class="rounded-none border px-3 py-1 text-[11px]">Print</button>
+          <label class="flex items-center gap-1.5 text-[11px]"><input v-model="issuesOnly" type="checkbox"
+              class="rounded-none border-slate-300" /> Issues only</label>
           <button type="button" @click="load" :disabled="loading" aria-label="Refresh attendance"
             title="Refresh attendance"
-            class="rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5 text-base leading-none text-sky-700 disabled:opacity-50 dark:border-sky-900 dark:bg-sky-900/20 dark:text-sky-300">↻</button>
+            class="rounded-none border border-teal-200 bg-teal-50 px-2 py-1 text-base leading-none text-teal-700 disabled:opacity-50 dark:border-sky-900 dark:bg-sky-900/20 dark:text-teal-300">↻</button>
         </div>
       </div>
-      <div class="mt-4 grid grid-cols-2 items-end gap-2 md:grid-cols-4">
-        <label class="text-xs font-medium">Date
+      <div class="mt-2 grid grid-cols-2 items-end gap-2 md:grid-cols-4">
+        <label class="text-[11px] font-medium">Date
           <flat-pickr v-model="date" :config="datePickerConfig" :disabled="initializing && loading"
             placeholder="Select date"
-            class="mt-1 block h-9 rounded-md border border-slate-300 bg-transparent text-xs dark:border-slate-700" />
+            class="mt-1 block h-7 w-full min-w-0 rounded-none border border-slate-300 bg-transparent text-[11px] dark:border-slate-700" />
         </label>
-        <label class="text-xs font-medium">Office shift
+        <label class="text-[11px] font-medium">Office shift
           <select v-model="shiftId" :disabled="initializing && loading"
-            class="mt-1 block h-9 min-w-44 rounded-md border border-slate-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+            class="mt-1 block h-7 min-w-0 w-full rounded-none border border-slate-300 bg-white px-3 text-[11px] dark:border-slate-700 dark:bg-slate-900">
             <option value="">All shifts</option>
             <option v-for="shift in shifts" :key="shift.id" :value="shift.id">{{ shift.name }}</option>
           </select>
         </label>
         <input v-model="search" type="search" aria-label="Search employees" placeholder="Search employee or shift…"
-          class="h-9 rounded-md border border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
-        <label class="flex items-center gap-1.5 text-xs">Sort
+          class="h-7 rounded-none border border-slate-300 bg-transparent px-2 text-[11px] dark:border-slate-700" />
+        <label class="flex items-center gap-1.5 text-[11px]">Sort
           <select v-model="sort"
-            class="h-9 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900">
+            class="h-7 min-w-0 flex-1 rounded-none border border-slate-300 bg-white px-2 text-[11px] dark:border-slate-700 dark:bg-slate-900">
             <option value="late">Late minutes ↓</option>
             <option value="in">First IN ↓</option>
             <option value="last_in">Last check-in ↓</option><option value="name">Name A–Z</option>
           </select>
         </label>
-        <!-- <p v-if="report" class="pb-2 text-xs text-slate-500">Updated {{ clock(report.generated_at) }} · {{ report.timezone }}</p> -->
+        <!-- <p v-if="report" class="pb-2 text-[11px] text-slate-500">Updated {{ clock(report.generated_at) }} · {{ report.timezone }}</p> -->
       </div>
-      <div class="mt-3 grid grid-cols-2 gap-1.5 lg:grid-cols-4">
-        <div v-for="card in cards" :key="card.label" class="rounded-md bg-slate-50 p-2 dark:bg-slate-900/70">
-          <p class="text-xs text-slate-500 dark:text-slate-400">{{ card.label }}</p>
-          <p class="mt-0.5 text-lg font-semibold tabular-nums">{{ card.value ?? '—' }} <span
-              class="text-xs font-normal">{{ card.unit }}</span></p>
+      <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div v-for="card in cards" :key="card.label" class="border border-white/15 bg-white/5 px-2 py-1.5">
+          <p class="text-[10px] text-slate-300">{{ card.label }}</p>
+          <p class="mt-0.5 text-base font-semibold tabular-nums">{{ card.value ?? '—' }} <span
+              class="text-[11px] font-normal">{{ card.unit }}</span></p>
         </div>
       </div>
-      <!-- <p class="mt-2 text-xs text-slate-500">Counts are unique employees for the selected date and shift. Minutes include all their work periods.</p> -->
+      <!-- <p class="mt-2 text-[11px] text-slate-500">Counts are unique employees for the selected date and shift. Minutes include all their work periods.</p> -->
 
       <div class="hidden">
         <!-- <h2 class="shrink-0 text-sm font-semibold">Employees <span v-if="report" class="font-normal text-slate-500">({{ employees.length }} / {{ report.employees.length }})</span></h2> -->
         <input v-model="search" type="search" aria-label="Search employees" placeholder="Search employee or shift…"
-          class="h-8 w-44 shrink-0 rounded-md border border-slate-300 bg-transparent px-2 text-xs dark:border-slate-700" />
-        <label class="flex shrink-0 items-center gap-1.5 text-xs"><input v-model="issuesOnly" type="checkbox"
-            class="rounded border-slate-300" /> Issues Only</label>
-        <label class="ml-auto flex shrink-0 items-center gap-1.5 text-xs">Sort
+          class="h-8 w-44 shrink-0 rounded-none border border-slate-300 bg-transparent px-2 text-[11px] dark:border-slate-700" />
+        <label class="flex shrink-0 items-center gap-1.5 text-[11px]"><input v-model="issuesOnly" type="checkbox"
+            class="rounded-none border-slate-300" /> Issues Only</label>
+        <label class="ml-auto flex shrink-0 items-center gap-1.5 text-[11px]">Sort
           <select v-model="sort"
-            class="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900">
+            class="h-8 rounded-none border border-slate-300 bg-white px-2 text-[11px] dark:border-slate-700 dark:bg-slate-900">
             <option value="late">Late minutes ↓</option>
             <option value="in">First IN ↓</option>
             <option value="name">Name A–Z</option>
@@ -179,50 +179,50 @@ const cards = computed(() => [
       </div>
     </section>
 
-    <div v-if="error" role="alert" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{
+    <div v-if="error" role="alert" class="rounded-none border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{
       error }} <button type="button" @click="load" class="ml-2 underline">Retry</button></div>
     <div v-if="report?.holidays.length"
-      class="rounded-lg bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
+      class="rounded-none bg-teal-50 p-3 text-[11px] text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
       <span v-for="holiday in report.holidays" :key="holiday.id" class="mr-3">{{ holiday.name }} · {{
         holiday.duration.replaceAll('_', ' ') }} · {{ holiday.is_working_day ? 'Working' : 'Exempt from late /undertime' }}</span>
     </div>
 
     <section
-      class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]"
+      class="overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]"
       :aria-busy="loading">
 
       <div class="overflow-x-auto">
-        <table ref="printGrid" class="min-w-full text-left text-xs">
-          <thead class="bg-slate-50 text-slate-500 dark:bg-slate-900/60 dark:text-slate-400">
+        <table ref="printGrid" class="min-w-full border-collapse text-left text-[11px]">
+          <thead class="bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] text-[10px] text-slate-100">
             <tr>
-              <th rowspan="2" class="px-3 py-2">Name</th>
-              <th rowspan="2" class="px-3 py-2">Shift</th>
+              <th rowspan="2" class="px-2 py-1.5">Name</th>
+              <th rowspan="2" class="px-2 py-1.5">Shift</th>
               <th v-for="column in columns" :key="column.key" colspan="2"
-                class="border-l border-slate-200 px-3 py-2 text-center font-medium dark:border-slate-800">Until {{
+                class="border-l border-slate-200 px-2 py-1.5 text-center font-medium dark:border-slate-800">Until {{
                   clock(column.end) }}{{ column.nextDay ? ' (+1 day)' : '' }}</th>
-              <th rowspan="2" class="px-3 py-2 text-right">Late min</th>
-              <th rowspan="2" class="px-3 py-2 text-right">Undertime min</th>
-              <th rowspan="2" class="px-3 py-2">Status</th>
+              <th rowspan="2" class="px-2 py-1.5 text-right">Late min</th>
+              <th rowspan="2" class="px-2 py-1.5 text-right">Undertime min</th>
+              <th rowspan="2" class="px-2 py-1.5">Status</th>
             </tr>
             <tr><template v-for="column in columns" :key="column.key">
-                <th class="border-l border-slate-200 px-3 pb-2 dark:border-slate-800">IN</th>
-                <th class="px-3 pb-2">OUT</th>
+                <th class="border-l border-slate-200 px-2 pb-1.5 dark:border-slate-800">IN</th>
+                <th class="px-2 pb-1.5">OUT</th>
               </template>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
             <template v-for="row in employees" :key="row.id">
               <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                <td class="px-3 py-3"><button type="button" @click="expanded = expanded === row.id ? null : row.id"
+                <td class="px-2 py-1.5"><button type="button" @click="expanded = expanded === row.id ? null : row.id"
                     :aria-expanded="expanded === row.id"
-                    class="max-w-[150px] truncate text-left font-medium text-sky-700 hover:underline dark:text-sky-300">{{ row.name }}</button>
+                    :title="row.name" class="max-w-[160px] truncate text-left font-medium text-teal-700 hover:underline dark:text-teal-300">{{ row.name }}</button>
                 </td>
-                <td class="whitespace-nowrap px-3 py-3">{{ row.shift_name }}<span
+                <td class="whitespace-nowrap px-2 py-1.5">{{ row.shift_name }}<span
                     v-if="row.schedule_name && row.schedule_name !== row.shift_name"
                     class="block text-[10px] text-slate-500">{{ row.schedule_name }}</span></td>
                 <template v-for="(period, index) in row.cells" :key="index">
                   <td v-for="direction in ['in', 'out']" :key="direction"
-                    class="whitespace-nowrap px-3 py-3 tabular-nums"
+                    class="whitespace-nowrap px-2 py-1.5 tabular-nums"
                     :class="direction === 'in' ? 'border-l border-slate-100 dark:border-slate-800' : ''">
                     <template v-if="period">
                       <span
@@ -238,10 +238,10 @@ const cards = computed(() => [
                     </template><span v-else class="text-slate-400">—</span>
                   </td>
                 </template>
-                <td class="px-3 py-3 text-right font-semibold tabular-nums">{{ row.late_minutes }}</td>
-                <td class="px-3 py-3 text-right font-semibold tabular-nums">{{ row.undertime_minutes }}</td>
-                <td class="whitespace-nowrap px-3 py-3"><span
-                    class="rounded bg-slate-100 px-2 py-1 text-[10px] dark:bg-slate-800"
+                <td class="px-2 py-1.5 text-right font-semibold tabular-nums">{{ row.late_minutes }}</td>
+                <td class="px-2 py-1.5 text-right font-semibold tabular-nums">{{ row.undertime_minutes }}</td>
+                <td class="whitespace-nowrap px-2 py-1.5"><span
+                    class="rounded-none bg-slate-100 px-2 py-1 text-[10px] dark:bg-slate-800"
                     :class="row.missing_count ? 'text-amber-700 dark:text-amber-300' : ''">{{ row.status }}</span></td>
               </tr>
               <tr v-if="expanded === row.id">
@@ -266,7 +266,7 @@ const cards = computed(() => [
         </table>
       </div>
       <div
-        class="space-y-1 border-t border-slate-200 p-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        class="space-y-1 border-t border-slate-200 bg-slate-50/60 px-3 py-2 text-[10px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
         <p>⚠ Late · ↓ Undertime · — Work period not assigned. Click an employee to view their schedule and punches.</p>
         <p>Late minutes start at scheduled IN. Schedule grace settings correct punch types only. Undertime is calculated
           after
@@ -278,3 +278,9 @@ const cards = computed(() => [
     </section>
   </div>
 </template>
+
+<style scoped>
+.admin-page-header .grid > * { min-width: 0; }
+.admin-page-header button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+.admin-page-header input, .admin-page-header select { max-width: 100%; }
+</style>

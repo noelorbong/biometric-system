@@ -434,7 +434,14 @@ function printReport() {
     .weekend { color: #c00; } .holiday, .exempt { background: #eee; } .missing-record { color: #92400e; background: #fef3c7; } .holiday-cell { color: #075985; background: #e0f2fe; }
     thead { display: table-header-group; } tr { break-inside: avoid; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  </style></head><body><h1>Monthly Tardiness and Undertime — ${escape(report.value.month_label)}</h1><p>${escape(selectedShiftName.value)} · ${rows.value.length} employees · Generated ${escape(report.value.generated_at)} (${escape(report.value.timezone)})</p>${printGrid.outerHTML}<p>${escape(reportNote.value)}</p></body></html>`)
+  
+.admin-page-header .grid > * { min-width: 0; }
+.month-grid thead th { background: #1e293b; color: #f1f5f9; }
+.month-grid thead .month-heading { background: #0f766e; font-size: 11px; }
+.month-grid thead .weekend, .month-grid thead .holiday { color: #fda4af; }
+.month-grid thead .weekend-heading span { color: #cbd5e1; }
+.admin-page-header button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
+</style></head><body><h1>Monthly Tardiness and Undertime — ${escape(report.value.month_label)}</h1><p>${escape(selectedShiftName.value)} · ${rows.value.length} employees · Generated ${escape(report.value.generated_at)} (${escape(report.value.timezone)})</p>${printGrid.outerHTML}<p>${escape(reportNote.value)}</p></body></html>`)
   preview.document.close()
   preview.focus()
   void finishPrintWindow(preview)
@@ -446,18 +453,18 @@ function printReport() {
 
     <template v-if="activeTab === 'attendance'">
     <section
-      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
-      <nav class="mb-3 flex flex-wrap w-fit border-b border-slate-200 text-sm dark:border-slate-700" aria-label="Monthly attendance reports">
+      class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <nav class="mb-2 flex w-fit flex-wrap border-b border-white/15 text-[11px]" aria-label="Monthly attendance reports">
       <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
       <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
     </nav>
-      <div class="flex flex-wrap items-center gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 class="text-lg font-semibold dark:text-white">Monthly Tardiness and Undertime</h1>
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">A monthly grid of late arrivals and early
+          <h1 class="text-base font-semibold dark:text-white">Monthly Tardiness and Undertime</h1>
+          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">A monthly grid of late arrivals and early
             departures, in minutes.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="ml-auto flex flex-wrap gap-2">
           <button type="button" @click="load" :disabled="loading" class="action-button">{{ loading ? 'Loading…' :
             'Refresh' }}</button>
           <button type="button" @click="exportExcel" :disabled="!report || !rows.length" class="action-button">Export
@@ -466,38 +473,38 @@ function printReport() {
             PDF</button>
         </div>
       </div>
-      <div class="mt-4 flex flex-wrap items-end gap-3">
-        <label class="text-xs font-medium">Month<flat-pickr v-model="month" :config="pickerConfig"
+      <div class="mt-2 grid grid-cols-2 items-end gap-2 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <label class="text-[11px] font-medium">Month<flat-pickr v-model="month" :config="pickerConfig"
             :disabled="initializing && loading" placeholder="Select month" class="filter-input mt-1 block" /></label>
-        <label class="text-xs font-medium">Office shift<select v-model="shiftId" :disabled="initializing && loading"
+        <label class="text-[11px] font-medium">Office shift<select v-model="shiftId" :disabled="initializing && loading"
             class="filter-input mt-1 block">
             <option value="">All shifts</option>
             <option v-for="shift in shifts" :key="shift.id" :value="shift.id">{{ shift.name }}</option>
           </select></label>
-        <label class="text-xs font-medium">Search<input v-model="search" type="search" placeholder="Employee or shift…"
+        <label class="text-[11px] font-medium">Search<input v-model="search" type="search" placeholder="Employee or shift…"
             class="filter-input mt-1 block" /></label>
-        <label class="text-xs font-medium">Sort<select v-model="sort" class="filter-input mt-1 block">
+        <label class="text-[11px] font-medium">Sort<select v-model="sort" class="filter-input mt-1 block">
             <option value="late_count">Times tardy ↓</option>
             <option value="undertime_count">Times undertime ↓</option>
             <option value="total_minutes">Total minutes ↓</option>
             <option value="name">Employee name A–Z</option>
           </select></label>
-        <label class="flex items-center gap-2 pb-2 text-xs"><input v-model="issuesOnly" type="checkbox"
-            class="rounded border-slate-300" /> With late / undertime only</label>
+        <label class="flex items-center gap-2 pb-1 text-[11px]"><input v-model="issuesOnly" type="checkbox"
+            class="rounded-none border-slate-300" /> With late / undertime only</label>
       </div>
-      <div v-if="report" class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+      <div v-if="report" class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
         <span><strong>{{ rows.length }}</strong> employees shown</span><span><strong>{{ totals.minutes.toLocaleString()
             }}</strong> total minutes</span><span><strong>{{ totals.late }}</strong> times tardy</span><span><strong>{{
               totals.under }}</strong> times undertime</span>
         <span v-if="report.provisional"
-          class="rounded bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Provisional</span>
+          class="rounded-none bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Provisional</span>
       </div>
     </section>
-    <div v-if="error" role="alert" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{
+    <div v-if="error" role="alert" class="rounded-none border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{
       error }} <button type="button" @click="load" class="ml-2 underline">Retry</button></div>
-    <p v-if="notice" role="status" class="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">{{ notice }}</p>
+    <p v-if="notice" role="status" class="rounded-none bg-emerald-50 p-3 text-[11px] text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">{{ notice }}</p>
     <section
-      class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]"
+      class="overflow-hidden rounded-none border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]"
       :aria-busy="loading">
       <div v-if="report" class="grid-scroll" tabindex="0"
         aria-label="Monthly attendance grid; scroll horizontally to view all days">
@@ -556,7 +563,7 @@ function printReport() {
       <div v-else class="px-4 py-10 text-center text-sm text-slate-500">{{ loading ? 'Preparing monthly report…' :
         'Select a month and refresh to view the report.' }}</div>
       <div
-        class="space-y-1 border-t border-slate-200 p-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        class="space-y-1 border-t border-slate-200 bg-slate-50/60 px-3 py-2 text-[10px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
         <p><strong>I</strong> = late minutes · <strong>O</strong> = undertime minutes · Red dates = weekends · * =
           holiday.
           Click any IN/OUT cell, including a blank cell, to add or override attendance logs or mark the day absent. Totals recalculate automatically.</p>
@@ -571,7 +578,7 @@ function printReport() {
     </template>
     <AbsencesSummary v-else>
       <template #navigation>
-        <nav class="mb-3 flex flex-wrap w-fit border-b border-slate-200 text-sm dark:border-slate-700" aria-label="Monthly attendance reports">
+        <nav class="mb-2 flex w-fit flex-wrap border-b border-white/15 text-[11px]" aria-label="Monthly attendance reports">
       <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
       <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
     </nav>
@@ -584,14 +591,14 @@ function printReport() {
 .cell-edit { display: block; width: 100%; min-height: 22px; color: inherit; font: inherit; cursor: pointer; }
 .cell-edit:hover, .cell-edit:focus-visible { background: #e0f2fe; outline: 2px solid #38bdf8; outline-offset: -2px; }
 .dark .cell-edit:hover, .dark .cell-edit:focus-visible { background: #0c4a6e; }
-.tab-active { @apply border-b-2 border-sky-600 px-3 py-2 font-semibold text-sky-700 dark:border-sky-400 dark:text-sky-300; }
-.tab-inactive { @apply px-3 py-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200; }
+.tab-active { @apply border-b-2 border-teal-400 bg-teal-400/10 px-3 py-1.5 font-semibold text-teal-200; }
+.tab-inactive { @apply border-b-2 border-transparent px-3 py-1.5 text-slate-300 hover:bg-white/5 hover:text-white; }
 .action-button {
-  @apply rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 disabled:opacity-50 dark:border-sky-900 dark:bg-sky-900/20 dark:text-sky-300;
+  @apply inline-flex h-7 items-center justify-center whitespace-nowrap rounded-none border border-cyan-300/30 bg-teal-700 px-2 text-[11px] font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 :deep(.filter-input) {
-  @apply h-9 max-w-full rounded-md border border-slate-300 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-900;
+  @apply h-7 w-full min-w-0 max-w-full rounded-none border border-slate-300 bg-white py-0 pl-2 pr-6 text-[11px] focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-700 dark:bg-slate-900;
 }
 
 .grid-scroll {
@@ -609,7 +616,7 @@ function printReport() {
 
 .month-grid th,
 .month-grid td {
-  height: 27px;
+  height: 24px;
   padding: 3px 1px;
   text-align: center;
   border-right: 1px dotted #cbd5e1;
@@ -639,7 +646,10 @@ function printReport() {
   left: 0;
   z-index: 2;
   width: 220px;
-  padding: 5px 8px;
+  padding: 3px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-align: left;
   background: white;
   font-size: 11px;

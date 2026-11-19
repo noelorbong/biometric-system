@@ -563,32 +563,39 @@ const applyMachineTimerSettings = () => {
 
 const openMachineTimerSettings = async () => {
   const result = await Swal.fire({
+    width: 460,
+    padding: 0,
+    buttonsStyling: false,
+    showCloseButton: true,
+    focusConfirm: false,
+    reverseButtons: true,
+    customClass: { popup: 'machine-push-confirm machine-timer-dialog', title: 'machine-push-title', htmlContainer: 'machine-push-body', actions: 'machine-push-actions', confirmButton: 'machine-push-save', cancelButton: 'machine-push-cancel', closeButton: 'machine-push-close' },
     title: 'Machine Page Timer Settings',
     html: `
-      <div class="space-y-3 text-left">
-        <div class="rounded-md border border-gray-200 p-2">
-          <label class="mb-1 inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input id="timer-status-enabled" type="checkbox" ${appSettingStore.machineAutoSyncStatusTimerEnabled ? 'checked' : ''} />
+      <div class="space-y-2 text-left">
+        <div class="border border-slate-200 bg-slate-50/60 p-3">
+          <label class="mb-2 inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+            <input id="timer-status-enabled" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" ${appSettingStore.machineAutoSyncStatusTimerEnabled ? 'checked' : ''} />
             Daemon Status Poll
           </label>
-          <input id="timer-status-ms" type="number" min="250" max="300000" class="swal2-input !m-0 !mt-1 !w-full" value="${ensureIntervalMs(appSettingStore.machineAutoSyncStatusTimerMs, 5000)}" />
-          <p class="mt-1 text-xs text-gray-500">Interval in milliseconds</p>
+          <input aria-label="Daemon status poll interval in milliseconds" id="timer-status-ms" type="number" min="250" max="300000" class="swal2-input !m-0 !mt-1 !w-full" value="${ensureIntervalMs(appSettingStore.machineAutoSyncStatusTimerMs, 5000)}" />
+          <p class="mt-1 text-[10px] text-slate-400">Interval in milliseconds</p>
         </div>
-        <div class="rounded-md border border-gray-200 p-2">
-          <label class="mb-1 inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input id="timer-refresh-enabled" type="checkbox" ${appSettingStore.machineRefreshTimerEnabled ? 'checked' : ''} />
+        <div class="border border-slate-200 bg-slate-50/60 p-3">
+          <label class="mb-2 inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+            <input id="timer-refresh-enabled" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" ${appSettingStore.machineRefreshTimerEnabled ? 'checked' : ''} />
             Machine List Refresh
           </label>
-          <input id="timer-refresh-ms" type="number" min="250" max="300000" class="swal2-input !m-0 !mt-1 !w-full" value="${ensureIntervalMs(appSettingStore.machineRefreshTimerMs, 5000)}" />
-          <p class="mt-1 text-xs text-gray-500">Interval in milliseconds</p>
+          <input aria-label="Machine list refresh interval in milliseconds" id="timer-refresh-ms" type="number" min="250" max="300000" class="swal2-input !m-0 !mt-1 !w-full" value="${ensureIntervalMs(appSettingStore.machineRefreshTimerMs, 5000)}" />
+          <p class="mt-1 text-[10px] text-slate-400">Interval in milliseconds</p>
         </div>
-        <div class="rounded-md border border-gray-200 p-2">
-          <label class="mb-1 inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input id="timer-fallback-enabled" type="checkbox" ${appSettingStore.machineWebAutoFallbackTimerEnabled ? 'checked' : ''} />
+        <div class="border border-slate-200 bg-slate-50/60 p-3">
+          <label class="mb-2 inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+            <input id="timer-fallback-enabled" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" ${appSettingStore.machineWebAutoFallbackTimerEnabled ? 'checked' : ''} />
             Web Auto Fallback Cycle
           </label>
-          <input id="timer-fallback-ms" type="number" min="250" max="300000" class="swal2-input !m-0 !mt-1 !w-full" value="${ensureIntervalMs(appSettingStore.machineWebAutoFallbackTimerMs, 1000)}" />
-          <p class="mt-1 text-xs text-gray-500">Interval in milliseconds</p>
+          <input aria-label="Web auto fallback interval in milliseconds" id="timer-fallback-ms" type="number" min="250" max="300000" class="swal2-input !m-0 !mt-1 !w-full" value="${ensureIntervalMs(appSettingStore.machineWebAutoFallbackTimerMs, 1000)}" />
+          <p class="mt-1 text-[10px] text-slate-400">Interval in milliseconds</p>
         </div>
       </div>
     `,
@@ -1744,9 +1751,23 @@ const downloadUsersFromDevice = async (machine) => {
 
 const pushUsersToAllMachines = async () => {
   const confirm = await Swal.fire({
-    icon: 'question',
+    width: 420,
+    padding: 0,
+    buttonsStyling: false,
+    showCloseButton: true,
+    focusCancel: true,
+    reverseButtons: true,
+    customClass: {
+      popup: 'machine-push-confirm',
+      title: 'machine-push-title',
+      htmlContainer: 'machine-push-body',
+      actions: 'machine-push-actions',
+      confirmButton: 'machine-push-save',
+      cancelButton: 'machine-push-cancel',
+      closeButton: 'machine-push-close',
+    },
     title: 'Push Users to All Devices',
-    html: `<p class="text-sm text-gray-600">This will update <strong>all users</strong> on every enabled biometric machine.</p>`,
+    html: `<div class="text-left"><p class="text-xs font-semibold text-slate-800">Update users on every enabled machine?</p><p class="mt-2 text-[11px] leading-relaxed text-slate-500">All local biometric users will be sent to your enabled devices.</p><div class="mt-4 flex items-center justify-between border border-teal-100 bg-teal-50/60 px-3 py-2 text-[11px]"><span class="text-slate-500">Enabled machines</span><strong class="text-teal-800">${machineStats.value.enabled}</strong></div></div>`,
     showCancelButton: true,
     confirmButtonText: 'Push Now',
     cancelButtonText: 'Cancel',
@@ -1844,89 +1865,90 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class=" space-y-4 ">
-    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
-      <div class="flex flex-col gap-4 min-[1024px]:flex-row min-[1024px]:items-center min-[1024px]:justify-between">
-        <div class="min-w-0">
+  <div class="space-y-3">
+    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <div class="flex flex-col gap-2">
+        <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 class="text-xl font-semibold text-slate-900 dark:text-white">Biometric Machines</h1>
-            <span class="text-sm text-slate-500 dark:text-slate-400">{{ filteredMachines.length }} of {{ machineStats.total }} shown</span>
+            <h1 class="text-base font-semibold text-slate-900 dark:text-white">Biometric Machines</h1>
+            <span class="text-[10px] text-slate-500 dark:text-slate-400">{{ filteredMachines.length }} of {{ machineStats.total }} shown</span>
           </div>
-          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
             <span><strong class="font-semibold text-emerald-600 dark:text-emerald-400">{{ machineStats.enabled }}</strong> enabled</span>
             <span><strong class="font-semibold text-cyan-600 dark:text-cyan-400">{{ machineStats.autoEnabled }}</strong> auto sync</span>
             <span><strong class="font-semibold text-slate-700 dark:text-slate-200">{{ machineStats.activeAuto }}</strong> active</span>
-            <span class="inline-flex rounded px-1.5 py-0.5 font-semibold" :class="autoSyncDaemonStatus.running ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'">
+            <span class="inline-flex rounded-none px-1.5 py-0.5 font-semibold" :class="autoSyncDaemonStatus.running ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'">
               {{ autoSyncDaemonStatus.running ? 'Daemon Running' : 'Daemon Stopped' }}
             </span>
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:flex-wrap sm:items-center min-[1024px]:justify-end">
+        <div class="flex w-full flex-wrap items-center gap-2 border-t border-white/10 pt-2 sm:justify-between">
           <div class="flex w-full flex-wrap gap-2 sm:w-auto">
-          <button @click="toggleWebAutoFallback" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition" :class="webAutoFallbackEnabled ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'" :title="webAutoFallbackEnabled ? 'Disable browser fallback auto-download' : 'Enable browser fallback auto-download when daemon is stopped'" :aria-label="webAutoFallbackEnabled ? 'Disable browser fallback auto-download' : 'Enable browser fallback auto-download when daemon is stopped'" :aria-pressed="webAutoFallbackEnabled">
-            <RefreshIcon class="h-4 w-4" />
+          <button @click="toggleWebAutoFallback" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none border transition" :class="webAutoFallbackEnabled ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'" :title="webAutoFallbackEnabled ? 'Disable browser fallback auto-download' : 'Enable browser fallback auto-download when daemon is stopped'" :aria-label="webAutoFallbackEnabled ? 'Disable browser fallback auto-download' : 'Enable browser fallback auto-download when daemon is stopped'" :aria-pressed="webAutoFallbackEnabled">
+            <RefreshIcon class="h-3.5 w-3.5" />
           </button>
-          <button @click="openMachineTimerSettings" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="Configure machine page timer intervals" aria-label="Configure machine page timer intervals">
-            <ClockIcon class="h-4 w-4" />
+          <button @click="openMachineTimerSettings" type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" title="Configure machine page timer intervals" aria-label="Configure machine page timer intervals">
+            <ClockIcon class="h-3.5 w-3.5" />
           </button>
-          <button @click="openAttendanceDatImport" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30">
+          <button @click="openAttendanceDatImport" type="button" class="inline-flex h-7 items-center justify-center gap-1.5 rounded-none bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30">
             <RefreshIcon class="h-3.5 w-3.5" />
             Import Attendance
           </button>
-          <button @click="pushUsersToAllMachines" type="button" :disabled="pushingUsers" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition" :class="pushingUsers ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-cyan-600 text-white hover:bg-cyan-500'">
+          <button @click="pushUsersToAllMachines" type="button" :disabled="pushingUsers" class="inline-flex h-7 items-center justify-center gap-1.5 rounded-none px-2.5 text-[11px] font-semibold transition" :class="pushingUsers ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' : 'bg-cyan-600 text-white hover:bg-cyan-500'">
             <span v-if="pushingUsers" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
             <RefreshIcon v-else class="h-3.5 w-3.5" />
             {{ pushingUsers ? 'Pushing…' : 'Push Users' }}
           </button>
           </div>
-          <div class="order-last flex w-full min-w-0 flex-1 basis-full flex-row items-center gap-2 sm:order-none sm:w-auto sm:basis-auto sm:flex-none">
+            <button @click="openDiscoveryScanner" type="button" class="inline-flex h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-none border border-cyan-200 bg-cyan-50 px-2.5 text-[11px] font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30">
+              <RefreshIcon class="h-3.5 w-3.5" />
+              IP Scanner
+            </button>
+          <div class="ml-auto flex w-full min-w-0 items-stretch sm:w-auto">
             <input
               v-model="search"
               type="text"
               placeholder="Search machine, IP, or serial"
-              class="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-56 sm:flex-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
+              class="h-7 min-w-0 flex-1 rounded-none border border-r-0 border-slate-200 bg-slate-50 px-3 text-[11px] text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-56 sm:flex-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
             />
-            <Button @click="openCreate" :className="'h-9 justify-center whitespace-nowrap px-2.5 text-xs'" size="sm" variant="primary" :startIcon="PlusIcon">Add Machine</Button>
-            <button @click="openDiscoveryScanner" type="button" class="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300 dark:hover:bg-cyan-900/30">
-              <RefreshIcon class="h-3.5 w-3.5" />
-              IP Scanner
-            </button>
+            <Button @click="openCreate" :className="'h-7 !shrink-0 !gap-1 !rounded-none !py-1 !px-2 !text-[11px] justify-center whitespace-nowrap border border-cyan-300/30 !bg-teal-700 hover:!bg-teal-600'" size="sm" variant="primary" :startIcon="PlusIcon" class="[&_svg]:h-3 [&_svg]:w-3"> Machine</Button>
+
           </div>
         </div>
       </div>
     </section>
 
     <section>
-      <div v-if="filteredMachines.length" class=":pr-2 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div v-if="filteredMachines.length" class="grid items-start gap-3 md:grid-cols-2 2xl:grid-cols-3">
         <article
           v-for="machine in filteredMachines"
           :key="machine.ID"
-          class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-white/[0.03]"
+          class="group min-w-0 overflow-hidden border border-slate-200 bg-white shadow-sm transition hover:border-teal-300 hover:shadow-md dark:border-slate-800 dark:bg-white/[0.03]"
         >
-          <div class="border-b border-slate-200 bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(251,191,36,0.08))] p-3 dark:border-slate-800 dark:bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(34,197,94,0.05))]">
+          <div class="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-teal-50/70 p-2 dark:border-slate-800 dark:bg-[linear-gradient(135deg,_rgba(14,165,233,0.08),_rgba(34,197,94,0.05))]">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="truncate text-lg font-semibold text-slate-900 dark:text-white">{{ machine.MachineAlias || 'Unnamed Machine' }}</h3>
+                  <h3 :title="machine.MachineAlias" class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ machine.MachineAlias || 'Unnamed Machine' }}</h3>
                   
                 </div>
 
-                <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                <div class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
                   <span class="whitespace-nowrap">{{ machine.IP || 'No IP configured' }}<span v-if="machine.Port"> :{{ machine.Port }}</span></span>
                   <span
-                    class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                    class="inline-flex rounded-none px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
                     :class="machine.Enabled
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                       : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'"
                   >
                     {{ machine.Enabled ? 'Enabled' : 'Disabled' }}
                   </span>
-                  <span class="rounded-full bg-white/80 px-2.5 py-1 font-medium text-slate-700 ring-1 ring-inset ring-slate-200 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-slate-700">
+                  <span class="rounded-none bg-white/80 px-1.5 py-0.5 font-medium text-slate-700 ring-1 ring-inset ring-slate-200 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-slate-700">
                     {{ machine.ConnectType || 'Unknown Type' }}
                   </span>
                   <span
-                    class="rounded-full px-2.5 py-1 font-medium"
+                    class="rounded-none px-1.5 py-0.5 font-medium"
                     :class="getMachineAutoSyncState(machine).className"
                   >
                     Auto {{ getMachineAutoSyncState(machine).label }}
@@ -1938,100 +1960,100 @@ onUnmounted(() => {
                 <button
                   @click="openEdit(machine)"
                   type="button"
-                  class="rounded-lg bg-white/80 p-1.5 text-sky-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-sky-300 dark:ring-slate-700"
+                  class="rounded-none bg-white/80 p-1.5 text-sky-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-sky-300 dark:ring-slate-700"
                   title="Edit"
                 >
-                  <PencilIcon />
+                  <PencilIcon class="h-3.5 w-3.5" />
                 </button>
                 <button
                   @click="openDelete(machine)"
                   type="button"
-                  class="rounded-lg bg-white/80 p-1.5 text-rose-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-rose-300 dark:ring-slate-700"
+                  class="rounded-none bg-white/80 p-1.5 text-rose-700 ring-1 ring-inset ring-slate-200 transition hover:bg-white dark:bg-slate-800 dark:text-rose-300 dark:ring-slate-700"
                   title="Delete"
                 >
-                  <TrashIcon />
+                  <TrashIcon class="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
           </div>
 
-          <div class="space-y-3 p-3">
-            <div class="grid grid-cols-2 gap-2 text-xs lg:grid-cols-3">
-              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Machine No</p>
-                <p class="mt-1 font-medium text-slate-800 dark:text-slate-100">{{ machine.MachineNumber ?? '-' }}</p>
+          <div class="space-y-2 p-2">
+            <div class="grid grid-cols-2 gap-1.5 text-[11px] xl:grid-cols-3">
+              <div class="min-w-0 border border-slate-100 bg-slate-50/60 px-2 py-1.5 dark:bg-slate-900/60">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Machine No</p>
+                <p class="mt-0.5 font-medium text-slate-800 dark:text-slate-100">{{ machine.MachineNumber ?? '-' }}</p>
               </div>
-              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Serial</p>
-                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.sn || '-' }}</p>
+              <div class="min-w-0 border border-slate-100 bg-slate-50/60 px-2 py-1.5 dark:bg-slate-900/60">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Serial</p>
+                <p :title="String(machine.sn || '')" class="mt-0.5 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.sn || '-' }}</p>
               </div>
-              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Product</p>
-                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProductType || '-' }}</p>
+              <div class="min-w-0 border border-slate-100 bg-slate-50/60 px-2 py-1.5 dark:bg-slate-900/60">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Product</p>
+                <p :title="String(machine.ProductType || '')" class="mt-0.5 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProductType || '-' }}</p>
               </div>
-              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Firmware</p>
-                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.FirmwareVersion || '-' }}</p>
+              <div class="min-w-0 border border-slate-100 bg-slate-50/60 px-2 py-1.5 dark:bg-slate-900/60">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Firmware</p>
+                <p :title="String(machine.FirmwareVersion || '')" class="mt-0.5 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.FirmwareVersion || '-' }}</p>
               </div>
-              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Produce Kind</p>
-                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProduceKind || '-' }}</p>
+              <div class="min-w-0 border border-slate-100 bg-slate-50/60 px-2 py-1.5 dark:bg-slate-900/60">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Produce Kind</p>
+                <p :title="String(machine.ProduceKind || '')" class="mt-0.5 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.ProduceKind || '-' }}</p>
               </div>
-              <div class="rounded-lg bg-slate-50 p-2 dark:bg-slate-900/60">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
-                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.pushver || '-' }}</p>
+              <div class="min-w-0 border border-slate-100 bg-slate-50/60 px-2 py-1.5 dark:bg-slate-900/60">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Platform</p>
+                <p :title="String(machine.pushver || '')" class="mt-0.5 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.pushver || '-' }}</p>
               </div>
-              <div class="rounded-2xl bg-slate-50 p-3 dark:bg-slate-900/60 hidden">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Purpose</p>
-                <p class="mt-1 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.Purpose || '-' }}</p>
+              <div class="rounded-none bg-slate-50 p-2 dark:bg-slate-900/60 hidden">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Purpose</p>
+                <p class="mt-0.5 truncate font-medium text-slate-800 dark:text-slate-100">{{ machine.Purpose || '-' }}</p>
               </div>
             </div>
 
             <div class="hidden grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
-              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Users</p>
-                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.usercount ?? 0 }}</p>
+              <div class="rounded-none border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Users</p>
+                <p class="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">{{ machine.usercount ?? 0 }}</p>
               </div>
-              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Managers</p>
-                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.managercount ?? 0 }}</p>
+              <div class="rounded-none border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Managers</p>
+                <p class="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">{{ machine.managercount ?? 0 }}</p>
               </div>
-              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Fingerprints</p>
-                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.fingercount ?? 0 }}</p>
+              <div class="rounded-none border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Fingerprints</p>
+                <p class="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">{{ machine.fingercount ?? 0 }}</p>
               </div>
-              <div class="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Face/Secret</p>
-                <p class="mt-1 font-semibold text-slate-800 dark:text-slate-100">{{ machine.SecretCount ?? 0 }}</p>
+              <div class="rounded-none border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Face/Secret</p>
+                <p class="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">{{ machine.SecretCount ?? 0 }}</p>
               </div>
             </div>
 
-            <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+            <div class="border border-slate-200 bg-slate-50/60 px-2 py-1.5 dark:border-slate-700">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Last Auto Sync</p>
-                  <p class="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{{ formatLastAutoSync(machine.AutoDownloadLastSyncedAt) }}</p>
+                  <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Last Auto Sync</p>
+                  <p class="mt-0.5 text-[11px] font-medium text-slate-800 dark:text-slate-100">{{ formatLastAutoSync(machine.AutoDownloadLastSyncedAt) }}</p>
                 </div>
                 <div class="text-right">
-                  <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Interval</p>
-                  <p class="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">{{ machine.AutoDownload ? `${machine.AutoDownloadInterval || 60}s` : 'Off' }}</p>
+                  <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">Interval</p>
+                  <p class="mt-0.5 text-[11px] font-medium text-slate-800 dark:text-slate-100">{{ machine.AutoDownload ? `${machine.AutoDownloadInterval || 60}s` : 'Off' }}</p>
                 </div>
               </div>
             </div>
 
-            <div class="grid gap-2 grid-cols-2">
+            <div class="grid gap-1.5 grid-cols-2">
               <button
                 @click="connectMachine(machine)"
                 type="button"
                 :disabled="connectingIds.has(machine.ID) || syncingIds.has(machine.ID)"
                 :title="connectingIds.has(machine.ID) ? 'Connecting…' : 'Test Connection'"
-                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
+                class="flex min-h-7 items-center justify-center gap-1.5 border border-slate-200 px-2 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-slate-700"
                 :class="connectingIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30'"
               >
-                <span v-if="connectingIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent"></span>
-                <PlugInIcon v-else class="h-4 w-4" />
+                <span v-if="connectingIds.has(machine.ID)" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent"></span>
+                <PlugInIcon v-else class="h-3.5 w-3.5" />
                 <span>{{ connectingIds.has(machine.ID) ? 'Connecting…' : 'Connect' }}</span>
               </button>
               <button
@@ -2039,7 +2061,7 @@ onUnmounted(() => {
                 type="button"
                 :disabled="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)"
                 :title="machine.AutoDownload ? 'Disable automatic background download' : 'Enable automatic background download'"
-                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
+                class="flex min-h-7 items-center justify-center gap-1.5 border border-slate-200 px-2 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-slate-700"
                 :class="!machine.IP || !machine.Enabled || autoToggleIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : machine.AutoDownload
@@ -2056,13 +2078,13 @@ onUnmounted(() => {
                 type="button"
                 :disabled="downloadingUserIds.has(machine.ID) || connectingIds.has(machine.ID) || pushingUserIds.has(machine.ID)"
                 :title="downloadingUserIds.has(machine.ID) ? 'Downloading users…' : 'Download Users from Device'"
-                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
+                class="flex min-h-7 items-center justify-center gap-1.5 border border-slate-200 px-2 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-slate-700"
                 :class="downloadingUserIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                  : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:bg-indigo-900/30'"
+                  : 'bg-teal-50/60 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30'"
               >
-                <span v-if="downloadingUserIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent"></span>
-                <RefreshIcon v-else class="h-4 w-4" />
+                <span v-if="downloadingUserIds.has(machine.ID)" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent"></span>
+                <RefreshIcon v-else class="h-3.5 w-3.5" />
                 <span>{{ downloadingUserIds.has(machine.ID) ? 'Downloading…' : 'Download Users' }}</span>
               </button>
 
@@ -2071,13 +2093,13 @@ onUnmounted(() => {
                 type="button"
                 :disabled="pushingUserIds.has(machine.ID) || syncingIds.has(machine.ID) || connectingIds.has(machine.ID)"
                 :title="pushingUserIds.has(machine.ID) ? 'Pushing users…' : 'Push Users to Device'"
-                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
+                class="flex min-h-7 items-center justify-center gap-1.5 border border-slate-200 px-2 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-slate-700"
                 :class="pushingUserIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                  : 'bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-900/20 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/30'"
+                  : 'bg-teal-50/60 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30'"
               >
-                <span v-if="pushingUserIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-fuchsia-400 border-t-transparent"></span>
-                <RefreshIcon v-else class="h-4 w-4" />
+                <span v-if="pushingUserIds.has(machine.ID)" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-fuchsia-400 border-t-transparent"></span>
+                <RefreshIcon v-else class="h-3.5 w-3.5" />
                 <span>{{ pushingUserIds.has(machine.ID) ? 'Pushing…' : 'Push Users' }}</span>
               </button>
 
@@ -2086,13 +2108,13 @@ onUnmounted(() => {
                 type="button"
                 :disabled="syncingIds.has(machine.ID) || clearingLogIds.has(machine.ID) || connectingIds.has(machine.ID)"
                 :title="syncingIds.has(machine.ID) ? 'Downloading…' : 'Download Attendance'"
-                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
+                class="flex min-h-7 items-center justify-center gap-1.5 border border-slate-200 px-2 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-slate-700"
                 :class="syncingIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
-                  : 'bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30'"
+                  : 'bg-teal-50/60 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30'"
               >
-                <span v-if="syncingIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent"></span>
-                <RefreshIcon v-else class="h-4 w-4" />
+                <span v-if="syncingIds.has(machine.ID)" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-400 border-t-transparent"></span>
+                <RefreshIcon v-else class="h-3.5 w-3.5" />
                 <span>{{ syncingIds.has(machine.ID) ? 'Downloading…' : 'Download Logs' }}</span>
               </button>
 
@@ -2101,13 +2123,13 @@ onUnmounted(() => {
                 type="button"
                 :disabled="clearingLogIds.has(machine.ID) || syncingIds.has(machine.ID) || connectingIds.has(machine.ID)"
                 :title="clearingLogIds.has(machine.ID) ? 'Clearing logs…' : 'Clear Device Attendance Logs'"
-                class="flex h-9 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition"
+                class="flex min-h-7 items-center justify-center gap-1.5 border border-slate-200 px-2 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40 disabled:opacity-60 dark:border-slate-700"
                 :class="clearingLogIds.has(machine.ID)
                   ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800'
                   : 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30'"
               >
-                <span v-if="clearingLogIds.has(machine.ID)" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-rose-400 border-t-transparent"></span>
-                <TrashIcon v-else class="h-4 w-4" />
+                <span v-if="clearingLogIds.has(machine.ID)" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-400 border-t-transparent"></span>
+                <TrashIcon v-else class="h-3.5 w-3.5" />
                 <span>{{ clearingLogIds.has(machine.ID) ? 'Clearing…' : 'Clear Logs' }}</span>
               </button>
 
@@ -2119,12 +2141,12 @@ onUnmounted(() => {
         </article>
       </div>
 
-      <div v-else class="rounded-[26px] border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm dark:border-slate-700 dark:bg-white/[0.03]">
+      <div v-else class="rounded-none border border-dashed border-slate-300 bg-white p-12 text-center shadow-sm dark:border-slate-700 dark:bg-white/[0.03]">
         <h3 class="text-xl font-semibold text-slate-900 dark:text-white">No machines found</h3>
         <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Try changing the search term or add a new machine to start managing devices.</p>
         <div class="mt-5 flex justify-center">
-          <Button @click="openCreate" :className="'h-11 rounded-2xl whitespace-nowrap text-nowrap'" size="sm" variant="primary" :startIcon="PlusIcon">
-            Add Machine
+          <Button @click="openCreate" :className="'h-11 rounded-none whitespace-nowrap text-nowrap'" size="sm" variant="primary" :startIcon="PlusIcon">
+             Machine
           </Button>
         </div>
       </div>
@@ -2132,58 +2154,59 @@ onUnmounted(() => {
 
     <Modal v-if="isDiscoveryModalOpen" @close="isDiscoveryModalOpen = false">
       <template #body>
-        <div class="no-scrollbar relative m-2 w-full max-w-[920px] max-h-[90vh] overflow-y-auto bg-white p-5 shadow-xl dark:bg-gray-900 lg:p-7">
-          <div class="flex flex-col gap-4 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-start sm:justify-between">
+        <div class="ip-scanner-dialog no-scrollbar relative m-2 min-w-0 w-[calc(100%_-_1rem)] max-w-[880px] max-h-[90vh] overflow-y-auto border border-slate-300 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div class="sticky top-0 z-40 flex items-start justify-between gap-3 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] px-4 py-3 text-white">
             <div>
-              <h4 class="text-xl font-semibold text-slate-900 dark:text-white">IP Scanner</h4>
-              <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Scan the local network for biometric devices and add the detected IP.</p>
+              <h4 class="text-[11px] font-semibold text-white">IP Scanner</h4>
+              <p class="mt-1 text-[11px] text-slate-300">Scan the local network for biometric devices and add the detected IP.</p>
             </div>
-            <button type="button" @click="isDiscoveryModalOpen = false" class="h-9 border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Close</button>
+            <button type="button" @click="isDiscoveryModalOpen = false" class="h-7 shrink-0 border border-white/20 px-2 text-[11px] font-semibold text-white transition hover:bg-white/10">Close</button>
           </div>
 
-          <div class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_90px_90px_100px]">
-            <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Subnet</label>
-              <input v-model="discoverySubnet" type="text" placeholder="Auto or 192.168.1" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+          <div class="space-y-3 bg-slate-50/60 p-3 dark:bg-slate-950/20">
+          <div class="grid grid-cols-2 items-end gap-2 border border-teal-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_72px_72px_88px] dark:border-teal-900 dark:bg-slate-900">
+            <div class="col-span-2 min-w-0 sm:col-span-1">
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Subnet</label>
+              <input v-model="discoverySubnet" type="text" placeholder="Auto or 192.168.1" class="h-8 w-full border border-slate-300 bg-white px-2 text-[11px] text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
             </div>
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Start</label>
-              <input v-model.number="discoveryStart" type="number" min="1" max="254" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Start</label>
+              <input v-model.number="discoveryStart" type="number" min="1" max="254" class="h-8 w-full border border-slate-300 bg-white px-2 text-[11px] text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
             </div>
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">End</label>
-              <input v-model.number="discoveryEnd" type="number" min="1" max="254" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+              <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">End</label>
+              <input v-model.number="discoveryEnd" type="number" min="1" max="254" class="h-8 w-full border border-slate-300 bg-white px-2 text-[11px] text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
             </div>
             <div class="flex items-end">
               <button
                 @click="discoverMachines"
                 :disabled="discoveryLoading"
                 type="button"
-                class="inline-flex h-10 w-full items-center justify-center gap-2 bg-cyan-600 px-3 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800"
+                class="inline-flex h-8 w-full items-center justify-center gap-2 border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-2 text-[11px] font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-800"
               >
-                <span v-if="discoveryLoading" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                <span v-if="discoveryLoading" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                 {{ discoveryLoading ? 'Scanning' : 'Scan' }}
               </button>
             </div>
           </div>
 
-          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span>Port: {{ form.Port || 4370 }}</span>
             <span>Leave subnet blank to scan the server's local network.</span>
           </div>
 
-          <div v-if="discoveryMessage" class="mt-4 border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+          <div v-if="discoveryMessage" class="border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
             {{ discoveryMessage }}
           </div>
 
-          <div class="mt-5 overflow-hidden border border-slate-200 dark:border-slate-800">
-            <div class="grid grid-cols-[1fr_110px_90px] border-b border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+          <div class="overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div class="grid grid-cols-[minmax(0,1fr)_70px_60px] sm:grid-cols-[minmax(0,1fr)_90px_70px] border-b border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-100">
               <span>Device</span>
               <span>Status</span>
               <span class="text-right">Action</span>
             </div>
 
-            <div v-if="discoveryLoading" class="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div v-if="discoveryLoading" class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
               Scanning network...
             </div>
 
@@ -2191,14 +2214,14 @@ onUnmounted(() => {
               <div
                 v-for="machine in verifiedDiscoveryMachines"
                 :key="`scanner-verified-${machine.ip}`"
-                class="grid grid-cols-[1fr_110px_90px] items-center gap-3 px-3 py-3"
+                class="grid grid-cols-[minmax(0,1fr)_70px_60px] sm:grid-cols-[minmax(0,1fr)_90px_70px] items-center gap-2 px-3 py-2"
               >
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ machine.device_name || machine.serial || machine.ip }}</p>
+                  <p class="truncate text-[11px] font-semibold text-slate-900 dark:text-white">{{ machine.device_name || machine.serial || machine.ip }}</p>
                   <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ machine.ip }}:{{ machine.port }}<span v-if="machine.firmware"> - {{ machine.firmware }}</span></p>
                 </div>
-                <span class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{{ machine.already_added ? 'Saved' : 'Verified' }}</span>
-                <button @click="useDiscoveredMachine(machine)" type="button" class="h-8 bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
+                <span class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{{ machine.already_added ? 'Saved' : 'Verified' }}</span>
+                <button @click="useDiscoveredMachine(machine)" type="button" class="h-8 bg-slate-900 px-3 text-[11px] font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
                   {{ machine.already_added ? 'Edit' : 'Add' }}
                 </button>
               </div>
@@ -2206,22 +2229,23 @@ onUnmounted(() => {
               <div
                 v-for="machine in reachableDiscoveryMachines"
                 :key="`scanner-reachable-${machine.ip}`"
-                class="grid grid-cols-[1fr_110px_90px] items-center gap-3 px-3 py-3"
+                class="grid grid-cols-[minmax(0,1fr)_70px_60px] sm:grid-cols-[minmax(0,1fr)_90px_70px] items-center gap-2 px-3 py-2"
               >
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{{ machine.ip }}:{{ machine.port }}</p>
+                  <p class="truncate text-[11px] font-semibold text-slate-800 dark:text-slate-100">{{ machine.ip }}:{{ machine.port }}</p>
                   <p class="truncate text-xs text-slate-500 dark:text-slate-400">Port open, device info not verified</p>
                 </div>
-                <span class="text-xs font-semibold text-amber-600 dark:text-amber-400">{{ machine.already_added ? 'Saved' : 'Open Port' }}</span>
-                <button @click="useDiscoveredMachine(machine)" type="button" class="h-8 border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span class="text-[11px] font-semibold text-amber-600 dark:text-amber-400">{{ machine.already_added ? 'Saved' : 'Open Port' }}</span>
+                <button @click="useDiscoveredMachine(machine)" type="button" class="h-8 border border-slate-300 bg-white px-3 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {{ machine.already_added ? 'Edit' : 'Add' }}
                 </button>
               </div>
             </div>
 
-            <div v-else class="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div v-else class="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
               Run a scan to show reachable biometric devices.
             </div>
+          </div>
           </div>
         </div>
       </template>
@@ -2229,29 +2253,29 @@ onUnmounted(() => {
 
     <Modal v-if="isAttendanceDatModalOpen" @close="closeAttendanceDatImport">
       <template #body>
-        <div class="no-scrollbar relative m-2 w-full max-w-[1120px] max-h-[90vh] overflow-y-auto border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-gray-900">
-          <div class="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-start sm:justify-between">
+        <div class="attendance-import-dialog no-scrollbar relative m-2 min-w-0 w-[calc(100%_-_1rem)] max-w-[1000px] max-h-[90vh] overflow-y-auto border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-gray-900">
+          <div class="sticky top-0 z-40 flex items-start justify-between gap-3 border-b border-white/10 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] px-4 py-3 text-white">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <h4 class="text-lg font-semibold text-slate-900 dark:text-white">Attendance Import</h4>
-                <span class="border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300">File Decoder</span>
+                <h4 class="text-sm font-semibold text-white">Attendance Import</h4>
+                <span class="border border-teal-300/30 bg-teal-300/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-teal-100">File Decoder</span>
               </div>
-              <p class="mt-1 max-w-4xl text-xs leading-5 text-slate-500 dark:text-slate-400">Upload <strong>AttEncryptLog.dat</strong> or an exported <strong>CHECKINOUT.txt, CHECKINOUT.csv, or CHECKINOUT.xlsx</strong>. The app decodes, maps, previews, exports, and imports the records.</p>
+              <p class="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-300">Upload <strong>AttEncryptLog.dat</strong> or an exported <strong>CHECKINOUT.txt, CHECKINOUT.csv, or CHECKINOUT.xlsx</strong>. Preview the decoded records before importing.</p>
             </div>
-            <button type="button" @click="closeAttendanceDatImport" class="inline-flex h-9 items-center justify-center border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Close</button>
+            <button type="button" @click="closeAttendanceDatImport" class="inline-flex h-7 shrink-0 items-center justify-center border border-white/20 px-2 text-[11px] font-semibold text-white transition hover:bg-white/10">Close</button>
           </div>
 
-          <div class="grid gap-4 p-4 lg:p-5">
-            <div class="space-y-4">
-              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                <div class="border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
-                  <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Export File</label>
-                  <input type="file" accept=".dat,.bin,.txt,.csv,.tsv,.xlsx" @change="onAttendanceDatFileChange" class="h-10 w-full border border-slate-300 bg-white px-3 text-sm text-slate-800 file:mr-3 file:h-8 file:border-0 file:bg-slate-900 file:px-3 file:text-xs file:font-semibold file:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:file:bg-white dark:file:text-slate-900" />
-                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ attendanceDatFileName || 'No file selected' }}</p>
+          <div class="grid gap-3 bg-slate-50/60 p-3 dark:bg-slate-950/20">
+            <div class="space-y-3">
+              <div class="grid gap-3">
+                <div class="border border-teal-200 bg-gradient-to-r from-teal-50/60 to-white p-3 dark:border-teal-900 dark:from-teal-950/30 dark:to-slate-900">
+                  <label for="attendance-import-file" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Export File</label>
+                  <input id="attendance-import-file" type="file" accept=".dat,.bin,.txt,.csv,.tsv,.xlsx" @change="onAttendanceDatFileChange" class="h-8 w-full min-w-0 border border-slate-300 bg-white pr-2 text-[11px] text-slate-700 file:mr-3 file:h-full file:border-0 file:border-r file:border-teal-800 file:bg-teal-700 file:px-3 file:text-[11px] file:font-semibold file:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:file:bg-white dark:file:text-slate-900" />
+                  <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ attendanceDatFileName || 'No file selected' }}</p>
                 </div>
                 <div class="hidden">
-                  <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">User Filter</label>
-                  <select v-model="attendanceDatUserFilter" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
+                  <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-400">User Filter</label>
+                  <select v-model="attendanceDatUserFilter" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-xs">
                     <option value="existing">Only Existing Local Users</option>
                     <option value="all">All Logs (Include Unknown Users)</option>
                   </select>
@@ -2259,29 +2283,29 @@ onUnmounted(() => {
               </div>
 
               <div class="hidden">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Paste Attendance Text</label>
+                <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-400">Paste Attendance Text</label>
                 <textarea
                   v-model="attendanceDatText"
                   @input="onAttendanceDatTextInput"
                   rows="10"
                   placeholder="Paste tabular attendance rows here, including headers like USERID, CHECKTIME, CHECKTYPE, VERIFYCODE."
-                  class="w-full rounded-2xl border border-gray-300 bg-transparent px-4 py-3 text-sm"
+                  class="w-full rounded-2xl border border-gray-300 bg-transparent px-4 py-3 text-xs"
                 ></textarea>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Optional: paste an already-decoded table. Header names are auto-mapped, even when exported columns are interchanged.</p>
+                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Optional: paste an already-decoded table. Header names are auto-mapped, even when exported columns are interchanged.</p>
               </div>
 
-              <div class="flex flex-wrap gap-2">
+              <div class="flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
                   @click="loadAttendanceDatPreview"
                   :disabled="attendanceDatLoading || !attendanceDatHasInput"
-                  class="inline-flex h-9 items-center gap-2 border px-3 text-xs font-semibold transition"
+                  class="inline-flex h-7 items-center gap-1.5 border px-3 text-[11px] font-semibold transition"
                   :class="attendanceDatLoading || !attendanceDatHasInput
                     ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800'
-                    : 'border-cyan-600 bg-cyan-600 text-white hover:bg-cyan-500'"
+                    : 'border-teal-600 bg-white text-teal-700 hover:bg-teal-50'"
                 >
-                  <span v-if="attendanceDatLoading" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                  <RefreshIcon v-else class="h-4 w-4" />
+                  <span v-if="attendanceDatLoading" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  <RefreshIcon v-else class="h-3.5 w-3.5" />
                   <span>{{ attendanceDatLoading ? 'Loading Preview…' : 'Load Preview' }}</span>
                 </button>
 
@@ -2289,13 +2313,13 @@ onUnmounted(() => {
                   type="button"
                   @click="importAttendanceDat"
                   :disabled="attendanceDatImporting || attendanceDatLoading || !attendanceDatHasInput"
-                  class="inline-flex h-9 items-center gap-2 border px-3 text-xs font-semibold transition"
+                  class="inline-flex h-7 items-center gap-1.5 border px-3 text-[11px] font-semibold transition"
                   :class="attendanceDatImporting || attendanceDatLoading || !attendanceDatHasInput
                     ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800'
-                    : 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-500'"
+                    : 'border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] text-white hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)]'"
                 >
-                  <span v-if="attendanceDatImporting" class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                  <RefreshIcon v-else class="h-4 w-4" />
+                  <span v-if="attendanceDatImporting" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                  <RefreshIcon v-else class="h-3.5 w-3.5" />
                   <span>{{ attendanceDatImporting ? 'Importing…' : 'Import Attendance' }}</span>
                 </button>
 
@@ -2303,22 +2327,22 @@ onUnmounted(() => {
                   v-if="attendanceDatPreview"
                   type="button"
                   @click="exportAttendanceDatCsv"
-                  class="inline-flex h-9 items-center gap-2 border border-slate-700 bg-slate-700 px-3 text-xs font-semibold text-white transition hover:bg-slate-600"
+                  class="inline-flex h-7 items-center gap-1.5 border border-slate-700 bg-slate-700 px-3 text-[11px] font-semibold text-white transition hover:bg-slate-600"
                 >
                   Export Decoded CSV
                 </button>
               </div>
 
-              <p v-if="attendanceDatError" class="border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
+              <p v-if="attendanceDatError" class="border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/10 dark:text-rose-300">
                 {{ attendanceDatError }}
               </p>
 
               <div v-if="attendanceDatProgressVisible" class="border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  <p class="text-xs font-medium text-slate-800 dark:text-slate-200">
                     {{ attendanceDatProgress?.message || (attendanceDatImporting ? 'Importing attendance records...' : 'Preparing import...') }}
                   </p>
-                  <span class="text-xs font-semibold text-cyan-700 dark:text-cyan-300">{{ attendanceDatProgressText }}</span>
+                  <span class="text-[11px] font-semibold text-cyan-700 dark:text-cyan-300">{{ attendanceDatProgressText }}</span>
                 </div>
 
                 <div class="mt-3 h-2 w-full overflow-hidden bg-slate-200 dark:bg-slate-800">
@@ -2330,7 +2354,7 @@ onUnmounted(() => {
                   <div v-else class="h-full w-full animate-pulse bg-cyan-400/70"></div>
                 </div>
 
-                <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-4">
+                <div class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-300 sm:grid-cols-4">
                   <p>State: <strong>{{ attendanceDatProgress?.state || 'running' }}</strong></p>
                   <p>Processed: <strong>{{ Number(attendanceDatProgress?.processed || 0) }}</strong></p>
                   <p>Imported: <strong class="text-emerald-700 dark:text-emerald-300">{{ Number(attendanceDatProgress?.imported || 0) }}</strong></p>
@@ -2357,46 +2381,52 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div v-if="attendanceDatPreview" class="border border-slate-200 dark:border-slate-800">
-                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60">
-                  <div class="text-sm text-slate-600 dark:text-slate-300">
+              <div v-if="attendanceDatPreview" class="min-w-0 overflow-hidden border border-slate-200 dark:border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
                     Showing <strong>{{ ((attendanceDatPage - 1) * attendanceDatPageSize) + 1 }}</strong>-<strong>{{ Math.min(attendanceDatPage * attendanceDatPageSize, attendanceDatRows.length) }}</strong>
                     of <strong>{{ attendanceDatRows.length }}</strong>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage - 1)" :disabled="attendanceDatPage <= 1" class="border px-3 py-1.5 text-xs font-semibold" :class="attendanceDatPage <= 1 ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">Prev</button>
-                    <span class="min-w-20 text-center text-sm font-semibold text-slate-700 dark:text-slate-200">{{ attendanceDatPage }} / {{ attendanceDatTotalPages }}</span>
-                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage + 1)" :disabled="attendanceDatPage >= attendanceDatTotalPages" class="border px-3 py-1.5 text-xs font-semibold" :class="attendanceDatPage >= attendanceDatTotalPages ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">Next</button>
+                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage - 1)" :disabled="attendanceDatPage <= 1" class="border px-3 py-1.5 text-[11px] font-semibold" :class="attendanceDatPage <= 1 ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">Prev</button>
+                    <span class="min-w-12 text-center text-xs font-semibold text-slate-700 dark:text-slate-200">{{ attendanceDatPage }} / {{ attendanceDatTotalPages }}</span>
+                    <button type="button" @click="gotoAttendanceDatPage(attendanceDatPage + 1)" :disabled="attendanceDatPage >= attendanceDatTotalPages" class="border px-3 py-1.5 text-[11px] font-semibold" :class="attendanceDatPage >= attendanceDatTotalPages ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">Next</button>
                   </div>
                 </div>
 
-                <div class="max-h-[48vh] overflow-auto">
-                  <table class="min-w-full divide-y divide-slate-200 text-left text-xs dark:divide-slate-800">
+                <div class="max-h-[48vh] w-full overflow-auto overscroll-contain">
+                  <table class="w-max min-w-full whitespace-nowrap divide-y divide-slate-200 text-left text-[11px] dark:divide-slate-800">
                     <thead class="sticky top-0 bg-slate-900 text-white dark:bg-slate-800">
                       <tr>
-                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">USERID</th>
-                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">CHECKTIME</th>
-                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">CHECKTYPE</th>
-                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">VERIFYCODE</th>
-                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">SENSORID</th>
-                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">WORKCODE</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">USERID</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">User Name</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">CHECKTIME</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">CHECKTYPE</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">VERIFYCODE</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">SENSORID</th>
+                        <th class="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide">WORKCODE</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-950">
                       <tr v-for="(row, index) in attendanceDatPageRows" :key="`${attendanceDatPage}-${index}-${row.CHECKTIME || ''}`">
-                        <td class="px-3 py-2 font-medium text-slate-700 dark:text-slate-200">{{ row.USERID ?? '' }}</td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.CHECKTIME ?? '' }}</td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.CHECKTYPE ?? '' }}</td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.VERIFYCODE ?? '' }}</td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.SENSORID ?? '' }}</td>
-                        <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ row.WorkCode ?? '' }}</td>
+                        <td class="px-2 py-1.5 font-medium text-slate-700 dark:text-slate-200">{{ row.USERID ?? '' }}</td>
+                        <td class="px-2 py-1.5 text-slate-700 dark:text-slate-200"><span class="block w-[160px] truncate sm:w-[200px]" :title="row.user_name || 'Unknown user'">{{ row.user_name || 'Unknown user' }}</span></td>
+                        <td class="px-2 py-1.5 text-slate-600 dark:text-slate-300">{{ row.CHECKTIME ?? '' }}</td>
+                        <td class="px-2 py-1.5 text-slate-600 dark:text-slate-300">{{ row.CHECKTYPE ?? '' }}</td>
+                        <td class="px-2 py-1.5 text-slate-600 dark:text-slate-300">{{ row.VERIFYCODE ?? '' }}</td>
+                        <td class="px-2 py-1.5 text-slate-600 dark:text-slate-300">{{ row.SENSORID ?? '' }}</td>
+                        <td class="px-2 py-1.5 text-slate-600 dark:text-slate-300">{{ row.WorkCode ?? '' }}</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <p v-else class="border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">Load a DAT, text, CSV, or Excel attendance file to preview the decoded rows.</p>
+<div v-else class="flex flex-col items-center justify-center gap-2 border border-dashed border-slate-300 bg-white px-4 py-7 text-center dark:border-slate-700 dark:bg-slate-900">
+                <div class="flex h-9 w-9 items-center justify-center border border-teal-100 bg-teal-50 text-teal-600 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-400"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></svg></div>
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">Your attendance preview will appear here</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Choose a DAT, text, CSV or Excel file, then select Load Preview.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -2405,133 +2435,149 @@ onUnmounted(() => {
 
     <Modal v-if="isModalOpen" @close="isModalOpen = false">
       <template #body>
-        <div class="no-scrollbar relative m-2 w-full max-w-[980px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-7">
-          <h4 class="mb-4 text-2xl font-semibold text-gray-800 dark:text-white/90">
-            {{ isEdit ? 'Update Machine' : 'Add Machine' }}
-          </h4>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Machine Alias</label>
-              <input v-model="form.MachineAlias" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+        <div class="machine-form-dialog no-scrollbar relative m-2 max-h-[90vh] w-full max-w-[880px] overflow-y-auto border border-slate-300 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div class="sticky top-0 z-40 flex items-start justify-between gap-3 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] px-4 py-3 text-white">
+            <div><h4 class="text-sm font-semibold">{{ isEdit ? 'Update Machine' : 'Add Machine' }}</h4><p class="mt-1 text-[11px] text-slate-300">Connection, device settings and automatic downloads.</p></div>
+            <button type="button" aria-label="Close machine form" @click="isModalOpen = false" class="flex h-7 w-7 shrink-0 items-center justify-center border border-white/20 text-slate-200 hover:bg-white/10 hover:text-white"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button>
+          </div>
+          <div class="space-y-3 bg-slate-50/60 p-3 dark:bg-slate-950/20">
+            <section class="border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+ <h5 class="mb-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-teal-700 dark:border-slate-800 dark:text-teal-400">Connection</h5>
+ <div class="grid grid-cols-2 gap-3 md:grid-cols-4"><div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Machine Alias</label>
+              <input v-model="form.MachineAlias" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Connect Type</label>
-              <input v-model="form.ConnectType" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Connect Type</label>
+              <input v-model="form.ConnectType" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">IP Address</label>
-              <input v-model="form.IP" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">IP Address</label>
+              <input v-model="form.IP" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Serial Port</label>
-              <input v-model="form.SerialPort" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Port</label>
+              <input v-model.number="form.Port" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Port</label>
-              <input v-model.number="form.Port" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Machine Number</label>
+              <input v-model.number="form.MachineNumber" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Baudrate</label>
-              <input v-model.number="form.Baudrate" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Comm Password</label>
+              <input v-model="form.CommPassword" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Machine Number</label>
-              <input v-model.number="form.MachineNumber" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Serial Port</label>
+              <input v-model="form.SerialPort" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Comm Password</label>
-              <input v-model="form.CommPassword" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Baudrate</label>
+              <input v-model.number="form.Baudrate" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
+            </div></div>
+ </section>
+<section class="border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+ <h5 class="mb-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-teal-700 dark:border-slate-800 dark:text-teal-400">Device settings</h5>
+ <div class="grid grid-cols-2 gap-3 md:grid-cols-4"><div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">UI Language</label>
+              <input v-model="form.UILanguage" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">UI Language</label>
-              <input v-model="form.UILanguage" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Date Format</label>
+              <input v-model="form.DateFormat" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Date Format</label>
-              <input v-model="form.DateFormat" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">In/Out Record Warn</label>
+              <input v-model.number="form.InOutRecordWarn" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">In/Out Record Warn</label>
-              <input v-model.number="form.InOutRecordWarn" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Idle</label>
+              <input v-model.number="form.Idle" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Idle</label>
-              <input v-model.number="form.Idle" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Voice</label>
+              <input v-model.number="form.Voice" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Voice</label>
-              <input v-model.number="form.Voice" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Lock Control</label>
+              <input v-model="form.LockControl" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Managers</label>
-              <input v-model.number="form.managercount" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Purpose</label>
+              <input v-model="form.Purpose" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
+            </div></div>
+ </section>
+<section class="border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+ <h5 class="mb-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-teal-700 dark:border-slate-800 dark:text-teal-400">Hardware &amp; capacity</h5>
+ <div class="grid grid-cols-2 gap-3 md:grid-cols-4"><div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Serial Number</label>
+              <input v-model="form.sn" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Users</label>
-              <input v-model.number="form.usercount" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Product Type</label>
+              <input v-model="form.ProductType" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Finger Count</label>
-              <input v-model.number="form.fingercount" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Firmware Version</label>
+              <input v-model="form.FirmwareVersion" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Secret Count</label>
-              <input v-model.number="form.SecretCount" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Produce Kind</label>
+              <input v-model="form.ProduceKind" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Firmware Version</label>
-              <input v-model="form.FirmwareVersion" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Push Version</label>
+              <input v-model="form.pushver" type="text" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Product Type</label>
-              <input v-model="form.ProductType" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Managers</label>
+              <input v-model.number="form.managercount" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Lock Control</label>
-              <input v-model="form.LockControl" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Users</label>
+              <input v-model.number="form.usercount" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Purpose</label>
-              <input v-model="form.Purpose" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Finger Count</label>
+              <input v-model.number="form.fingercount" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Produce Kind</label>
-              <input v-model="form.ProduceKind" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Secret Count</label>
+              <input v-model.number="form.SecretCount" type="number" min="0" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
+            </div></div>
+ </section>
+<section class="border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+ <h5 class="mb-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-teal-700 dark:border-slate-800 dark:text-teal-400">Automatic downloads</h5>
+ <div class="grid grid-cols-2 gap-3 md:grid-cols-4"><div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Auto Download Interval (seconds)</label>
+              <input v-model.number="form.AutoDownloadInterval" type="number" min="1" max="86400" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100" />
             </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Serial Number</label>
-              <input v-model="form.sn" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
-            </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Push Version</label>
-              <input v-model="form.pushver" type="text" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
-            </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Auto Download Interval (seconds)</label>
-              <input v-model.number="form.AutoDownloadInterval" type="number" min="1" max="86400" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm" />
-            </div>
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Auto Download User Filter</label>
-              <select v-model="form.AutoDownloadUserFilter" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm">
+<div>
+              <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-400">Auto Download User Filter</label>
+              <select v-model="form.AutoDownloadUserFilter" class="h-8 w-full min-w-0 rounded-none border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100">
                 <option value="existing">Only Existing Local Users</option>
                 <option value="all">All Logs (Include Unknown Users)</option>
               </select>
-            </div>
+            </div></div>
+ </section>
+
+            <section class="border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+              <h5 class="mb-3 border-b border-slate-100 pb-2 text-[10px] font-semibold uppercase tracking-wider text-teal-700 dark:border-slate-800 dark:text-teal-400">Options</h5>
+                        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-300"><input v-model="form.Enabled" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" /> Enabled</label>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-300"><input v-model="form.IsHost" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" /> Is Host</label>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-300"><input v-model="form.PhotoStamp" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" /> Photo Stamp</label>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-300"><input v-model="form.IsIfChangeConfigServer2" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" /> Change Config Server 2</label>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-300"><input v-model="form.IsAndroid" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" /> Android Device</label>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-gray-700 dark:text-gray-300"><input v-model="form.AutoDownload" type="checkbox" class="h-3.5 w-3.5 accent-teal-700" /> Auto Download</label>
           </div>
 
-          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input v-model="form.Enabled" type="checkbox" class="h-4 w-4" /> Enabled</label>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input v-model="form.IsHost" type="checkbox" class="h-4 w-4" /> Is Host</label>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input v-model="form.PhotoStamp" type="checkbox" class="h-4 w-4" /> Photo Stamp</label>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input v-model="form.IsIfChangeConfigServer2" type="checkbox" class="h-4 w-4" /> Change Config Server 2</label>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input v-model="form.IsAndroid" type="checkbox" class="h-4 w-4" /> Android Device</label>
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input v-model="form.AutoDownload" type="checkbox" class="h-4 w-4" /> Auto Download</label>
-          </div>
 
-          <div class="mt-5 flex items-center gap-3 lg:justify-end">
-            <button @click="isModalOpen = false" type="button" class="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto">Close</button>
-            <button @click="saveMachine" type="button" class="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto">Save</button>
+            </section>
+          </div>
+          <div class="sticky bottom-0 z-30 flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+            <button @click="isModalOpen = false" type="button" class="h-8 border border-slate-300 bg-white px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">Close</button>
+            <button @click="saveMachine" type="button" class="h-8 border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-[11px] font-semibold text-white hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)]">{{ isEdit ? 'Update Machine' : 'Save Machine' }}</button>
           </div>
         </div>
       </template>
@@ -2547,3 +2593,32 @@ onUnmounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.ip-scanner-dialog .grid > div,
+.machine-form-dialog .grid > div,
+.attendance-import-dialog .grid > div { min-width: 0; }
+.machine-form-dialog input, .machine-form-dialog select { max-width: 100%; }
+.machine-form-dialog button:focus-visible { outline: 2px solid #14b8a6; outline-offset: 2px; }
+</style>
+
+<style>
+.swal2-popup.machine-push-confirm { position: relative; display: flex !important; flex-direction: column; align-items: stretch; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 0; background: #fff; box-shadow: 0 24px 60px rgb(15 23 42 / 25%); }
+.machine-push-confirm .machine-push-title { margin: 0; padding: 16px 48px 16px 20px; background: linear-gradient(135deg, #0f172a, #1e293b 40%, #0f766e); color: #fff; text-align: left; font-size: 14px; line-height: 20px; font-weight: 600; }
+.machine-push-confirm .machine-push-close { position: absolute; top: 0; right: 0; z-index: 1; width: 32px; height: 32px; margin: 10px; color: #cbd5e1; font-size: 24px; box-shadow: none; }
+.machine-push-confirm .machine-push-close:hover { color: #fff; background: rgb(255 255 255 / 10%); }
+.machine-push-confirm .machine-push-body { margin: 0; padding: 20px; text-align: left; font-size: 12px; color: #475569; }
+.machine-push-confirm .machine-push-actions { justify-content: flex-end; flex-wrap: wrap; gap: 8px; width: 100%; margin: 0; padding: 12px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.machine-push-confirm .machine-push-save, .machine-push-confirm .machine-push-cancel { min-height: 30px; margin: 0; padding: 5px 14px; border: 1px solid #cbd5e1; border-radius: 0; font-size: 11px; line-height: 18px; font-weight: 600; }
+.machine-push-confirm .machine-push-save { border-color: #0d9488; background: linear-gradient(135deg, #0891b2, #0f766e); color: #fff; }
+.machine-push-confirm .machine-push-save:hover { background: #0f766e; }
+.machine-push-confirm .machine-push-cancel { background: #fff; color: #475569; }
+.machine-push-confirm .machine-push-cancel:hover { background: #f1f5f9; }
+.machine-push-confirm button:focus-visible { outline: 2px solid #14b8a6; outline-offset: 2px; }
+</style>
+
+<style>
+.machine-timer-dialog .swal2-input { box-sizing: border-box; height: 32px; min-width: 0; padding: 0 9px; border: 1px solid #cbd5e1; border-radius: 0; background: #fff; color: #0f172a; box-shadow: none; font-size: 12px; }
+.machine-timer-dialog .swal2-input:focus { border-color: #0d9488; outline: 2px solid rgb(20 184 166 / 20%); box-shadow: none; }
+.machine-timer-dialog .swal2-validation-message { margin: 0; font-size: 11px; }
+</style>

@@ -37,6 +37,7 @@ const machineStore = useMachineStore();
 const { machines } = storeToRefs(machineStore)
 
 
+const showFilters = ref(false)
 const isUserAddModal = ref(false)
 const isImportUserDatModal = ref(false)
 const isImportBiometricTemplateDatModal = ref(false)
@@ -85,7 +86,9 @@ var filteredUsers = computed(() => sortedUsers.value.filter((item) => {
       +" "+
       ((item.profile?.first_name || '') + ' ' + (item.profile?.last_name || '')).trim()
       +" "+
-      item.email
+      (item.username || '')
+      +" "+
+      (item.email || '')
       +" "+
       (item.primary_contact?.value || '')
     ).toLowerCase().indexOf(search_user.value.toLowerCase()) > -1);
@@ -236,6 +239,7 @@ const editUser = (event) => {
     id: event.id,
     name: event.name,
     email: event.email,
+    username: event.username || '',
     role: event.role,
     status: Number(event.status),
     office_shift_id: event.office_shift_id ?? null,
@@ -286,6 +290,11 @@ const deleteUser = async (event) => {
   }
 
   isLoading.value = false;
+}
+
+const updateUserStatus = async (payload) => {
+  const result = await userStore.updateUserStatus(payload)
+  toastResult(result.success ? 'Status updated' : 'Unable to update status', result.success ? 'success' : 'error')
 }
 
 const updateOfficeShift = async (payload) => {
@@ -1147,12 +1156,12 @@ const closeEnrollModal = () => {
 
 <template>
   <div class="space-y-2">
-    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
-      <div class="flex flex-col gap-4 min-[1024px]:flex-row min-[1024px]:items-center min-[1024px]:justify-between">
-        <div class="min-w-0">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 class="text-xl font-semibold text-slate-900 dark:text-white">Users</h1>
-            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="min-w-0 shrink-0">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 class="text-base font-semibold text-slate-900 dark:text-white">Users</h1>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
             <span><strong class="font-semibold text-emerald-600 dark:text-emerald-400">{{ userStats.active }}</strong> active</span>
             <span><strong class="font-semibold text-slate-700 dark:text-slate-200">{{ userStats.withShift }}</strong> with shift</span>
             <!-- <span><strong class="font-semibold text-slate-700 dark:text-slate-200">{{ userStats.withAffiliation }}</strong> affiliated</span> -->
@@ -1162,38 +1171,63 @@ const closeEnrollModal = () => {
 
         </div>
 
-        <div class="flex flex-col gap-3 sm:ml-auto sm:flex-row sm:items-center xl:justify-end">
-          <div class="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
-          <button class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 pb-0.5">
-            <svg class="fill-slate-500 dark:fill-slate-400" width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <div class="ml-auto flex min-w-0 max-w-[560px] flex-1 basis-[520px] flex-wrap items-center justify-end gap-2">
+          <div class="flex min-w-0 flex-1 basis-[240px] items-stretch">
+          <div class="relative min-w-0 flex-1">
+          <button class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 pb-0.5">
+            <svg class="fill-slate-500 dark:fill-slate-400" width="16" height="16" viewBox="0 0 20 20" fill="none">
               <path fill-rule="evenodd" clip-rule="evenodd"
                 d="M3.04175 9.37363C3.04175 5.87693 5.87711 3.04199 9.37508 3.04199C12.8731 3.04199 15.7084 5.87693 15.7084 9.37363C15.7084 12.8703 12.8731 15.7053 9.37508 15.7053C5.87711 15.7053 3.04175 12.8703 3.04175 9.37363ZM9.37508 1.54199C5.04902 1.54199 1.54175 5.04817 1.54175 9.37363C1.54175 13.6991 5.04902 17.2053 9.37508 17.2053C11.2674 17.2053 13.003 16.5344 14.357 15.4176L17.177 18.238C17.4699 18.5309 17.9448 18.5309 18.2377 18.238C18.5306 17.9451 18.5306 17.4703 18.2377 17.1774L15.418 14.3573C16.5365 13.0033 17.2084 11.2669 17.2084 9.37363C17.2084 5.04817 13.7011 1.54199 9.37508 1.54199Z"
                 fill="" />
             </svg>
           </button>
           <input id="search_button" type="text" v-model="search_user" placeholder="Search name, email, or contact"
-            class="h-9 w-full rounded border border-white/15 bg-slate-950/30 py-2 pl-11 pr-4 text-sm font-medium text-white shadow-inner outline-none transition placeholder:text-slate-400 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/30" />
+            class="h-7 w-full rounded-none border border-r-0 border-white/15 bg-slate-950/30 py-1 pl-8 pr-2 text-xs font-medium text-white shadow-inner outline-none transition placeholder:text-slate-400 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/30" />
           </div>
-          <div class="grid grid-cols-3 gap-2 sm:flex sm:items-center">
-            <Button @click="addUser" :className="'h-9 justify-center whitespace-nowrap rounded border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-xs font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="primary"
-              :startIcon="PlusIcon">User</Button>
-            <Button @click="openImportUserDatModal" :className="'h-9 justify-center whitespace-nowrap rounded border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="outline">
+            <Button @click="addUser" :className="'h-7 !gap-1 !py-1 justify-center whitespace-nowrap !rounded-none !shrink-0 border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] !px-2 !text-[11px] font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="primary"
+              :startIcon="PlusIcon" class="[&_svg]:h-3 [&_svg]:w-3">User</Button>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 sm:flex sm:items-center">
+
+            <button type="button" @click="openImportUserDatModal" class="inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-none border border-cyan-300/30 bg-teal-800 px-2 text-[11px] font-semibold text-cyan-50 shadow-sm transition hover:border-cyan-200/60 hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40">
+              <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M20 14V4m-3 3 3-3 3 3" /></svg>
               Import Users
-            </Button>
-            <Button @click="openImportBiometricTemplateDatModal" :className="'h-9 justify-center whitespace-nowrap rounded border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white shadow-sm hover:border-cyan-200/40 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-300/40'" size="sm" variant="outline">
+            </button>
+            <button type="button" @click="openImportBiometricTemplateDatModal" class="inline-flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded-none border border-cyan-300/30 bg-teal-800 px-2 text-[11px] font-semibold text-cyan-50 shadow-sm transition hover:border-cyan-200/60 hover:bg-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40">
+              <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6m-8 10v-7m-3 3 3-3 3 3" /></svg>
               Import Templates
-            </Button>
+            </button>
           </div>
         </div>
       </div>
+      <div class="absolute -bottom-5 right-4 z-30 md:right-6">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-1.5  text-[11px] font-semibold text-white shadow-sm transition hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40 focus-visible:ring-offset-2"
+          :aria-expanded="showFilters"
+          aria-controls="user-filters"
+          @click="showFilters = !showFilters"
+        >
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z" />
+          </svg>
+          Filters
+          <svg class="h-3 w-3 transition-transform" :class="{ 'rotate-180': showFilters }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+
     </section>
 
     <UserTable
+      :showFilters="showFilters"
       @viewUser="viewUser"
       @deleteUser="deleteUserPop"
       @editUser="editUser"
       @machineAction="openMachineAction"
       @updateOfficeShift="updateOfficeShift"
+      @updateUserStatus="updateUserStatus"
       @updateUserAffiliation="updateUserAffiliation"
       :users="filteredUsers"
       :officeShifts="officeShifts"

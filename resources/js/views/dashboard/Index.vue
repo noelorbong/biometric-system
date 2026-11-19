@@ -118,7 +118,7 @@ const attendanceChartOptions = computed(() => ({
   },
   xaxis: {
     categories: ['Today', 'Month', 'Year'],
-    labels: { style: { colors: chartTextColor, fontSize: '11px' } },
+    labels: { style: { colors: chartTextColor, fontSize: '10px' } },
     axisBorder: { color: chartGridColor },
     axisTicks: { color: chartGridColor },
   },
@@ -180,9 +180,11 @@ const distributionOptions = computed(() => ({
         size: '62%',
         labels: {
           show: true,
+          value: { fontSize: '18px', fontWeight: 600 },
           total: {
             show: true,
             label: isSuperAdmin.value ? 'Total' : 'Recent',
+            fontSize: '11px',
             formatter: value => formatNumber(value.globals.seriesTotals.reduce((sum, item) => sum + item, 0)),
           },
         },
@@ -236,12 +238,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="dashboard-page space-y-4 text-slate-800 dark:text-slate-200">
-    <section class="-ml-4 -mt-4 -mr-4 border-b border-slate-900/20 bg-[linear-gradient(135deg,_#0f172a_0%,_#164e63_52%,_#0f766e_100%)] px-4 py-4 text-white shadow-sm md:-ml-6 md:-mr-6 md:-mt-6 md:px-6 dark:border-slate-800">
-      <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+  <div class="dashboard-page space-y-3 text-slate-800 dark:text-slate-200">
+    <section class="-ml-4 -mt-4 -mr-4 border-b border-slate-900/20 bg-[linear-gradient(135deg,_#0f172a_0%,_#164e63_52%,_#0f766e_100%)] px-2 py-2 text-white shadow-sm md:-ml-6 md:-mr-6 md:-mt-6 md:px-3 dark:border-slate-800">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="max-w-3xl">
           <div class="flex flex-wrap items-center gap-2">
-            <h1 class="text-xl font-semibold text-white">{{ isSuperAdmin ? 'Super Admin Dashboard' : 'User Dashboard' }}</h1>
+            <h1 class="text-base font-semibold text-white">{{ isSuperAdmin ? 'Super Admin Dashboard' : 'User Dashboard' }}</h1>
             <span class="border border-white/20 bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-50">
               {{ dashboard?.role_label || roleMap[Number(user?.role)] || 'User' }}
             </span>
@@ -249,25 +251,25 @@ onMounted(async () => {
           <p class="hidden mt-2 max-w-3xl text-sm leading-6 text-slate-100/90">{{ headline }}</p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 xl:justify-end">
-          <div class="inline-flex min-h-9 items-center gap-2 border border-white/20 bg-white/10 px-3 text-xs text-white">
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <div class="inline-flex min-h-7 items-center gap-2 border border-white/20 bg-white/10 px-3 text-[11px] text-white">
             <span class="h-2 w-2 bg-emerald-300"></span>
             <span class="font-medium">{{ dashboard?.user?.name || user?.name || 'Account' }}</span>
           </div>
-          <button type="button" class="inline-flex h-9 items-center justify-center border border-white/30 bg-white px-3 text-xs font-semibold text-slate-900 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60" :disabled="loading" @click="loadDashboard">
+          <button type="button" class="inline-flex h-7 items-center justify-center border border-white/30 bg-white px-2 text-[11px] font-semibold text-slate-900 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60" :disabled="loading" @click="loadDashboard">
             {{ loading ? 'Refreshing...' : 'Refresh' }}
           </button>
         </div>
       </div>
 
-      <div class="mt-5 grid gap-3 grid-cols-3">
-        <article v-for="metric in heroMetrics" :key="metric.label" class="border border-white/15 bg-white/10 p-3 backdrop-blur">
+      <div class="mt-2 grid grid-cols-3 gap-2">
+        <article v-for="metric in heroMetrics" :key="metric.label" class="border border-white/15 bg-white/10 px-3 py-2 backdrop-blur">
           <div class="flex items-start justify-between gap-3">
             <p class="text-[11px] font-semibold uppercase tracking-wide text-cyan-50/80 truncate">{{ metric.label }}</p>
             <span class="h-2 w-2 bg-cyan-200"></span>
           </div>
-          <p class="mt-2 text-2xl font-semibold tracking-tight text-white">{{ formatNumber(metric.value) }}</p>
-          <p class="mt-1 text-xs text-slate-100/80">{{ metric.note }}</p>
+          <p class="mt-1 text-xl font-semibold tracking-tight text-white">{{ formatNumber(metric.value) }}</p>
+          <p class="mt-0.5 text-[10px] leading-4 text-slate-100/80">{{ metric.note }}</p>
         </article>
       </div>
     </section>
@@ -275,10 +277,10 @@ onMounted(async () => {
     <section v-if="error" class="border border-rose-300 bg-rose-50 p-3 text-rose-700 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-200">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p class="text-sm font-semibold">Unable to load dashboard data</p>
+          <p class="text-xs font-semibold">Unable to load dashboard data</p>
           <p class="mt-1 text-sm text-rose-600/90 dark:text-rose-200/80">{{ error }}</p>
         </div>
-        <button type="button" class="inline-flex h-9 items-center justify-center border border-rose-700 bg-rose-600 px-3 text-xs font-semibold text-white transition hover:bg-rose-700" @click="loadDashboard">
+        <button type="button" class="inline-flex h-7 items-center justify-center border border-rose-700 bg-rose-600 px-2 text-[11px] font-semibold text-white transition hover:bg-rose-700" @click="loadDashboard">
           Retry
         </button>
       </div>
@@ -292,37 +294,37 @@ onMounted(async () => {
       </article>
     </section> -->
 
-    <section class="grid gap-4 lg:grid-cols-2">
+    <section class="grid gap-3 lg:grid-cols-2">
       <div class="border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Trend</p>
-          <h2 class="text-sm font-semibold text-slate-950 dark:text-white">Log volume overview</h2>
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Trend</p>
+          <h2 class="text-xs font-semibold text-slate-950 dark:text-white">Log volume overview</h2>
         </div>
-        <div class="min-h-[260px] px-2 py-3">
-          <VueApexCharts type="bar" height="235" :options="attendanceChartOptions" :series="attendanceChartSeries" />
+        <div class="min-h-[220px] px-2 py-2">
+          <VueApexCharts type="bar" height="200" :options="attendanceChartOptions" :series="attendanceChartSeries" />
         </div>
       </div>
 
       <div class="border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ isSuperAdmin ? 'Operations Mix' : 'Recent Log Mix' }}</p>
-          <h2 class="text-sm font-semibold text-slate-950 dark:text-white">{{ isSuperAdmin ? 'Users and machines' : 'Check in / out balance' }}</h2>
+          <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ isSuperAdmin ? 'Operations Mix' : 'Recent Log Mix' }}</p>
+          <h2 class="text-xs font-semibold text-slate-950 dark:text-white">{{ isSuperAdmin ? 'Users and machines' : 'Check in / out balance' }}</h2>
         </div>
-        <div class="min-h-[260px] px-2 py-3">
-          <VueApexCharts v-if="hasDistributionData" type="donut" height="235" :options="distributionOptions" :series="distributionSeries" />
-          <div v-else class="flex h-[235px] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
+        <div class="min-h-[220px] px-2 py-2">
+          <VueApexCharts v-if="hasDistributionData" type="donut" height="200" :options="distributionOptions" :series="distributionSeries" />
+          <div v-else class="flex h-[200px] items-center justify-center text-sm text-slate-500 dark:text-slate-400">
             No chart data
           </div>
         </div>
       </div>
     </section>
 
-    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <section class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div class="border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Feed</p>
-            <h2 class="text-sm font-semibold text-slate-950 dark:text-white">{{ isSuperAdmin ? 'Latest attendance activity' : 'My recent attendance' }}</h2>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance Feed</p>
+            <h2 class="text-xs font-semibold text-slate-950 dark:text-white">{{ isSuperAdmin ? 'Latest attendance activity' : 'My recent attendance' }}</h2>
           </div>
           <div v-if="loading" class="text-xs text-slate-500 dark:text-slate-400">Refreshing...</div>
         </div>
@@ -355,12 +357,12 @@ onMounted(async () => {
       <div class="space-y-4">
         <div class="border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Quick Actions</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Quick Actions</p>
           </div>
           <div class="divide-y divide-slate-100 dark:divide-slate-800">
             <router-link v-for="item in quickLinks" :key="item.label" :to="item.path" class="block px-3 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-900/60">
               <div class="flex items-center justify-between gap-3">
-                <p class="text-sm font-semibold text-slate-950 dark:text-white">{{ item.label }}</p>
+                <p class="text-xs font-semibold text-slate-950 dark:text-white">{{ item.label }}</p>
                 <span class="text-slate-400">&rsaquo;</span>
               </div>
               <p class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ item.note }}</p>
@@ -370,13 +372,13 @@ onMounted(async () => {
 
         <div v-if="isSuperAdmin" class="border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Machine Sync</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Machine Sync</p>
           </div>
           <div v-if="machineOverview.length" class="divide-y divide-slate-100 dark:divide-slate-800">
             <article v-for="machine in machineOverview" :key="machine.id" class="px-3 py-3">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <p class="text-sm font-semibold text-slate-950 dark:text-white">{{ machine.name }}</p>
+                  <p class="text-xs font-semibold text-slate-950 dark:text-white">{{ machine.name }}</p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ machine.ip || 'No IP configured' }}</p>
                 </div>
                 <span :class="machine.auto_download ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300' : 'border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'" class="border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide">
@@ -396,7 +398,7 @@ onMounted(async () => {
 
         <div v-else class="border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
           <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Schedule</p>
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Assigned Schedule</p>
           </div>
           <div class="border-b border-slate-100 px-3 py-3 dark:border-slate-800">
             <p class="text-base font-semibold text-slate-950 dark:text-white">{{ dashboard?.schedule?.name || 'No office shift assigned' }}</p>
@@ -411,7 +413,7 @@ onMounted(async () => {
           <div v-if="scheduleEntries.length" class="divide-y divide-slate-100 dark:divide-slate-800">
             <article v-for="entry in scheduleEntries" :key="entry.sequence" class="flex items-center justify-between px-3 py-3">
               <div>
-                <p class="text-sm font-semibold text-slate-950 dark:text-white">Segment {{ entry.sequence }}</p>
+                <p class="text-xs font-semibold text-slate-950 dark:text-white">Segment {{ entry.sequence }}</p>
                 <p class="mt-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ entry.is_next_day ? 'Next day exit' : 'Same day exit' }}</p>
               </div>
               <div class="text-right text-sm font-medium text-slate-700 dark:text-slate-200">

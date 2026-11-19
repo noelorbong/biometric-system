@@ -14,7 +14,7 @@ const authStore = useAuthStore();
 const { isLoading, text } = storeToRefs(loadingStore)
 const { authenticated, user } = storeToRefs(authStore)
 
-const email = ref('')
+const login = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const keepLoggedIn = ref(false)
@@ -37,7 +37,7 @@ const handleSubmit = async() => {
   isLoading.value = true;
   text.value = "Signing In.."
   var login_account = {
-    email: email.value,
+    login: login.value.trim(),
     password: password.value,
   };
   var result = await authStore.login(login_account);
@@ -124,7 +124,7 @@ const handleSubmit = async() => {
               <div class="px-6 py-7 sm:px-8">
                 <div class="mb-6">
                   <p class="text-sm text-slate-500 dark:text-slate-400">
-                    Enter your email and password to access the dashboard.
+                    Enter your username or email and password to access the dashboard.
                   </p>
                   <p v-if="error" class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-300">
                     Incorrect account details.
@@ -135,18 +135,18 @@ const handleSubmit = async() => {
                   <div class="space-y-5">
                     <div>
                       <label
-                        for="email"
+                        for="login"
                         class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300"
                       >
-                        Email<span class="text-rose-500">*</span>
+                        Username or email<span class="text-rose-500">*</span>
                       </label>
                       <input
-                        v-model="email"
+                        v-model="login"
                         type="text"
                         @input="error=false"
-                        id="email"
-                        name="email"
-                        placeholder="name@example.com"
+                        id="login"
+                        name="login" autocomplete="username" required
+                        placeholder="Username or email address"
                         class="h-12 w-full rounded-xl border border-slate-300 bg-slate-50/80 px-4 py-2.5 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-900/60 dark:text-white/90 dark:placeholder:text-slate-500"
                       />
                     </div>

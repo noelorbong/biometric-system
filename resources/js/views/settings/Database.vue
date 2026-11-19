@@ -371,46 +371,46 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
-      <SettingsNav class="mb-3" />
-      <div class="flex flex-wrap items-end justify-between gap-3">
+  <div class="space-y-3">
+    <div class="admin-page-header dark -ml-4 -mt-3 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Database Settings</h2>
-          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Encrypted backup, import/export, and automatic backup controls.</p>
+          <h2 class="text-base font-semibold text-slate-900 dark:text-white">Database Settings</h2>
+          <p class="mt-0.5 text-[10px] text-slate-400">Encrypted backup, import/export, and automatic backup controls.</p>
         </div>
+        <SettingsNav class="ml-auto" />
         <button
           type="button"
           @click="runAutoBackupNow"
           :disabled="runningAutoBackupNow"
-          class="inline-flex h-11 items-center justify-center rounded-xl border border-emerald-300 bg-emerald-100 px-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-emerald-900/50 dark:bg-emerald-900/25 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
+          class="inline-flex h-7 items-center justify-center rounded-none border border-emerald-300 bg-emerald-100 px-4 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-emerald-900/50 dark:bg-emerald-900/25 dark:text-emerald-300 dark:hover:bg-emerald-900/35"
         >
           {{ runningAutoBackupNow ? 'Running backup now...' : 'Run Auto Backup Now' }}
         </button>
       </div>
-      <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-900/40">
-        <div class="grid gap-2 sm:grid-cols-3">
+      <div class="mt-2 border-t border-white/10 pt-1 dark:border-slate-700 dark:bg-slate-900/40">
+        <div class="flex flex-wrap items-center gap-1">
           <button
             type="button"
             @click="activePanel = 'auto'"
-            class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-center text-xs font-semibold transition"
-            :class="activePanel === 'auto' ? 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+            class="inline-flex h-7 items-center justify-center whitespace-nowrap border-b-2 px-3 text-center text-[11px] font-semibold transition"
+            :class="activePanel === 'auto' ? 'border-teal-400 bg-teal-400/10 text-teal-200' : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'"
           >
             Auto Backup Config
           </button>
           <button
             type="button"
             @click="activePanel = 'manual'"
-            class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-center text-xs font-semibold transition"
-            :class="activePanel === 'manual' ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+            class="inline-flex h-7 items-center justify-center whitespace-nowrap border-b-2 px-3 text-center text-[11px] font-semibold transition"
+            :class="activePanel === 'manual' ? 'border-teal-400 bg-teal-400/10 text-teal-200' : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'"
           >
             Manual Encrypted Tools
           </button>
           <button
             type="button"
             @click="activePanel = 'files'"
-            class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-2 text-center text-xs font-semibold transition"
-            :class="activePanel === 'files' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+            class="inline-flex h-7 items-center justify-center whitespace-nowrap border-b-2 px-3 text-center text-[11px] font-semibold transition"
+            :class="activePanel === 'files' ? 'border-teal-400 bg-teal-400/10 text-teal-200' : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-white'"
           >
             Server Backup Files
           </button>
@@ -418,32 +418,32 @@ onMounted(async () => {
       </div>
     </div>
 
-    <section class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-5">
+    <section class="rounded-none border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03] lg:p-3">
 
 
-      <div v-if="autoRunResult" class="mt-3 rounded-lg border px-3 py-2 text-xs" :class="autoRunResult.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'">
+      <div v-if="autoRunResult" class="mt-3 rounded-none border px-3 py-2 text-xs" :class="autoRunResult.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300'">
         <p class="font-semibold">Exit code: {{ autoRunResult.exit_code }}</p>
         <p v-if="autoRunResult.output" class="mt-1 whitespace-pre-line break-words">{{ autoRunResult.output }}</p>
       </div>
 
 
 
-      <div v-show="activePanel === 'auto'" class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900/50 dark:bg-indigo-950/20">
+      <div v-show="activePanel === 'auto'" class="mt-3 rounded-none border border-slate-200 bg-slate-50/60 p-3 dark:border-indigo-900/50 dark:bg-indigo-950/20">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">Auto Backup Config</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">Auto Backup Config</p>
             <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Stored in app settings (database).</p>
           </div>
-          <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
             <input :checked="autoBackupForm.enabled" @change="updateAutoBackupField('enabled', $event.target.checked)" type="checkbox" class="h-4 w-4" />
             <span>{{ autoBackupForm.enabled ? 'Enabled' : 'Disabled' }}</span>
           </label>
         </div>
 
-        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <div class="mt-3 grid grid-cols-2 gap-2">
           <div>
-            <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">Schedule</label>
-            <select :value="autoBackupForm.schedule" @change="updateAutoBackupField('schedule', $event.target.value)" class="h-10 w-full rounded-md border border-indigo-200 bg-white px-3 text-sm text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90">
+            <label class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Schedule</label>
+            <select :value="autoBackupForm.schedule" @change="updateAutoBackupField('schedule', $event.target.value)" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90">
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="hourly">Hourly</option>
@@ -451,60 +451,60 @@ onMounted(async () => {
             </select>
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">Run Time</label>
-            <input :value="autoBackupForm.time" @input="updateAutoBackupField('time', $event.target.value)" type="time" :disabled="autoBackupForm.schedule === 'hourly' || autoBackupForm.schedule === 'everyTwelveHours'" class="h-10 w-full rounded-md border border-indigo-200 bg-white px-3 text-sm text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
+            <label class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Run Time</label>
+            <input :value="autoBackupForm.time" @input="updateAutoBackupField('time', $event.target.value)" type="time" :disabled="autoBackupForm.schedule === 'hourly' || autoBackupForm.schedule === 'everyTwelveHours'" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">Retention (days)</label>
-            <input :value="autoBackupForm.retain_days" @input="updateAutoBackupField('retain_days', Number($event.target.value))" type="number" min="1" max="365" class="h-10 w-full rounded-md border border-indigo-200 bg-white px-3 text-sm text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
+            <label class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Retention (days)</label>
+            <input :value="autoBackupForm.retain_days" @input="updateAutoBackupField('retain_days', Number($event.target.value))" type="number" min="1" max="365" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">Backup Passphrase</label>
-            <input :value="autoBackupForm.passphrase" @input="updateAutoBackupField('passphrase', $event.target.value)" type="password" placeholder="Leave blank to keep current" class="h-10 w-full rounded-md border border-indigo-200 bg-white px-3 text-sm text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
+            <label class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Backup Passphrase</label>
+            <input :value="autoBackupForm.passphrase" @input="updateAutoBackupField('passphrase', $event.target.value)" type="password" placeholder="Leave blank to keep current" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
           </div>
           <div class="sm:col-span-2">
-            <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">Confirm Backup Passphrase</label>
-            <input :value="autoBackupForm.passphrase_confirm" @input="updateAutoBackupField('passphrase_confirm', $event.target.value)" type="password" placeholder="Repeat new passphrase" class="h-10 w-full rounded-md border border-indigo-200 bg-white px-3 text-sm text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
+            <label class="mb-1 block text-[11px] font-semibold text-slate-600 dark:text-slate-300">Confirm Backup Passphrase</label>
+            <input :value="autoBackupForm.passphrase_confirm" @input="updateAutoBackupField('passphrase_confirm', $event.target.value)" type="password" placeholder="Repeat new passphrase" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 dark:border-indigo-900/60 dark:bg-slate-900 dark:text-white/90" />
           </div>
         </div>
 
         <p v-if="autoBackupPassphraseError" class="mt-2 text-xs font-medium text-rose-600 dark:text-rose-400">{{ autoBackupPassphraseError }}</p>
         <p v-else-if="autoBackupConfig?.passphrase_configured" class="mt-2 text-xs text-emerald-600 dark:text-emerald-400">A passphrase is already stored. Leave blank to keep it unchanged.</p>
 
-        <button type="button" @click="saveAutoBackupSettings" :disabled="savingAutoBackup || !!autoBackupPassphraseError" class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-indigo-300 bg-indigo-100 px-4 py-2 text-center text-sm font-semibold text-indigo-900 transition hover:bg-indigo-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-indigo-900/50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/40">
+        <button type="button" @click="saveAutoBackupSettings" :disabled="savingAutoBackup || !!autoBackupPassphraseError" class="mt-3 inline-flex min-h-7 items-center justify-center border border-cyan-300/30 bg-teal-700 px-3 py-1 text-center text-[11px] font-semibold text-white transition hover:bg-teal-600 disabled:cursor-not-allowed disabled:opacity-70">
           {{ savingAutoBackup ? 'Saving auto backup...' : 'Save auto-backup settings' }}
         </button>
       </div>
 
-      <div v-show="activePanel === 'manual'" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Manual Encrypted Tools</h3>
-        <div class="mt-3 grid gap-3 sm:grid-cols-2">
-          <input v-model="backupPassphrase" type="password" placeholder="Passphrase" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white/90" />
-          <input v-model="backupPassphraseConfirm" type="password" placeholder="Confirm Passphrase" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white/90" />
+      <div v-show="activePanel === 'manual'" class="mt-3 rounded-none border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+        <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Manual Encrypted Tools</h3>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <input v-model="backupPassphrase" type="password" placeholder="Passphrase" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white/90" />
+          <input v-model="backupPassphraseConfirm" type="password" placeholder="Confirm Passphrase" class="h-8 w-full rounded-none border border-slate-300 bg-white px-3 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white/90" />
         </div>
         <p v-if="passphraseError" class="mt-2 text-xs font-medium text-rose-600 dark:text-rose-400">{{ passphraseError }}</p>
 
         <div class="mt-3 grid gap-3 md:grid-cols-2">
-          <button type="button" @click="runDatabaseBackup" :disabled="backuping || !!passphraseError" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-200 disabled:opacity-70 dark:border-amber-900/50 dark:bg-amber-900/25 dark:text-amber-300">{{ backuping ? 'Creating backup...' : 'Create server backup' }}</button>
-          <button type="button" @click="runDatabaseExport" :disabled="exportingBackup || !!passphraseError" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-sky-300 bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-900 transition hover:bg-sky-200 disabled:opacity-70 dark:border-sky-900/50 dark:bg-sky-900/25 dark:text-sky-300">{{ exportingBackup ? 'Exporting...' : 'Export encrypted file' }}</button>
+          <button type="button" @click="runDatabaseBackup" :disabled="backuping || !!passphraseError" class="inline-flex min-h-7 w-full items-center justify-center rounded-none border border-amber-300 bg-amber-100 px-4 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-200 disabled:opacity-70 dark:border-amber-900/50 dark:bg-amber-900/25 dark:text-amber-300">{{ backuping ? 'Creating backup...' : 'Create server backup' }}</button>
+          <button type="button" @click="runDatabaseExport" :disabled="exportingBackup || !!passphraseError" class="inline-flex min-h-7 w-full items-center justify-center rounded-none border border-sky-300 bg-sky-100 px-4 py-2 text-xs font-semibold text-sky-900 transition hover:bg-sky-200 disabled:opacity-70 dark:border-sky-900/50 dark:bg-sky-900/25 dark:text-sky-300">{{ exportingBackup ? 'Exporting...' : 'Export encrypted file' }}</button>
         </div>
 
-        <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50/80 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
-          <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">Import backup file</label>
-          <input type="file" accept=".bkp,.txt,application/octet-stream" @change="onBackupFileSelected" class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-rose-200 file:px-3 file:py-2 file:font-semibold file:text-rose-900 hover:file:bg-rose-300 dark:text-slate-300 dark:file:bg-rose-900/40 dark:file:text-rose-200" />
+        <div class="mt-3 rounded-none border border-rose-200 bg-rose-50/80 p-3 dark:border-rose-900/50 dark:bg-rose-950/20">
+          <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">Import backup file</label>
+          <input type="file" accept=".bkp,.txt,application/octet-stream" @change="onBackupFileSelected" class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-none file:border-0 file:bg-rose-200 file:px-3 file:py-2 file:font-semibold file:text-rose-900 hover:file:bg-rose-300 dark:text-slate-300 dark:file:bg-rose-900/40 dark:file:text-rose-200" />
           <p v-if="backupFile" class="mt-2 break-words text-[11px] text-slate-600 dark:text-slate-400">Selected: {{ backupFile.name }}</p>
-          <button type="button" @click="runDatabaseImport" :disabled="importingBackup || !!passphraseError" class="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-300 bg-rose-200 px-4 py-2 text-sm font-semibold text-rose-900 transition hover:bg-rose-300 disabled:opacity-70 dark:border-rose-900/60 dark:bg-rose-900/30 dark:text-rose-300">{{ importingBackup ? 'Importing backup...' : 'Import and replace database' }}</button>
+          <button type="button" @click="runDatabaseImport" :disabled="importingBackup || !!passphraseError" class="mt-3 inline-flex min-h-8 w-full items-center justify-center rounded-none border border-rose-300 bg-rose-200 px-4 py-2 text-xs font-semibold text-rose-900 transition hover:bg-rose-300 disabled:opacity-70 dark:border-rose-900/60 dark:bg-rose-900/30 dark:text-rose-300">{{ importingBackup ? 'Importing backup...' : 'Import and replace database' }}</button>
         </div>
       </div>
 
-      <div v-show="activePanel === 'files'" class="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+      <div v-show="activePanel === 'files'" class="mt-3 rounded-none border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/40">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Server Backup Files</h3>
-          <button type="button" @click="loadAutoBackupStatus" :disabled="loadingAutoBackup" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ loadingAutoBackup ? 'Refreshing...' : 'Refresh' }}</button>
+          <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Server Backup Files</h3>
+          <button type="button" @click="loadAutoBackupStatus" :disabled="loadingAutoBackup" class="inline-flex items-center gap-1 rounded-none border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">{{ loadingAutoBackup ? 'Refreshing...' : 'Refresh' }}</button>
         </div>
 
-        <div v-if="autoBackupFiles.length === 0" class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">No backups found yet.</div>
-        <div v-else class="mt-2 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+        <div v-if="autoBackupFiles.length === 0" class="mt-2 rounded-none border border-slate-200 bg-white px-3 py-3 text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500">No backups found yet.</div>
+        <div v-else class="mt-2 overflow-hidden rounded-none border border-slate-200 dark:border-slate-700">
           <table class="min-w-full text-xs">
             <thead class="bg-slate-50 dark:bg-slate-800/60">
               <tr>
@@ -521,9 +521,9 @@ onMounted(async () => {
                 <td class="px-3 py-2 text-slate-600 dark:text-slate-400">{{ formatIso(file.modified_at) }}</td>
                 <td class="px-3 py-2 text-right">
                   <div class="inline-flex gap-2">
-                    <button type="button" @click="restoreBackupFile(file.filename)" class="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-900/25 dark:text-emerald-300">Restore</button>
-                    <button type="button" @click="downloadBackupFile(file.filename)" class="rounded-md border border-sky-200 bg-sky-50 px-2.5 py-1 font-semibold text-sky-700 hover:bg-sky-100 dark:border-sky-900/50 dark:bg-sky-900/25 dark:text-sky-300">Download</button>
-                    <button type="button" @click="deleteBackupFile(file.filename)" class="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/25 dark:text-rose-300">Delete</button>
+                    <button type="button" @click="restoreBackupFile(file.filename)" class="rounded-none border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-900/25 dark:text-emerald-300">Restore</button>
+                    <button type="button" @click="downloadBackupFile(file.filename)" class="rounded-none border border-sky-200 bg-sky-50 px-2.5 py-1 font-semibold text-sky-700 hover:bg-sky-100 dark:border-sky-900/50 dark:bg-sky-900/25 dark:text-sky-300">Download</button>
+                    <button type="button" @click="deleteBackupFile(file.filename)" class="rounded-none border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-900/25 dark:text-rose-300">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -534,3 +534,11 @@ onMounted(async () => {
     </section>
   </div>
 </template>
+
+<style scoped>
+.admin-page-header .grid > *, section .grid > div { min-width: 0; }
+input, select { min-width: 0; max-width: 100%; font-size: 11px; }
+input:focus, select:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 2px rgb(20 184 166 / 15%); }
+input[type="checkbox"] { accent-color: #0f766e; }
+button:focus-visible { outline: 2px solid #14b8a6; outline-offset: 2px; }
+</style>

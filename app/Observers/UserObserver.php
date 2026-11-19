@@ -31,7 +31,9 @@ class UserObserver
             return;
         }
 
-        $user->email = $this->deletedEmail($user->email, $user->id);
+        if ($user->email !== null) {
+            $user->email = $this->deletedEmail($user->email, $user->id);
+        }
         $user->saveQuietly();
     }
 

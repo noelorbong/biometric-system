@@ -1189,6 +1189,9 @@ const manageAbsence = async (row) => {
   if (!isSuperAdmin.value || !userId.value || !canManageAbsence(row.date)) return
   const absence = row.absence
   const result = await Swal.fire({
+    ...biometricLogDialogStyle,
+    customClass: { ...biometricLogDialogStyle.customClass, popup: 'biometric-log-dialog absence-dialog', denyButton: 'biometric-log-clear' },
+    showCancelButton: true,
     title: `Absence - ${formatDateOnly(row.date)}`,
     html: `<div class="grid gap-3 text-left"><label class="text-sm font-medium">Status<select id="absence-status" class="swal2-select"><option value="filed" ${absence?.status !== 'unfiled' ? 'selected' : ''}>Filed</option><option value="unfiled" ${absence?.status === 'unfiled' ? 'selected' : ''}>Unfiled</option></select></label><label class="text-sm font-medium">Duration<select id="absence-duration" class="swal2-select"><option value="whole_day" ${absence?.duration !== 'morning' && absence?.duration !== 'afternoon' ? 'selected' : ''}>Whole day</option><option value="morning" ${absence?.duration === 'morning' ? 'selected' : ''}>Morning</option><option value="afternoon" ${absence?.duration === 'afternoon' ? 'selected' : ''}>Afternoon</option></select></label><label class="text-sm font-medium">Filed type<select id="absence-leave-type" class="swal2-select"><option value="cto" ${absence?.leave_type === 'cto' ? 'selected' : ''}>CTO</option><option value="vacation" ${absence?.leave_type === 'vacation' ? 'selected' : ''}>Vacation</option><option value="sick" ${!absence?.leave_type || absence?.leave_type === 'sick' ? 'selected' : ''}>Sick</option><option value="spl" ${absence?.leave_type === 'spl' ? 'selected' : ''}>SPL</option><option value="without_pay" ${absence?.leave_type === 'without_pay' ? 'selected' : ''}>Without pay</option></select></label></div>`,
     showDenyButton: Boolean(absence),
@@ -1215,18 +1218,29 @@ const manageAbsence = async (row) => {
   }
 }
 
+const biometricLogDialogStyle = {
+  width: 420,
+  padding: 0,
+  buttonsStyling: false,
+  showCloseButton: true,
+  focusConfirm: false,
+  reverseButtons: true,
+  customClass: { popup: 'biometric-log-dialog', title: 'biometric-log-title', htmlContainer: 'biometric-log-body', actions: 'biometric-log-actions', confirmButton: 'biometric-log-save', cancelButton: 'biometric-log-cancel', closeButton: 'biometric-log-close' },
+}
+
 const openAddBiometricLog = async (date = null) => {
   if (!isSuperAdmin.value || !userId.value) {
     return
   }
 
   const result = await Swal.fire({
+    ...biometricLogDialogStyle,
     title: 'Add Biometric Log',
     html: `
       <div class="space-y-3 text-left">
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Date & Time</label>
+        <label for="swal-log-datetime" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Date &amp; Time</label>
         <input id="swal-log-datetime" type="datetime-local" class="swal2-input !m-0 !w-full" value="${defaultDateTimeLocalValue(date)}" />
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Check Type</label>
+        <label for="swal-log-checktype" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Check Type</label>
         <select id="swal-log-checktype" class="swal2-select !m-0 !w-full">
           <option value="I">IN</option>
           <option value="O">OUT</option>
@@ -1277,12 +1291,13 @@ const openOverrideBiometricLog = async (log) => {
   }
 
   const result = await Swal.fire({
+    ...biometricLogDialogStyle,
     title: 'Override Biometric Log',
     html: `
       <div class="space-y-3 text-left">
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Date & Time</label>
+        <label for="swal-log-datetime" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Date &amp; Time</label>
         <input id="swal-log-datetime" type="datetime-local" class="swal2-input !m-0 !w-full" value="${toDateTimeLocalValue(log.CHECKTIME)}" />
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Check Type</label>
+        <label for="swal-log-checktype" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Check Type</label>
         <select id="swal-log-checktype" class="swal2-select !m-0 !w-full">
           <option value="I" ${String(log.CHECKTYPE).toUpperCase() === 'I' ? 'selected' : ''}>IN</option>
           <option value="O" ${String(log.CHECKTYPE).toUpperCase() === 'O' ? 'selected' : ''}>OUT</option>
@@ -1334,12 +1349,13 @@ const openEditOverrideLog = async (log) => {
   }
 
   const result = await Swal.fire({
+    ...biometricLogDialogStyle,
     title: 'Edit Override Log',
     html: `
       <div class="space-y-3 text-left">
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Date & Time</label>
+        <label for="swal-log-datetime" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Date &amp; Time</label>
         <input id="swal-log-datetime" type="datetime-local" class="swal2-input !m-0 !w-full" value="${toDateTimeLocalValue(log.CHECKTIME)}" />
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Check Type</label>
+        <label for="swal-log-checktype" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Check Type</label>
         <select id="swal-log-checktype" class="swal2-select !m-0 !w-full">
           <option value="I" ${String(log.CHECKTYPE).toUpperCase() === 'I' ? 'selected' : ''}>IN</option>
           <option value="O" ${String(log.CHECKTYPE).toUpperCase() === 'O' ? 'selected' : ''}>OUT</option>
@@ -1495,143 +1511,150 @@ const saveEditedUser = async (payload) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-3">
 
     <!-- ── HERO ── -->
     <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border shadow-sm md:-mr-6 ">
-      <div class="relative p-2 text-white">
+      <div class="relative px-2 py-1.5 pb-2 text-white">
       <!-- decorative dots -->
       <div class="pointer-events-none absolute inset-0 opacity-10"
         style="background-image:radial-gradient(circle,white 1px,transparent 1px);background-size:28px 28px"></div>
 
-      <div class="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <div class="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <!-- Avatar + Name -->
-        <div class="flex items-center gap-4">
-          <div>
-            <h1 class="flex flex-wrap items-center gap-2 text-2xl font-bold leading-tight text-white">
-              <button v-if="canGoBackToUsers" type="button" @click="router.push({ name: 'User' })" aria-label="Back to users" title="Back to users" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/40 bg-slate-900/70 text-white transition hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-white/70">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="min-w-0 w-full">
+            <h1 class="flex min-w-0 items-center gap-2 text-base font-semibold leading-tight text-white">
+              <button v-if="canGoBackToUsers" type="button" @click="router.push({ name: 'User' })" aria-label="Back to users" title="Back to users" class="inline-flex h-7 w-7 shrink-0 items-center justify-center bg-transparent text-white transition hover:text-cyan-200 focus:outline-none focus:ring-2 focus:ring-white/70">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
               </button>
-              <span>{{ heroFullName }}</span>
-              <span class="order-3 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white min-[800px]:order-none">{{ heroRole }}</span>
+              <span class="min-w-0 truncate" :title="heroFullName">{{ heroFullName }}</span>
+              <span class="shrink-0 whitespace-nowrap rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium text-white">{{ heroRole }}</span>
               <span
                 :class="selectedUser?.status ? 'border-emerald-300/40 bg-emerald-400/20 text-emerald-100' : 'border-rose-300/40 bg-rose-400/20 text-rose-100'"
-                class="order-3 rounded-full border px-2.5 py-0.5 text-xs font-medium min-[800px]:order-none"
+                class="shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium"
               >{{ selectedUser?.status ? 'Active' : 'Inactive' }}</span>
-              <button v-if="isSuperAdmin" type="button" @click="openEditUserModal" :disabled="userEditSaving" aria-label="Edit user" title="Edit user" class="order-4 inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/40 bg-slate-900/70 text-white transition hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:opacity-60 min-[800px]:order-none">
+              <button v-if="isSuperAdmin" type="button" @click="openEditUserModal" :disabled="userEditSaving" aria-label="Edit user" title="Edit user" class="inline-flex h-7 w-7 shrink-0 items-center justify-center bg-transparent text-white transition hover:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-white/70 disabled:opacity-60">
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
             </h1>
           </div>
         </div>
 
-        <!-- Stats -->
-        <!-- <div class="flex flex-col items-start gap-3 md:items-end">
-          <div class="flex flex-wrap gap-2">
-            <div class="rounded-xl bg-white/10 px-4 py-2 text-center backdrop-blur-sm ring-1 ring-inset ring-white/10">
-              <p class="text-xs text-slate-300">Department</p>
-              <p class="text-sm font-semibold text-white">{{ heroDepartment }}</p>
-            </div>
-            <div class="rounded-xl bg-white/10 px-4 py-2 text-center backdrop-blur-sm ring-1 ring-inset ring-white/10">
-              <p class="text-xs text-slate-300">Shift</p>
-              <p class="text-sm font-semibold text-white">{{ selectedUser?.office_shift?.name || 'None' }}</p>
-            </div>
-            <div class="rounded-xl bg-white/10 px-4 py-2 text-center backdrop-blur-sm ring-1 ring-inset ring-white/10">
-              <p class="text-xs text-slate-300">Biometric ID</p>
-              <p class="text-sm font-semibold text-white">{{ biometricData?.user_id || '-' }}</p>
-            </div>
-          </div>
-        </div> -->
-      </div>
-    </div>
-      <div v-if="selectedUser" class="flex gap-1 border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div v-if="selectedUser" class="flex shrink-0 items-center justify-end gap-1 self-end md:self-auto">
         <button
           type="button"
+          :aria-pressed="activeTab === 'userinfo'"
           @click="activeTab = 'userinfo'"
           :class="[
-            'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
+            'flex h-7 whitespace-nowrap items-center justify-center border-b-2 px-3 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400',
             activeTab === 'userinfo'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              ? 'border-teal-400 bg-teal-400/10 text-teal-200'
+              : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-slate-100'
           ]"
         >User Info</button>
         <button
           type="button"
+          :aria-pressed="activeTab === 'biometrics'"
           @click="activeTab = 'biometrics'"
           :class="[
-            'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
+            'flex h-7 whitespace-nowrap items-center justify-center border-b-2 px-3 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400',
             activeTab === 'biometrics'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              ? 'border-teal-400 bg-teal-400/10 text-teal-200'
+              : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-slate-100'
           ]"
         >Attendance</button>
         <button
           type="button"
+          :aria-pressed="activeTab === 'print'"
           @click="activeTab = 'print'"
           :class="[
-            'flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
+            'flex h-7 whitespace-nowrap items-center justify-center border-b-2 px-3 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400',
             activeTab === 'print'
-              ? 'bg-sky-500 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              ? 'border-teal-400 bg-teal-400/10 text-teal-200'
+              : 'border-transparent text-slate-300 hover:bg-white/5 hover:text-slate-100'
           ]"
         >Print Record</button>
       </div>
-      <div v-if="selectedUser && activeTab === 'biometrics'" class="pb-1 flex flex-wrap items-end gap-2 bg-white px-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+
+      </div>
+    </div>
+      <div v-if="selectedUser && activeTab === 'biometrics'" class="flex flex-wrap items-end gap-x-4 gap-y-2 border-t border-teal-100 bg-[linear-gradient(110deg,_#f0fdfa_0%,_#f8fafc_65%,_#ffffff_100%)] px-4 py-3 text-slate-800">
           <div>
-            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Filter Mode</label>
-            <div class="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
+            <div role="group" aria-label="Filter mode" class="inline-flex border border-slate-200 bg-white p-0.5 shadow-sm">
               <button
                 type="button"
                 @click="filterMode = 'monthly'"
-                class="rounded px-2 py-1 text-xs font-medium transition"
-                :class="filterMode === 'monthly' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                class="h-6 px-3 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                :class="filterMode === 'monthly' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-500 hover:bg-teal-50 hover:text-teal-800'"
               >
                 Month
               </button>
               <button
                 type="button"
                 @click="filterMode = 'custom'"
-                class="rounded px-2 py-1 text-xs font-medium transition"
-                :class="filterMode === 'custom' ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                class="h-6 px-3 text-[11px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+                :class="filterMode === 'custom' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-500 hover:bg-teal-50 hover:text-teal-800'"
               >
                 Custom
               </button>
             </div>
           </div>
           <div v-if="filterMode === 'monthly'">
-            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Year</label>
             <select
+              aria-label="Year"
               v-model.number="selectedYear"
-              class="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              class="h-7 border border-slate-300 bg-white py-0 pl-2 pr-7 text-[11px] font-medium text-slate-800 shadow-sm transition focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400"
             >
               <option v-for="year in yearOptions" :key="`year-${year}`" :value="year">{{ year }}</option>
             </select>
           </div>
           <div v-if="filterMode === 'monthly'">
-            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Month</label>
             <select
+              aria-label="Month"
               v-model.number="selectedMonth"
-              class="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              class="h-7 border border-slate-300 bg-white py-0 pl-2 pr-7 text-[11px] font-medium text-slate-800 shadow-sm transition focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400"
             >
               <option v-for="month in monthOptions" :key="`month-${month.value}`" :value="month.value">{{ month.label }}</option>
             </select>
           </div>
           <div v-if="filterMode === 'custom'" class="min-w-[220px] flex-1 sm:max-w-[280px]">
-            <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date Range</label>
             <flat-pickr
+              aria-label="Date range"
               v-model="customDateRange"
               :config="customRangePickerConfig"
-              class="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              class="h-7 w-full border border-slate-300 bg-white py-0 pl-2 pr-7 text-[11px] font-medium text-slate-800 shadow-sm transition focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400"
               placeholder="Select date range"
             />
           </div>
-          <div v-if="checkinoutLoading" class="flex items-center gap-1.5 pb-0.5 text-xs text-slate-500 dark:text-slate-400">
+          <div v-if="checkinoutLoading" class="flex items-center gap-1.5 pb-0.5 text-[11px] text-teal-700">
             <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
             </svg>
             Loading...
           </div>
+        <!-- Sub-tabs: Attendance / Override History -->
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-1 self-end">
+          <button
+            type="button"
+            @click="biometricsViewTab = 'attendance'"
+            :class="[
+              'h-7 whitespace-nowrap border-b-2 px-3 text-[11px] font-semibold transition-colors',
+              biometricsViewTab === 'attendance' ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-teal-700'
+            ]"
+          >Attendance Record</button>
+          <button
+            v-if="isSuperAdmin"
+            type="button"
+            @click="biometricsViewTab = 'history'"
+            :class="[
+              'h-7 whitespace-nowrap border-b-2 px-3 text-[11px] font-semibold transition-colors',
+              biometricsViewTab === 'history' ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-teal-700'
+            ]"
+          >Override History</button>
+        </div>
+
         </div>
     </div>
 
@@ -1653,33 +1676,12 @@ const saveEditedUser = async (payload) => {
       </div>
 
       <!-- ── TAB: ATTENDANCE ── -->
-      <div v-if="activeTab === 'biometrics'" class="space-y-1.5">
+      <div v-if="activeTab === 'biometrics'" class="space-y-0">
         <!-- Filters -->
 
 
-        <!-- Sub-tabs: Attendance / Override History -->
-        <div class="flex items-center gap-1">
-          <button
-            type="button"
-            @click="biometricsViewTab = 'attendance'"
-            :class="[
-              'rounded-md px-2.5 py-1 text-xs font-medium transition',
-              biometricsViewTab === 'attendance' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-            ]"
-          >Attendance Record</button>
-          <button
-            v-if="isSuperAdmin"
-            type="button"
-            @click="biometricsViewTab = 'history'"
-            :class="[
-              'rounded-md px-2.5 py-1 text-xs font-medium transition',
-              biometricsViewTab === 'history' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-            ]"
-          >Override History</button>
-        </div>
-
         <!-- Override History -->
-        <div v-if="biometricsViewTab === 'history' && isSuperAdmin" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+        <div v-if="biometricsViewTab === 'history' && isSuperAdmin" class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
           <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
             <h3 class="text-sm font-semibold text-slate-800 dark:text-white/90">Override History</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -1689,19 +1691,19 @@ const saveEditedUser = async (payload) => {
           <div class="overflow-x-auto">
             <table class="min-w-full border-collapse">
               <thead>
-                <tr class="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Action</th>
-                  <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Old Value</th>
-                  <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">New Value</th>
-                  <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Created By</th>
-                  <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Modified By</th>
-                  <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Updated At</th>
-                  <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</th>
+                <tr class="border-b border-slate-700 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] text-white">
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-100">Action</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-100">Old Value</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-100">New Value</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-100">Created By</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-100">Modified By</th>
+                  <th class="px-4 py-2 text-left text-[11px] font-semibold text-slate-100">Updated At</th>
+                  <th class="px-4 py-2 text-right text-[11px] font-semibold text-slate-100">Actions</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                 <tr v-if="!overrideHistoryRows.length">
-                  <td colspan="7" class="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colspan="7" class="px-4 py-8 text-center text-[11px] text-slate-400">
                     No override history records for selected month.
                   </td>
                 </tr>
@@ -1710,17 +1712,17 @@ const saveEditedUser = async (payload) => {
                   :key="`override-history-${row.id}`"
                   class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
                 >
-                  <td class="px-4 py-3 text-sm">
+                  <td class="px-3 py-2 text-[11px]">
                     <span
                       :class="row.action_type === 'add'
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                         : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'"
-                      class="rounded-md px-2 py-0.5 text-xs font-bold uppercase"
+                      class="px-1.5 py-0.5 text-[10px] font-semibold uppercase"
                     >
                       {{ row.action_type === 'add' ? 'added' : row.action_type }}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                  <td class="px-3 py-2 text-[11px] text-slate-600 dark:text-slate-300">
                     <template v-if="row.old_checktime || row.old_checktype">
                       {{ formatLogDateTime(row.old_checktime) }} · {{ row.old_checktype || '-' }}
                     </template>
@@ -1728,25 +1730,25 @@ const saveEditedUser = async (payload) => {
                       -
                     </template>
                   </td>
-                  <td class="px-4 py-3 text-sm font-medium text-slate-800 dark:text-slate-100">
+                  <td class="px-3 py-2 text-[11px] font-medium text-slate-800 dark:text-slate-100">
                     {{ formatLogDateTime(row.new_checktime) }} · {{ row.new_checktype || '-' }}
                   </td>
-                  <td class="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{{ row.created_by_name || '-' }}</td>
-                  <td class="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{{ row.updated_by_name || row.created_by_name || '-' }}</td>
-                  <td class="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{{ formatLogDateTime(row.updated_at || row.created_at) }}</td>
-                  <td class="px-4 py-3 text-right">
+                  <td class="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">{{ row.created_by_name || '-' }}</td>
+                  <td class="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">{{ row.updated_by_name || row.created_by_name || '-' }}</td>
+                  <td class="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">{{ formatLogDateTime(row.updated_at || row.created_at) }}</td>
+                  <td class="px-3 py-2 text-right">
                     <div class="flex justify-end gap-2">
                       <button
                         type="button"
                         @click="openEditOverrideLog(toOverrideEditableLog(row))"
-                        class="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        class="border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         @click="deleteOverrideLog(toOverrideEditableLog(row))"
-                        class="rounded-md border border-rose-200 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                        class="border border-rose-200 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"
                       >
                         Delete
                       </button>
@@ -1759,38 +1761,31 @@ const saveEditedUser = async (payload) => {
         </div>
 
         <!-- Attendance table -->
-        <div v-if="biometricsViewTab === 'attendance'" class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-          <div class="border-b border-slate-200 px-2.5 py-1.5 dark:border-slate-800 sm:px-3 sm:py-2">
-            <h3 class="text-sm font-semibold text-slate-800 dark:text-white/90">Attendance Record</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              {{ selectedPeriodLabel }}
-            </p>
-          </div>
+        <div v-if="biometricsViewTab === 'attendance'" class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
           <div class="overflow-x-auto overscroll-x-contain">
             <table class="w-max min-w-full border-collapse">
               <thead>
-                <tr class="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
-                  <th class="min-w-[160px] whitespace-nowrap px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-3 sm:py-2">Day</th>
+                <tr class="border-b border-slate-700 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] text-white">
+                  <th class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[160px] whitespace-nowrap px-1 py-1.5 text-center text-[11px] font-semibold leading-4 text-slate-100">Day</th>
                   <template v-for="(slot, index) in scheduleSlots" :key="`head-${slot.sequence || index}`">
-                    <th class="min-w-[100px] whitespace-nowrap px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-3 sm:py-2">
+                    <th class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[80px] whitespace-nowrap px-1 py-1.5 text-center text-[11px] font-semibold leading-4 text-slate-100">
                       Check In{{ scheduleSlots.length > 1 ? ` ${index + 1}` : '' }}
                     </th>
-                    <th class="min-w-[100px] whitespace-nowrap px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-3 sm:py-2">
+                    <th class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[80px] whitespace-nowrap px-1 py-1.5 text-center text-[11px] font-semibold leading-4 text-slate-100">
                       Check Out{{ scheduleSlots.length > 1 ? ` ${index + 1}` : '' }}
                     </th>
                   </template>
-                  <th class="min-w-[120px] whitespace-nowrap px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-3 sm:py-2">Absence</th>
-                  <th class="min-w-[150px] whitespace-nowrap px-2 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:px-3 sm:py-2">Logs</th>
+                  <th class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[130px] whitespace-nowrap px-1 py-1.5 text-center text-[11px] font-semibold leading-4 text-slate-100">Action</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                 <tr v-if="checkinoutLoading">
-                  <td :colspan="3 + (scheduleSlots.length * 2)" class="px-5 py-10 text-center text-sm text-slate-400">
+                  <td :colspan="2 + (scheduleSlots.length * 2)" class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 px-5 py-10 text-center text-sm text-slate-400">
                     Loading attendance data…
                   </td>
                 </tr>
                 <tr v-else-if="!attendanceRows.length">
-                  <td :colspan="3 + (scheduleSlots.length * 2)" class="px-5 py-10 text-center text-sm text-slate-400">
+                  <td :colspan="2 + (scheduleSlots.length * 2)" class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 px-5 py-10 text-center text-sm text-slate-400">
                     No attendance records for selected month.
                   </td>
                 </tr>
@@ -1802,66 +1797,65 @@ const saveEditedUser = async (payload) => {
                     ? 'bg-rose-50/70 hover:bg-rose-100/70 dark:bg-rose-950/15 dark:hover:bg-rose-950/25'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'"
                 >
-                  <td class="min-w-[160px] px-2 py-1.5 text-center sm:px-3 sm:py-2">
+                  <td class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[160px] px-1 py-1 text-center leading-4">
                     <span
-                      class="whitespace-nowrap text-sm font-semibold"
+                      class="whitespace-nowrap text-xs font-semibold"
                       :class="isHolidayOrWeekend(row) ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-white'"
                     >
                       {{ formatDateOnly(row.date) }}
-                      <span class="ml-1 text-xs font-bold">{{ formatDayName(row.date) }}</span>
-                    </span><span v-if="row.resolved_schedule" class="block whitespace-nowrap text-[10px]" :class="isHolidayOrWeekend(row) ? 'text-rose-500 dark:text-rose-400' : 'text-slate-500'">{{ row.resolved_schedule._is_working_day === false ? 'Rest day' : row.resolved_schedule.name }} &middot; {{ (row.resolved_schedule.schedules || []).map(s => `${formatScheduleTime(s.time_in)}–${formatScheduleTime(s.time_out)}`).join(', ') }}</span><span v-if="row.resolved_schedule?._holiday_credit_minutes" class="block whitespace-nowrap text-[10px] text-rose-600 dark:text-rose-400">{{ row.resolved_schedule._holiday_credit_minutes / 60 }} hours holiday / suspension credit</span>
+                      <span class="ml-1 text-[10px] font-semibold">{{ formatDayName(row.date) }}</span>
+                    </span><span v-if="row.resolved_schedule" class="block whitespace-nowrap text-[10px] leading-3" :class="isHolidayOrWeekend(row) ? 'text-rose-500 dark:text-rose-400' : 'text-slate-500'"><span class="block">{{ row.resolved_schedule._is_working_day === false ? 'Rest day' : row.resolved_schedule.name }}</span><span class="block">{{ (row.resolved_schedule.schedules || []).map(s => `${formatScheduleTime(s.time_in)}–${formatScheduleTime(s.time_out)}`).join(', ') }}</span></span><span v-if="row.resolved_schedule?._holiday_credit_minutes" class="block whitespace-nowrap text-[10px] leading-3 text-rose-600 dark:text-rose-400">{{ row.resolved_schedule._holiday_credit_minutes / 60 }} hours holiday / suspension credit</span>
                   </td>
                   <template v-for="(slot, index) in row.slots" :key="`slot-${row.date}-${index}`">
-                    <td class="min-w-[100px] px-2 py-1.5 text-center sm:px-3 sm:py-2">
-                      <div class="flex flex-col items-center gap-1">
+                    <td class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[80px] px-1 py-1 text-center leading-4">
+                      <div class="flex flex-col items-center gap-0.5">
                         <span
                           v-if="slot.check_in_action"
                           :class="slot.check_in_action === 'add' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'"
-                          class="rounded-md px-2 leading-none text-[10px] font-bold uppercase"
+                          class="px-1 leading-none text-[10px] font-bold uppercase"
                         >
                           {{ slot.check_in_action === 'add' ? 'added' : slot.check_in_action }}
                         </span>
                         <span
                           :class="slot.check_in ? 'font-semibold text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'"
-                          class="text-sm"
+                          class="text-xs tabular-nums"
                         >{{ formatTimeOnly(slot.check_in) }}</span>
 
                       </div>
                     </td>
-                    <td class="min-w-[100px] px-2 py-1.5 text-center sm:px-3 sm:py-2">
-                      <div class="flex flex-col items-center gap-1">
+                    <td class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[80px] px-1 py-1 text-center leading-4">
+                      <div class="flex flex-col items-center gap-0.5">
                         <span
                           v-if="slot.check_out_action"
                           :class="slot.check_out_action === 'add' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'"
-                          class="rounded-md px-2 leading-none text-[10px] font-bold uppercase"
+                          class="px-1 leading-none text-[10px] font-bold uppercase"
                         >
                           {{ slot.check_out_action }}
                         </span>
                         <span
                           :class="slot.check_out ? 'font-semibold text-rose-500 dark:text-rose-400' : 'text-slate-300 dark:text-slate-600'"
-                          class="text-sm"
+                          class="text-xs tabular-nums"
                         >{{ formatTimeOnly(slot.check_out) }}</span>
 
                       </div>
                     </td>
                   </template>
-                  <td class="min-w-[120px] px-2 py-1.5 text-center sm:px-3 sm:py-2">
+
+                  <td class="border-r border-slate-100 last:border-r-0 dark:border-slate-800 min-w-[130px] px-1 py-1 text-center leading-4">
+                    <div class="flex flex-wrap items-center justify-center gap-1.5">
                     <button
                       v-if="isSuperAdmin && canManageAbsence(row.date)"
                       type="button"
                       @click="manageAbsence(row)"
                       :class="row.absence?.status === 'filed' ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/60 dark:text-emerald-300 dark:hover:bg-emerald-900/20' : row.absence?.status === 'unfiled' ? 'border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'"
-                      class="rounded-lg border px-2.5 py-1 text-xs font-medium transition"
+                      class="border px-1.5 py-0.5 text-[10px] font-semibold leading-4 transition"
                     >{{ row.absence ? absenceLabel(row.absence) : 'Mark absence' }}</button>
                     <span v-else-if="row.absence" :class="row.absence.status === 'filed' ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'" class="text-xs font-medium">{{ absenceLabel(row.absence) }}</span>
-                    <span v-else class="text-slate-400">-</span>
-                  </td>
-                  <td class="min-w-[150px] px-2 py-1.5 text-center sm:px-3 sm:py-2">
-                    <div class="flex flex-nowrap justify-center gap-2">
+
                       <button
                         type="button"
                         @click="openRawLogs(row.date)"
-                        class="rounded-lg border border-sky-200 px-2.5 py-1 text-xs font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                        class="border border-teal-200 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-teal-700 transition hover:bg-teal-50 dark:border-teal-800/60 dark:text-teal-300 dark:hover:bg-teal-900/20"
                       >
                         View Logs
                       </button>
@@ -1869,7 +1863,7 @@ const saveEditedUser = async (payload) => {
                         v-if="isSuperAdmin"
                         type="button"
                         @click="openAddBiometricLog(row.date)"
-                        class="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-800/60 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
+                        class="border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-800/60 dark:text-emerald-300 dark:hover:bg-emerald-900/20"
                       >
                         Add Log
                       </button>
@@ -1884,35 +1878,35 @@ const saveEditedUser = async (payload) => {
         <!-- Raw Logs Modal -->
         <Modal v-if="rawLogModalOpen" @close="closeRawLogs">
           <template #body>
-            <div class="relative m-2 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-slate-900">
-              <div class="mb-4 flex items-start justify-between gap-3">
+            <div class="relative m-2 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-300 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+              <div class="flex items-start justify-between gap-3 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] px-4 py-3 text-white">
                 <div>
-                  <h4 class="text-lg font-semibold text-slate-800 dark:text-white/90">Raw Biometric Logs</h4>
-                  <p class="text-sm font-medium text-slate-600 dark:text-slate-400">{{ formatDateOnly(rawLogModalDate) }}</p>
-                  <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">All entries shown as-is, including duplicates.</p>
+                  <h4 class="text-sm font-semibold text-white">Raw Biometric Logs</h4>
+                  <p class="mt-1 text-[11px] font-medium text-cyan-100">{{ formatDateOnly(rawLogModalDate) }}</p>
+                  <p class="mt-0.5 text-[10px] text-slate-300">All entries shown as-is, including duplicates.</p>
                 </div>
                 <button
                   @click="closeRawLogs"
                   type="button"
-                  class="rounded-xl border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  class="border border-white/20 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                 >Close</button>
               </div>
 
-              <div class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <div class="overflow-hidden">
                 <div class="max-h-[55vh] overflow-auto">
                   <table class="min-w-full">
                     <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800">
                       <tr>
-                        <th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">#</th>
-                        <th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</th>
-                        <th class="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date / Time</th>
-                        <th v-if="isSuperAdmin" class="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">#</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Type</th>
+                        <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Date / Time</th>
+                        <th v-if="isSuperAdmin" class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Actions</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                      <tr v-if="rawLogError"><td :colspan="isSuperAdmin ? 4 : 3" class="px-4 py-2 text-sm text-rose-600">{{ rawLogError }}</td></tr>
+                      <tr v-if="rawLogError"><td :colspan="isSuperAdmin ? 4 : 3" class="px-4 py-2 text-xs text-rose-600">{{ rawLogError }}</td></tr>
                       <tr v-if="!rawLogRows.length">
-                        <td :colspan="isSuperAdmin ? 4 : 3" class="px-4 py-8 text-center text-sm text-slate-400">No biometric logs for this day.</td>
+                        <td :colspan="isSuperAdmin ? 4 : 3" class="px-4 py-8 text-center text-xs text-slate-400">No biometric logs for this day.</td>
                       </tr>
                       <tr
                         v-else
@@ -1920,40 +1914,40 @@ const saveEditedUser = async (payload) => {
                         :key="`user-log-${index}-${log.CHECKTIME}`"
                         class="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                       >
-                        <td class="px-4 py-2.5 text-sm text-slate-400 dark:text-slate-500">{{ index + 1 }}</td>
-                        <td class="px-4 py-2.5">
+                        <td class="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">{{ index + 1 }}</td>
+                        <td class="px-3 py-2">
                           <div class="flex items-center gap-2">
                             <span
                               :class="log.CHECKTYPE === 'I'
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                               : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'"
-                              class="rounded-md px-2 py-0.5 text-xs font-bold"
+                              class="px-2 py-0.5 text-[10px] font-semibold"
                             >
                               {{ log.CHECKTYPE === 'I' ? 'IN' : log.CHECKTYPE === 'O' ? 'OUT' : log.CHECKTYPE || '-' }}
                             </span>
-                                <span v-if="log._deleted" class="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">DELETED</span>
-                                <span v-if="log._override_action" class="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                <span v-if="log._deleted" class="bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">DELETED</span>
+                                <span v-if="log._override_action" class="bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                   {{ log._override_action === 'add' ? 'added' : log._override_action }}
                                 </span>
                           </div>
                         </td>
-                        <td class="px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME) }}</td>
-                        <td v-if="isSuperAdmin" class="px-4 py-2.5 text-right">
+                        <td class="px-3 py-2 text-xs text-slate-700 dark:text-slate-200">{{ formatLogDateTime(log.CHECKTIME) }}</td>
+                        <td v-if="isSuperAdmin" class="px-3 py-2 text-right">
                           <div class="flex justify-end gap-2">
                             <button
                               v-if="!log._override_id && !log._deleted"
                               type="button"
                               @click="openOverrideBiometricLog(log)"
-                              class="rounded-md border border-sky-200 px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                              class="border border-teal-200 px-2 py-1 text-[10px] font-semibold text-teal-700 hover:bg-teal-50 dark:border-teal-800/60 dark:text-teal-300 dark:hover:bg-teal-900/20"
                             >
                               Override
                             </button>
-                            <button v-if="!log._override_id" type="button" :disabled="rawLogSaving" @click="changeRawLog(log)" class="rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-50" :class="log._deleted ? 'border-emerald-300 text-emerald-600' : 'border-rose-300 text-rose-600'">{{ log._deleted ? 'Restore' : 'Delete' }}</button>
+                            <button v-if="!log._override_id" type="button" :disabled="rawLogSaving" @click="changeRawLog(log)" class="border px-2 py-1 text-[10px] font-semibold disabled:opacity-50" :class="log._deleted ? 'border-emerald-300 text-emerald-600' : 'border-rose-300 text-rose-600'">{{ log._deleted ? 'Restore' : 'Delete' }}</button>
                             <button
                               v-if="log._override_id"
                               type="button"
                               @click="openEditOverrideLog(log)"
-                              class="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                              class="border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                             >
                               Edit
                             </button>
@@ -1961,7 +1955,7 @@ const saveEditedUser = async (payload) => {
                               v-if="log._override_id"
                               type="button"
                               @click="deleteOverrideLog(log)"
-                              class="rounded-md border border-rose-200 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                              class="border border-rose-200 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-800/60 dark:text-rose-300 dark:hover:bg-rose-900/20"
                             >
                               Delete
                             </button>
@@ -1978,7 +1972,7 @@ const saveEditedUser = async (payload) => {
       </div>
 
       <!-- ── TAB: PRINT ── -->
-      <div v-if="activeTab === 'print'" class="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+      <div v-if="activeTab === 'print'" class="min-w-0 border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/50">
         <PrintableAttendance
           :user="selectedUser"
           :selected-year="selectedYear"
@@ -2010,3 +2004,91 @@ const saveEditedUser = async (payload) => {
     </template>
   </div>
 </template>
+
+<style>
+.swal2-popup.biometric-log-dialog {
+  position: relative;
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  border: 1px solid #cbd5e1;
+  border-radius: 0;
+  overflow: hidden;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 25%);
+}
+.biometric-log-dialog .biometric-log-title {
+  margin: 0;
+  padding: 16px 48px 16px 20px;
+  background: linear-gradient(135deg, #0f172a, #1e293b 40%, #0f766e);
+  color: #fff;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.biometric-log-dialog .biometric-log-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  margin: 10px;
+  color: #cbd5e1;
+  font-size: 24px;
+  box-shadow: none;
+}
+.biometric-log-dialog .biometric-log-close:hover { color: #fff; background: rgb(255 255 255 / 10%); }
+.biometric-log-dialog .biometric-log-body { margin: 0; padding: 20px; text-align: left; }
+.biometric-log-dialog .biometric-log-body label { font-size: 10px; color: #64748b; }
+.biometric-log-dialog .swal2-input,
+.biometric-log-dialog .swal2-select {
+  box-sizing: border-box;
+  height: 36px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: none;
+  font-size: 12px;
+}
+.biometric-log-dialog .swal2-input:focus,
+.biometric-log-dialog .swal2-select:focus { outline: 2px solid rgb(20 184 166 / 20%); border-color: #0d9488; }
+.biometric-log-dialog .biometric-log-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.biometric-log-dialog .biometric-log-save,
+.biometric-log-dialog .biometric-log-cancel {
+  min-height: 30px;
+  margin: 0;
+  padding: 5px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.biometric-log-dialog .biometric-log-save { border-color: #0d9488; background: linear-gradient(135deg, #0891b2, #0f766e); color: #fff; }
+.biometric-log-dialog .biometric-log-save:hover { background: #0f766e; }
+.biometric-log-dialog .biometric-log-cancel { background: #fff; color: #475569; }
+.biometric-log-dialog .biometric-log-cancel:hover { background: #f1f5f9; }
+.biometric-log-dialog .biometric-log-save:focus-visible,
+.biometric-log-dialog .biometric-log-cancel:focus-visible { outline: 2px solid #14b8a6; outline-offset: 2px; }
+.biometric-log-dialog .swal2-validation-message { margin: 0; padding: 10px 20px; font-size: 12px; }
+
+.absence-dialog .biometric-log-body label { display: block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.absence-dialog .biometric-log-body .swal2-select { display: block; width: 100%; margin: 6px 0 0; font-weight: 400; text-transform: none; letter-spacing: normal; }
+.biometric-log-dialog .biometric-log-clear { min-height: 30px; margin: 0; padding: 5px 10px; border: 1px solid #fecdd3; border-radius: 0; background: #fff1f2; color: #be123c; font-size: 11px; font-weight: 600; }
+.biometric-log-dialog .biometric-log-clear:hover { background: #ffe4e6; }
+.biometric-log-dialog .biometric-log-actions { flex-wrap: wrap; }
+</style>

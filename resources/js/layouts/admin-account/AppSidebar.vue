@@ -1,11 +1,11 @@
 <template>
   <aside
     :class="[
-      'admin-sidebar fixed flex flex-col top-0 px-4 left-0 text-slate-200 h-screen transition-all duration-300 ease-in-out z-40 border-r',
+      'admin-sidebar fixed flex flex-col top-0 px-3 left-0 text-slate-200 h-screen transition-all duration-300 ease-in-out z-40 border-r',
       {
-        'lg:w-[250px]': isExpanded || isMobileOpen || isHovered,
+        'lg:w-[200px]': isExpanded || isMobileOpen || isHovered,
         'lg:w-[72px]': !isExpanded && !isHovered,
-        'translate-x-0 w-[250px]': isMobileOpen,
+        'translate-x-0 w-[200px]': isMobileOpen,
         '-translate-x-full': !isMobileOpen,
         'lg:translate-x-0': true,
       },
@@ -39,7 +39,7 @@
     </button>
     <div
       :class="[
-        'py-6 flex',
+        'py-4 flex',
         !isExpanded && !isHovered ? 'lg:justify-center' : 'justify-start',
       ]"
     >
@@ -49,7 +49,7 @@
           class="dark:hidden "
           :src="'/images/logo/banner_white_mode.png'"
           alt="Logo"
-          width="250"
+          width="176"
           height="40"
         />
         <img
@@ -57,7 +57,7 @@
           class="hidden dark:block"
           :src="'/images/logo/banner_white_mode.png'"
           alt="Logo"
-          width="250"
+          width="176"
           height="40"
         />
         <img
@@ -70,12 +70,12 @@
       </router-link>
     </div>
     <div class="flex flex-col flex-1 overflow-y-auto duration-300 ease-linear no-scrollbar">
-      <nav class="mb-6">
-        <div class="flex flex-col gap-4">
+      <nav class="mb-4">
+        <div class="flex flex-col gap-2">
           <div v-for="(menuGroup, groupIndex) in menuGroups" :key="groupIndex">
             <h2
               :class="[
-                'mb-3 text-[11px] font-semibold uppercase flex tracking-[0.2em] leading-[20px] text-slate-300',
+                'mb-1.5 text-[10px] font-semibold uppercase flex tracking-[0.15em] leading-[18px] text-slate-300',
                 !isExpanded && !isHovered
                   ? 'lg:justify-center'
                   : 'justify-start',
@@ -86,7 +86,7 @@
               </template>
               <HorizontalDots v-else />
             </h2>
-            <ul class="flex flex-col gap-4">
+            <ul class="flex flex-col gap-2">
               <li v-for="(item, index) in menuGroup.items" :key="item.name">
                 <button
                   v-if="item.subItems"
@@ -119,7 +119,7 @@
                   <ChevronDownIcon
                     v-if="isExpanded || isHovered || isMobileOpen"
                     :class="[
-                      'ml-auto w-5 h-5 transition-transform duration-200',
+                      'ml-auto w-4 h-4 transition-transform duration-200',
                       {
                         'rotate-180 text-sky-200': isSubmenuOpen(
                           groupIndex,
@@ -167,7 +167,7 @@
                       (isExpanded || isHovered || isMobileOpen)
                     "
                   >
-                    <ul class="mt-2 space-y-1 ml-9">
+                    <ul class="mt-1 space-y-0.5 ml-6">
                       <li v-for="subItem in item.subItems" :key="subItem.name">
                         <router-link
                           :to="subItem.path"
@@ -229,7 +229,7 @@
         </div>
       </nav>
     </div>
-    <div class="flex items-center gap-2 py-4 border-t border-white/15">
+    <div class="flex items-center gap-2 py-2 border-t border-white/15">
       <ThemeToggler />
       <button
         type="button"
@@ -275,7 +275,7 @@ const route = useRoute();
 const { isExpanded, isMobileOpen, isHovered, openSubmenu, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
 const handleToggle = () => {
-  if (window.innerWidth >= 991) {
+  if (window.innerWidth >= 1024) {
     toggleSidebar()
   } else {
     toggleMobileSidebar()
@@ -385,3 +385,20 @@ const endTransition = (el) => {
   el.style.height = "";
 }
 </script>
+
+<style scoped>
+.admin-sidebar .menu-item {
+  gap: 8px;
+  padding: 7px 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.admin-sidebar .menu-dropdown-item {
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 17px;
+}
+.admin-sidebar .menu-item :deep(svg) { width: 18px; height: 18px; flex-shrink: 0; }
+.admin-sidebar :deep(.menu-item-text) { font-size: 12px; }
+</style>

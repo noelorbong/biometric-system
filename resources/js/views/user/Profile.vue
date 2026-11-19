@@ -82,6 +82,7 @@ const editUser = (event) => {
     id: event.id,
     name: event.name,
     email: event.email,
+    username: event.username || '',
     role: event.role,
     status: Number(event.status),
     office_shift_id: event.office_shift_id ?? null,
@@ -116,78 +117,49 @@ const selectedCollege = (event) => {
 </script>
 <template>
   <div class="space-y-3">
-    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky p-2 top-0 z-20 -mr-4 border pb-4 shadow-sm md:-mr-6">
-      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1 class="text-lg font-semibold text-slate-900 dark:text-white">User Profile</h1>
-          <span class="text-xs text-slate-500 dark:text-slate-400">{{ user?.email || 'No email set' }}</span>
-          <span class="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">{{ roleMap[user?.role] || '-' }}</span>
-          <span class="rounded px-1.5 py-0.5 text-[11px] font-semibold" :class="user?.status ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'">
+    <section class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h1 class="text-base font-semibold text-slate-900 dark:text-white">User Profile</h1>
+          <span :title="user?.email || user?.username" class="max-w-[180px] truncate text-[10px] text-slate-500 dark:text-slate-400">{{ user?.email || user?.username || 'No email set' }}</span>
+          <span class="rounded-none bg-teal-50 px-1.5 py-0.5 text-[11px] font-semibold text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">{{ roleMap[user?.role] || '-' }}</span>
+          <span class="rounded-none px-1.5 py-0.5 text-[11px] font-semibold" :class="user?.status ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'">
             {{ user?.status ? 'Active' : 'Inactive' }}
           </span>
         </div>
-        <div class="flex flex-wrap items-center gap-2 min-[800px]:justify-end">
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             @click="router.push({ name: 'UserView', params: { id: user?.id } })"
-            class="inline-flex h-9 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-sky-800/60 dark:bg-sky-900/20 dark:text-sky-300"
+            class="inline-flex h-7 items-center gap-1.5 rounded-none border border-teal-200 bg-teal-50 px-2.5 text-[11px] font-medium text-teal-700 transition hover:bg-teal-100 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-teal-800/60 dark:bg-teal-900/20 dark:text-teal-300"
           >
             My Biometric
           </button>
           <button
             type="button"
             @click="editUser(user)"
-            class="inline-flex h-9 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-sky-800/60 dark:bg-sky-900/20 dark:text-sky-300"
+            class="inline-flex h-7 items-center gap-1.5 rounded-none border border-teal-200 bg-teal-50 px-2.5 text-[11px] font-medium text-teal-700 transition hover:bg-teal-100 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-teal-800/60 dark:bg-teal-900/20 dark:text-teal-300"
           >
-            <PencilIcon />
+            <PencilIcon class="h-3 w-3" />
             Edit Profile
           </button>
         </div>
       </div>
     </section>
 
-    <section class="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-1 text-xs">
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">Role</p>
-        <p class="font-semibold text-slate-900 dark:text-white">{{ roleMap[user?.role] || '-' }}</p>
-      </article>
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">Status</p>
-        <p class="font-semibold" :class="user?.status ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'">
-          {{ user?.status ? 'Active' : 'Inactive' }}
-        </p>
-      </article>
-      <article class="flex items-baseline gap-1.5">
-        <p class="font-medium text-slate-500 dark:text-slate-400">User ID</p>
-        <p class="font-semibold text-slate-900 dark:text-white">#{{ user?.id || '-' }}</p>
-      </article>
-    </section>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
-      <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
-        <div>
-          <h2 class="text-sm font-semibold text-slate-900 dark:text-white">My Biometric</h2>
-          <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Attendance, logs, and printable record.</p>
-        </div>
-        <button
-          type="button"
-          @click="router.push({ name: 'UserView', params: { id: user?.id } })"
-          class="inline-flex h-8 items-center justify-center rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100 dark:border-sky-800/60 dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/30"
-        >
-          Open Biometric Page
-        </button>
-      </div>
-    </section>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
+
+
+    <section class="rounded-none border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
       <div class="mb-2 flex items-center justify-between gap-3">
-        <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Profile Information</h2>
+        <h2 class="text-xs font-semibold text-slate-900 dark:text-white">Profile Information</h2>
         <button
           type="button"
            @click="editUser(user)"
-          class="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 px-2.5 text-xs font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-800/60 dark:text-sky-300 dark:hover:bg-sky-900/20"
+          class="inline-flex h-7 items-center gap-1.5 rounded-none border border-teal-200 px-2.5 text-[11px] font-medium text-teal-700 transition hover:bg-teal-50 dark:border-teal-800/60 dark:text-teal-300 dark:hover:bg-teal-900/20"
         >
-          <PencilIcon />
+          <PencilIcon class="h-3 w-3" />
           Edit
         </button>
       </div>

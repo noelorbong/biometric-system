@@ -1,27 +1,29 @@
 <template>
-    <div class="space-y-4">
+    <div class="space-y-3">
         <!-- Print Header Controls -->
-        <div v-if="showControls"
-            class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 print:hidden">
-            <div class="flex flex-col gap-2">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Printable Daily Time Record</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Print official attendance record for payroll</p>
+        <div v-if="showControls" class="flex flex-col justify-between gap-3 border border-slate-700 bg-[linear-gradient(135deg,_#0f172a_0%,_#1e293b_40%,_#0f766e_100%)] px-4 py-3 text-white md:flex-row md:items-center print:hidden">
+            <div class="flex min-w-0 items-center gap-3">
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center border border-white/15 bg-white/5 text-cyan-200">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 17H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v7H6zM17 12h1" /></svg>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-white">Daily Time Record</h3>
+                    <p class="mt-0.5 text-[11px] text-slate-300">{{ monthYearDisplay }} <span class="mx-1 text-teal-300">&middot;</span> Print preview</p>
+                </div>
             </div>
-            <div class="flex items-center gap-3">
-                <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    <input v-model="useCalculatedUndertime" type="checkbox" class="h-4 w-4" />
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <label class="flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-slate-200">
+                    <input v-model="useCalculatedUndertime" type="checkbox" class="h-3.5 w-3.5 border-white/30 bg-slate-900 text-teal-500 focus:ring-teal-400 focus:ring-offset-slate-900" />
                     Calculate Undertime
                 </label>
-                <div class="flex items-center gap-2">
-                    <label
-                        class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Copies:</label>
-                    <select v-model.number="copies"
-                        class="h-9 px-3 rounded border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-200 font-medium">
+                <div class="flex items-center gap-1.5">
+                    <label for="dtr-copies" class="whitespace-nowrap text-[11px] font-medium text-slate-300">Copies</label>
+                    <select id="dtr-copies" v-model.number="copies" class="h-7 border border-white/20 bg-slate-900 py-0 pl-2 pr-7 text-[11px] font-semibold text-white focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400">
                         <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
                     </select>
                 </div>
-                <button @click="handlePrint"
-                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+                <button type="button" @click="handlePrint" class="inline-flex h-7 items-center gap-1.5 border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-3 text-[11px] font-semibold text-white shadow-sm transition hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 17H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v7H6z" /></svg>
                     Print Record
                 </button>
             </div>
@@ -29,7 +31,7 @@
 
         <!-- Print Layout -->
         <div ref="printContainer"
-            style="background: white; padding: 0px; border: 1px solid #d1d5db; border-radius: 8px; color: #111827;">
+            style="background: white; padding: 0px; border: 1px solid #d1d5db; border-radius: 0; color: #111827;">
             <DtrTemplateTwo v-if="isTemplateTwo" :user="user" :company-name="companyName" :company-logo="showLogo ? companyLogo : ''"
                 :header-address="dtrSettings.biometricDtrHeaderAddress" :layout-settings="dtrSettings"
                 :month-year="monthYearDisplay" :days="totalDaysInMonth" :record-value="getRecordValue" :undertime-value="getUndertimeValue"

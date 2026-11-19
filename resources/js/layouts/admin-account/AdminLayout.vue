@@ -77,7 +77,7 @@ let myEventHandler = (e) => {
     <app-sidebar ref="sideBar" />
     <Backdrop />
     <div class="flex-1 transition-all duration-300 ease-in-out"
-      :class="[isExpanded || isHovered ? 'lg:ml-[250px]' : 'lg:ml-[72px]']">
+      :class="[isExpanded || isHovered ? 'lg:ml-[200px]' : 'lg:ml-[72px]']">
       <div class="p-4 mx-auto max-w-screen-2xl md:p-6">
         <!-- <slot></slot> -->
         <router-view v-slot="{ Component }">

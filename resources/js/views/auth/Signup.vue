@@ -38,7 +38,7 @@
                 Sign Up
               </h1>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                Enter your email and password to sign up!
+                Choose a username and password to sign up. Email is optional.
               </p>
             </div>
             <div>
@@ -141,11 +141,15 @@
                   </div>
                   <!-- Email -->
                   <div>
+                    <label for="signup-username" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-400">Username</label>
+                    <input id="signup-username" v-model="username" :required="!email" type="text" minlength="3" maxlength="100" pattern="[a-zA-Z0-9._\-]+" autocomplete="username" placeholder="Choose a username" class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm dark:border-gray-700 dark:text-white" />
+                  </div>
+                  <div>
                     <label
                       for="email"
                       class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400"
                     >
-                      Email<span class="text-error-500">*</span>
+                      Email (optional)
                     </label>
                     <input
                       v-model="email"
@@ -318,6 +322,7 @@ import { RouterLink } from 'vue-router'
 const firstName = ref('')
 const lastName = ref('')
 const email = ref('')
+const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const agreeToTerms = ref(false)
@@ -331,7 +336,8 @@ const handleSubmit = () => {
   console.log('Form submitted', {
     firstName: firstName.value,
     lastName: lastName.value,
-    email: email.value,
+    email: email.value.trim() || null,
+    username: username.value.trim() || null,
     password: password.value,
     agreeToTerms: agreeToTerms.value,
   })

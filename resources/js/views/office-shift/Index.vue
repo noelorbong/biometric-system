@@ -212,20 +212,11 @@ const formatScheduleChip = (row) => {
 
 <template>
   <div class="space-y-3">
-    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky top-0 z-20 -mr-4 border p-3 pb-4 shadow-sm md:-mr-6 space-y-3">
-      <section>
-        <div class="flex flex-col gap-2 min-[800px]:flex-row min-[800px]:items-center min-[800px]:justify-between">
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Office Shift</h1>
-            <span class="text-xs text-slate-500 dark:text-slate-400">Shift templates and schedules</span>
-          </div>
-          <!-- <Button @click="openCreate" :className="'h-9 whitespace-nowrap rounded border border-cyan-600 bg-cyan-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-cyan-500 dark:border-cyan-500 dark:bg-cyan-500 dark:text-white'" size="sm" variant="primary" :startIcon="PlusIcon">
-            Add Office Shift
-          </Button> -->
-        </div>
-      </section>
-
-  <section class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+    <div class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="min-w-0 space-y-1">
+          <h1 class="text-base font-semibold text-white">Office Shift</h1>
+          <section class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10px]">
         <article class="flex items-baseline gap-1.5">
           <p class="font-medium text-slate-500 dark:text-slate-400">Total</p>
           <p class="font-semibold text-slate-900 dark:text-white">{{ totalShifts }}</p>
@@ -247,25 +238,17 @@ const formatScheduleChip = (row) => {
           <p class="font-semibold text-slate-900 dark:text-white">{{ assignedUsersTotal }}</p>
         </article>
       </section>
-
-  <section class="border-t border-slate-200 pt-3 dark:border-slate-800">
-        <div class="flex  gap-3 flex-row md:items-center">
-          <div class="relative flex-1">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 105.3 5.3a7.5 7.5 0 0011.35 11.35z" />
-            </svg>
-            <input
-              v-model="search"
-              type="text"
-              placeholder="Search office shift..."
-              class="h-9 w-full rounded border border-slate-300 bg-white pl-9 pr-3 text-xs text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950 dark:text-white/90"
-            />
-          </div>
-          <Button @click="openCreate" :className="'h-9 whitespace-nowrap rounded border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'" size="sm" variant="primary" :startIcon="PlusIcon">
-            New Shift
-          </Button>
         </div>
-      </section>
+        <div class="ml-auto flex min-w-0 flex-1 basis-[300px] items-stretch sm:max-w-[380px]">
+          <div class="relative min-w-0 flex-1">
+            <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+            <input v-model="search" type="search" aria-label="Search office shifts" placeholder="Search office shift..." class="h-7 w-full min-w-0 rounded-none border border-r-0 border-white/15 bg-slate-950/30 py-1 pl-8 pr-2 text-[11px] text-white outline-none placeholder:text-slate-400 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/30" />
+          </div>
+          <button type="button" @click="openCreate" class="inline-flex h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap border border-cyan-300/30 bg-[linear-gradient(135deg,_#0891b2_0%,_#0f766e_100%)] px-2 text-[11px] font-semibold text-white shadow-sm hover:bg-[linear-gradient(135deg,_#0e7490_0%,_#115e59_100%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40">
+            <PlusIcon class="h-3 w-3" /> New Shift
+          </button>
+        </div>
+      </div>
     </div>
 
     <section class="overflow-hidden border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-white/[0.03]">
