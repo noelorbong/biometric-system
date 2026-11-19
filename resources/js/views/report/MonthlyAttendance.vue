@@ -1,4 +1,6 @@
 <script setup>
+import { monthlyPrintTable } from '@/utils/monthlyReportPrint'
+import { buildMonthlyGrid } from '@/utils/monthlyReportGrid'
 import { finishPrintWindow } from '@/utils/printPreview'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -17,6 +19,7 @@ const activeTab = ref(route.query.tab === 'absences' ? 'absences' : 'attendance'
 const month = ref('')
 const shiftId = ref('')
 const report = shallowRef(null)
+const appliedFilters = shallowRef(null)
 const shifts = ref([])
 const loading = ref(false)
 const initializing = ref(true)
@@ -24,6 +27,10 @@ const error = ref('')
 const search = ref('')
 const issuesOnly = ref(false)
 const sort = ref('late_count')
+const page = ref(1)
+const pageSize = ref(50)
+const exporting = ref(false)
+let searchTimer
 const grid = ref(null)
 const editorContext = ref(null)
 const notice = ref('')
@@ -36,7 +43,7 @@ const leaveTypes = ['cto', 'vacation', 'sick', 'spl', 'without_pay']
 let requestId = 0
 let controller
 
-async function load() {
+async function load({ refresh = false } = {}) {
   const id = ++requestId
   controller?.abort()
   controller = new AbortController()
@@ -45,11 +52,15 @@ async function load() {
   error.value = ''
   report.value = null
   try {
-    const { data } = await axios.post('/api/report/monthly-attendance', {
+    const payload = {
       month: month.value || null, office_shift_id: shiftId.value || null,
-    }, { signal: controller.signal })
+      page: page.value, per_page: pageSize.value, search: search.value.trim(), issues_only: issuesOnly.value, sort: sort.value, refresh,
+    }
+    const { data } = await axios.post('/api/report/monthly-attendance', payload, { signal: controller.signal })
     if (id !== requestId) return
+    appliedFilters.value = { ...payload, month: data.month }
     report.value = data
+    page.value = data.pagination?.page || 1
     shifts.value = data.office_shifts
     if (!month.value) month.value = data.month
   } catch (e) {
@@ -60,7 +71,9 @@ async function load() {
     if (id === requestId) loading.value = false
   }
 }
-watch([month, shiftId], () => {
+watch([month, shiftId, issuesOnly, sort, pageSize], () => {
+  clearTimeout(searchTimer)
+  page.value = 1
   if (initializing.value) return
   if (month.value) load()
   else {
@@ -71,127 +84,41 @@ watch([month, shiftId], () => {
     error.value = 'Select a month to view the report.'
   }
 })
-onMounted(async () => { await load(); initializing.value = false })
-onBeforeUnmount(() => { ++requestId; controller?.abort() })
-
-const keyFor = period => period.next_day ? `1-${period.scheduled_out}` : period.scheduled_out === '12:00' ? 'AM' : period.scheduled_in === '13:00' ? 'PM' : `0-${period.scheduled_out}`
-const selectedShiftName = computed(() => shifts.value.find(s => String(s.id) === String(shiftId.value))?.name || 'All shifts')
-const periods = computed(() => {
-  const columns = new Map()
-  for (const employee of report.value?.employees || []) {
-    for (const day of employee.days) {
-      for (const period of day.periods) {
-        const key = keyFor(period)
-        columns.set(key, { key, end: period.scheduled_out, nextDay: period.next_day,
-          label: key === 'AM' || key === 'PM' ? key : period.next_day ? period.scheduled_out + ' +1' : period.scheduled_out < '12:00' ? 'Early' : period.scheduled_out })
-      }
-    }
-  }
-  if (!columns.size) return [{ key: 'AM', end: '12:00', label: 'AM' }, { key: 'PM', end: '17:00', label: 'PM' }]
-  return [...columns.values()].sort((a, b) => Number(a.nextDay || false) - Number(b.nextDay || false) || a.end.localeCompare(b.end))
+watch(search, () => {
+  clearTimeout(searchTimer)
+  ++requestId
+  controller?.abort()
+  loading.value = false
+  report.value = null
+  searchTimer = setTimeout(() => { page.value = 1; load() }, 300)
 })
-const excludedDate = day => report.value?.employees.length ? report.value.employees.every(employee => {
-  const record = employee.days.find(d => d.date === day.date)
-  return record?.rest_day || (record?.working_day == null && day.weekend)
-}) : day.weekend
-const dayColumns = computed(() => (report.value?.days || []).flatMap(day => periods.value.flatMap(period =>
-  ['in', 'out'].map(direction => ({ day, period, direction, key: `${day.date}-${period.key}-${direction}` }))
-)))
-const gridColumns = computed(() => (report.value?.days || []).flatMap(day => excludedDate(day)
-  ? [{ key: `${day.date}-weekend`, day, weekend: true }]
-  : dayColumns.value.filter(column => column.day.date === day.date)
-))
-const statusForMissing = (period, day, direction) => {
-  const oppositeDirection = direction === 'in' ? 'out' : 'in'
-
-  return period?.[`${direction}_state`] === 'Missing'
-    && period?.[`${oppositeDirection}_state`] === 'Missing'
-    && !day.future
-    && !day.weekend
-    && !period.exempt
+const goToPage = async next => {
+  if (loading.value || next < 1 || next > pagination.value.last_page) return
+  page.value = next
+  await load()
 }
-const rows = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  return (report.value?.employees || []).filter(row =>
-    (!term || `${row.name} ${row.shift_name}`.toLowerCase().includes(term)) && (!issuesOnly.value || row.total_minutes > 0)
-  ).map(row => {
-    const days = new Map(row.days.map(day => [day.date, day]))
-    const cells = dayColumns.value.map(column => {
-        const day = days.get(column.day.date)
-        const period = day?.periods.find(p => keyFor(p) === column.period.key)
-        const restDay = Boolean(day?.rest_day || (day?.working_day == null && column.day.weekend))
-        const value = restDay ? 0 : period?.[column.direction === 'in' ? 'late_minutes' : 'undertime_minutes'] || 0
-        const holiday = (day?.holidays || column.day.holidays).some(h => !h.is_working_day && (h.duration === 'full_day' || (period && ((h.duration === 'morning' && period.scheduled_in < '12:00') || (h.duration === 'afternoon' && period.scheduled_in >= '12:00')))))
-        const missing = !restDay && statusForMissing(period, { ...column.day, weekend: false }, column.direction)
-        const absence = day?.absence || null
-        const status = period ? period[`${column.direction}_state`] : day?.status || 'Not assigned'
-        const filedAbsence = status === 'Filed absence'
-        const unfiledAbsence = status === 'Unfiled absence'
-        const display = holiday ? 'H' : restDay ? '?' : filedAbsence ? 'A' : missing ? 'M' : value || ''
-        const description = holiday ? `Holiday exemption: ${(day?.holidays || column.day.holidays).map(h => h.name).join(', ')}` : restDay ? 'Rest day excluded from monthly totals' : filedAbsence ? `Filed ${absence?.duration?.replace('_', ' ')} absence (exempt)` : unfiledAbsence ? `Unfiled ${absence?.duration?.replace('_', ' ')} absence; ${value} min ${column.direction === 'in' ? 'late' : 'undertime'}` : value ? `${value} min ${column.direction === 'in' ? 'late' : 'undertime'}`
-          : period?.exempt ? 'Holiday exemption' : status === 'Recorded' ? 'No late / undertime assessed' : status
-        return {
-          key: column.key, value, missing, holiday, filedAbsence, unfiledAbsence, display, restDay, weekend: restDay, future: column.day.future,
-          date: column.day.date, direction: column.direction, label: column.period.label, period,
-          absence,
-          overnight: day?.periods.some(p => p.next_day) || false,
-          exempt: period?.exempt, title: `${column.day.date} · ${column.period.label} ${column.direction.toUpperCase()} · ${description}${day?.schedule_name ? ` ? ${day.schedule_name}` : ''}${day?.holiday_credit_minutes ? ` ? ${day.holiday_credit_minutes / 60} credited hours that day` : ''}`
-        }
-      })
-    const cellsByKey = new Map(cells.map(cell => [cell.key, cell]))
-    return {
-      ...row,
-      cells,
-      gridCells: gridColumns.value.map(column => column.weekend
-        ? { ...column, title: `${column.day.date} (${column.day.weekday}) · Weekend excluded from monthly totals` }
-        : cellsByKey.get(column.key)),
-    }
-  }).sort((a, b) => sort.value === 'name' ? a.name.localeCompare(b.name)
-    : b[sort.value] - a[sort.value] || b.total_minutes - a.total_minutes || a.name.localeCompare(b.name))
-})
-const totals = computed(() => rows.value.reduce((sum, row) => ({
-  minutes: sum.minutes + row.total_minutes, late: sum.late + row.late_count, under: sum.under + row.undertime_count,
-}), { minutes: 0, late: 0, under: 0 }))
+onMounted(async () => { await load(); initializing.value = false })
+onBeforeUnmount(() => { clearTimeout(searchTimer); ++requestId; controller?.abort() })
+
+const selectedShiftName = computed(() => shifts.value.find(s => String(s.id) === String(shiftId.value))?.name || 'All shifts')
+const view = computed(() => buildMonthlyGrid(report.value, { search: '', issuesOnly: false, sort: sort.value }))
+const periods = computed(() => view.value.periods)
+const excludedDate = day => view.value.excludedDate(day)
+const gridColumns = computed(() => view.value.gridColumns)
+const rows = computed(() => view.value.rows)
+const totals = computed(() => report.value?.summary || view.value.totals)
+const pagination = computed(() => report.value?.pagination || { page: 1, per_page: 50, total: rows.value.length, last_page: 1, from: rows.value.length ? 1 : 0, to: rows.value.length })
 function openCell(row, cell) {
   editorContext.value = { ...cell, userId: row.id, name: row.name, shiftName: row.shift_name }
 }
 async function logSaved() {
   editorContext.value = null
-  await load()
+  await load({ refresh: true })
   notice.value = report.value ? 'Attendance log saved. Monthly totals have been recalculated.' : 'Attendance log saved. Refresh the report to see the updated totals.'
 }
 const reportNote = computed(() => `${selectedShiftName.value}. Each work period counts separately. IN = late minutes; OUT = undertime minutes. ${report.value?.provisional ? 'Provisional: the reporting month or its final overnight shift is not complete. ' : ''}H = Holiday. M = Missing. A = Filed absence. Unfiled absences show their assessed minutes. ? = excluded rest day. M = no attendance recorded for a completed work period. Future/pending periods and exemptions are not marked missing. Effective-dated schedules, weekly exceptions, and holiday/suspension exemptions apply. Configured rest days are excluded from monthly totals and missing-record checks. Leave rules are not configured.`)
 const leaveLabel = type => ({ cto: 'CTO', vacation: 'Vacation', sick: 'Sick', spl: 'SPL', without_pay: 'W/out Pay' }[type] || 'Unclassified')
-const durationValue = duration => duration === 'whole_day' ? 1 : 0.5
-const durationLabel = duration => duration === 'whole_day' ? '' : duration === 'morning' ? ' AM' : ' PM'
 const numberValue = value => Number.isInteger(value) ? value : Number(value || 0).toFixed(1)
-const absencesRows = computed(() => {
-  const term = search.value.trim().toLowerCase()
-
-  return (report.value?.employees || []).map(employee => {
-    const absences = employee.days.filter(day => day.absence).map(day => ({ date: day.date, ...day.absence }))
-    const leaveTotals = Object.fromEntries(leaveTypes.map(type => [type, 0]))
-
-    for (const absence of absences) {
-      leaveTotals[absence.leave_type || 'without_pay'] += durationValue(absence.duration)
-    }
-
-    return {
-      id: employee.id,
-      name: employee.name,
-      shift: employee.shift_name,
-      filed: absences.filter(absence => absence.status === 'filed').length,
-      daysAbsent: absences.reduce((sum, absence) => sum + durationValue(absence.duration), 0),
-      dates: absences.map(absence => `${new Date(`${absence.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${durationLabel(absence.duration)} (${leaveLabel(absence.leave_type || 'without_pay')})`).join(', '),
-      ...leaveTotals,
-      times: employee.late_count + employee.undertime_count,
-      late_count: employee.late_count,
-      undertime_count: employee.undertime_count,
-      hours: Math.floor(employee.total_minutes / 60),
-      minutes: employee.total_minutes % 60,
-    }
-  }).filter(row => !term || `${row.name} ${row.shift}`.toLowerCase().includes(term))
-})
 
 const splitEmployeeName = (name) => {
   const text = String(name || '').trim()
@@ -271,8 +198,30 @@ const excelWorkbook = (worksheets) => `<?xml version="1.0"?>
  ${worksheets.join('')}
 </Workbook>`
 
-function exportExcel() {
-  if (!report.value) return
+async function loadFullExport() {
+  if (!report.value || exporting.value || !appliedFilters.value) return null
+  const { page, per_page, refresh, ...filters } = appliedFilters.value
+  exporting.value = true
+  error.value = ''
+  try {
+    const { data } = await axios.post('/api/report/monthly-attendance', { ...filters, export_all: true })
+    return { data, filters, view: buildMonthlyGrid(data, { sort: filters.sort }) }
+  } catch (e) {
+    error.value = e.response?.data?.message || 'Unable to prepare the complete report. Please try again.'
+    if (e.response?.status === 401) auth.clearAccount()
+    return null
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function exportExcel() {
+  const snapshot = await loadFullExport()
+  if (!snapshot) return
+  const report = { value: snapshot.data }
+  const rows = { value: snapshot.view.rows }
+  const absencesRows = { value: snapshot.view.absencesRows }
+  const excludedDate = snapshot.view.excludedDate
 
   const daySpans = report.value.days.map(day => ({
     day,
@@ -299,7 +248,9 @@ function exportExcel() {
   })
   const dayColumnCount = daySpans.reduce((sum, item) => sum + item.span, 0)
   const monthTitle = `For the Month of ${String(report.value.month_label || '').toUpperCase()}`
-  const groupTitle = shiftId.value ? selectedShiftName.value : 'ADMIN Employees'
+  const groupTitle = snapshot.filters.office_shift_id
+    ? snapshot.data.office_shifts.find(shift => String(shift.id) === String(snapshot.filters.office_shift_id))?.name || 'Selected shift'
+    : 'ADMIN Employees'
   const blankDayCells = count => Array.from({ length: count }, () => '')
   const tardinessRows = [
     // excelRow([{ value: 'SAMAR STATE UNIVERSITY', styleId: 'TemplateTitle', mergeAcross: 3 }]),
@@ -410,42 +361,43 @@ function exportExcel() {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `monthly-tardiness-report-${report.value.month}-${shiftId.value || 'all'}.xls`
+  link.download = `monthly-tardiness-report-${report.value.month}-${snapshot.filters.office_shift_id || 'all'}.xls`
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
-function printReport() {
-  if (!grid.value || !report.value) return
+async function printReport() {
+  if (!report.value || exporting.value) return
+  const note = reportNote.value
+  const shiftLabel = selectedShiftName.value
   const preview = window.open('', '_blank', 'width=1400,height=900')
   if (!preview) { error.value = 'Allow pop-ups to open the printable report.'; return }
-  const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))
-  const printGrid = grid.value.cloneNode(true)
-  printGrid.removeAttribute('style')
-  printGrid.querySelectorAll('button').forEach(button => button.replaceWith(document.createTextNode(button.textContent)))
   preview.opener = null
-  preview.document.write(`<!doctype html><html><head><title>Monthly Tardiness — ${escape(report.value.month_label)}</title><style>
+  preview.document.write('<!doctype html><html><body><p>Preparing the complete report...</p></body></html>')
+  preview.document.close()
+  const snapshot = await loadFullExport()
+  if (!snapshot || preview.closed) { if (!preview.closed) preview.close(); return }
+  const data = snapshot.data
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]))
+  const table = monthlyPrintTable(data, snapshot.view)
+  preview.document.open()
+  preview.document.write(`<!doctype html><html><head><title>Monthly Tardiness - ${escape(data.month_label)}</title><style>
     @page { size: A3 landscape; margin: 8mm; }
     body { font-family: Arial, sans-serif; color: #111; margin: 0; }
     h1 { font-size: 14px; margin: 0 0 6px; } p { font-size: 9px; }
-    table { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: ${periods.value.length > 2 ? '4' : '5'}pt; }
+    table { border-collapse: collapse; table-layout: fixed; width: 100%; font-size: ${snapshot.view.periods.length > 2 ? '4' : '5'}pt; }
     th, td { border: .5pt dotted #777; padding: 2px 0; text-align: center; overflow-wrap: anywhere; }
     th.employee-name { width: 32mm; } th.total-cell { width: 11mm; }
-    .employee-name { text-align: left; padding-left: 3px; } .employee-shift { display: none; }
-    .weekend { color: #c00; } .holiday, .exempt { background: #eee; } .missing-record { color: #92400e; background: #fef3c7; } .holiday-cell { color: #075985; background: #e0f2fe; }
+    .employee-name { text-align: left; padding-left: 3px; }
+    .weekend { color: #c00; } .holiday, .exempt, .weekend-cell { background: #eee; }
+    .missing-record { color: #92400e; background: #fef3c7; } .holiday-cell { color: #075985; background: #e0f2fe; }
     thead { display: table-header-group; } tr { break-inside: avoid; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  
-.admin-page-header .grid > * { min-width: 0; }
-.month-grid thead th { background: #1e293b; color: #f1f5f9; }
-.month-grid thead .month-heading { background: #0f766e; font-size: 11px; }
-.month-grid thead .weekend, .month-grid thead .holiday { color: #fda4af; }
-.month-grid thead .weekend-heading span { color: #cbd5e1; }
-.admin-page-header button:focus-visible { outline: 2px solid #5eead4; outline-offset: 2px; }
-</style></head><body><h1>Monthly Tardiness and Undertime — ${escape(report.value.month_label)}</h1><p>${escape(selectedShiftName.value)} · ${rows.value.length} employees · Generated ${escape(report.value.generated_at)} (${escape(report.value.timezone)})</p>${printGrid.outerHTML}<p>${escape(reportNote.value)}</p></body></html>`)
+  </style></head><body><h1>Monthly Tardiness and Undertime - ${escape(data.month_label)}</h1><p>${escape(shiftLabel)} - ${snapshot.view.rows.length} employees - Generated ${escape(data.generated_at)} (${escape(data.timezone)})</p>${table}<p>${escape(note)}</p></body></html>`)
   preview.document.close()
   preview.focus()
   void finishPrintWindow(preview)
 }
+
 </script>
 
 <template>
@@ -454,50 +406,47 @@ function printReport() {
     <template v-if="activeTab === 'attendance'">
     <section
       class="admin-page-header dark -ml-4 -mt-4 md:-ml-6 md:-mt-6 sticky px-2 py-1.5 top-0 z-20 -mr-4 border pb-2 shadow-sm md:-mr-6">
-      <nav class="mb-2 flex w-fit flex-wrap border-b border-white/15 text-[11px]" aria-label="Monthly attendance reports">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h1 class="text-base font-semibold text-white" title="A monthly grid of late arrivals and early departures, in minutes.">Monthly Tardiness and Undertime</h1>
+              <nav class="ml-auto flex w-fit flex-wrap items-center text-[11px]" aria-label="Monthly attendance reports">
       <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
       <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
     </nav>
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 class="text-base font-semibold dark:text-white">Monthly Tardiness and Undertime</h1>
-          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">A monthly grid of late arrivals and early
-            departures, in minutes.</p>
-        </div>
-        <div class="ml-auto flex flex-wrap gap-2">
-          <button type="button" @click="load" :disabled="loading" class="action-button">{{ loading ? 'Loading…' :
-            'Refresh' }}</button>
-          <button type="button" @click="exportExcel" :disabled="!report || !rows.length" class="action-button">Export
-            Excel</button>
-          <button type="button" @click="printReport" :disabled="!report || !rows.length" class="action-button">Print /
-            PDF</button>
-        </div>
       </div>
-      <div class="mt-2 grid grid-cols-2 items-end gap-2 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-        <label class="text-[11px] font-medium">Month<flat-pickr v-model="month" :config="pickerConfig"
+      <div class="mt-2 border-t border-white/10 pt-2 grid grid-cols-2 items-end gap-2 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <label class="text-[10px] font-medium text-slate-300">Month<flat-pickr v-model="month" :config="pickerConfig"
             :disabled="initializing && loading" placeholder="Select month" class="filter-input mt-1 block" /></label>
-        <label class="text-[11px] font-medium">Office shift<select v-model="shiftId" :disabled="initializing && loading"
+        <label class="text-[10px] font-medium text-slate-300">Office shift<select v-model="shiftId" :disabled="initializing && loading"
             class="filter-input mt-1 block">
             <option value="">All shifts</option>
             <option v-for="shift in shifts" :key="shift.id" :value="shift.id">{{ shift.name }}</option>
           </select></label>
-        <label class="text-[11px] font-medium">Search<input v-model="search" type="search" placeholder="Employee or shift…"
+        <label class="text-[10px] font-medium text-slate-300">Search<input v-model="search" type="search" placeholder="Employee or shift…"
             class="filter-input mt-1 block" /></label>
-        <label class="text-[11px] font-medium">Sort<select v-model="sort" class="filter-input mt-1 block">
+        <label class="text-[10px] font-medium text-slate-300">Sort<select v-model="sort" class="filter-input mt-1 block">
             <option value="late_count">Times tardy ↓</option>
             <option value="undertime_count">Times undertime ↓</option>
             <option value="total_minutes">Total minutes ↓</option>
             <option value="name">Employee name A–Z</option>
           </select></label>
-        <label class="flex items-center gap-2 pb-1 text-[11px]"><input v-model="issuesOnly" type="checkbox"
+        <label class="flex items-center gap-1.5 pb-1 text-[10px] text-slate-300"><input v-model="issuesOnly" type="checkbox"
             class="rounded-none border-slate-300" /> With late / undertime only</label>
       </div>
-      <div v-if="report" class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
-        <span><strong>{{ rows.length }}</strong> employees shown</span><span><strong>{{ totals.minutes.toLocaleString()
+      <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+      <div v-if="report" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-300">
+        <span><strong>{{ pagination.total }}</strong> employees matched</span><span><strong>{{ totals.minutes.toLocaleString()
             }}</strong> total minutes</span><span><strong>{{ totals.late }}</strong> times tardy</span><span><strong>{{
               totals.under }}</strong> times undertime</span>
         <span v-if="report.provisional"
-          class="rounded-none bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Provisional</span>
+          class="rounded-none bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Provisional</span>
+      </div>
+        <div class="ml-auto flex flex-wrap items-center gap-1.5">
+          <button type="button" @click="load({ refresh: true })" :disabled="loading || exporting" class="action-button">{{ loading ? 'Loading…' :
+            'Refresh' }}</button>
+          <button type="button" @click="exportExcel" :disabled="loading || exporting || !report || !pagination.total" class="action-button">{{ exporting ? 'Preparing export...' : 'Export Excel' }}</button>
+          <button type="button" @click="printReport" :disabled="loading || exporting || !report || !pagination.total" class="action-button">Print /
+            PDF</button>
+        </div>
       </div>
     </section>
     <div v-if="error" role="alert" class="rounded-none border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{{
@@ -542,7 +491,7 @@ function printReport() {
             <tr v-for="(row, index) in rows" :key="row.id">
               <td class="employee-name"
                 :title="`${row.name} · ${row.shift_name}${row.review_days ? ' · ' + row.review_days + ' day(s) with missing or inconsistent punches' : ''}`">
-                <span class="mr-1 text-slate-400">{{ index + 1 }}.</span>{{ row.name }}
+                <span class="mr-1 text-slate-400">{{ pagination.from + index }}.</span>{{ row.name }}
                 <!-- <span class="employee-shift">{{
                   row.shift_name }}</span> -->
               </td>
@@ -562,6 +511,15 @@ function printReport() {
       </div>
       <div v-else class="px-4 py-10 text-center text-sm text-slate-500">{{ loading ? 'Preparing monthly report…' :
         'Select a month and refresh to view the report.' }}</div>
+      <div v-if="report" class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+        <label class="flex items-center gap-1.5">Show <select v-model.number="pageSize" class="h-7 rounded-none border border-slate-300 bg-white py-0 pl-2 pr-6 text-[11px] dark:border-slate-600 dark:bg-slate-900"><option :value="25">25</option><option :value="50">50</option><option :value="100">100</option></select> employees</label>
+        <span>{{ pagination.from }}?{{ pagination.to }} of {{ pagination.total }} employees</span>
+        <div class="flex items-center gap-2">
+          <button type="button" :disabled="loading || pagination.page <= 1" class="action-button" @click="goToPage(pagination.page - 1)">Previous</button>
+          <span>Page {{ pagination.page }} of {{ pagination.last_page }}</span>
+          <button type="button" :disabled="loading || pagination.page >= pagination.last_page" class="action-button" @click="goToPage(pagination.page + 1)">Next</button>
+        </div>
+      </div>
       <div
         class="space-y-1 border-t border-slate-200 bg-slate-50/60 px-3 py-2 text-[10px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
         <p><strong>I</strong> = late minutes · <strong>O</strong> = undertime minutes · Red dates = weekends · * =
@@ -578,7 +536,7 @@ function printReport() {
     </template>
     <AbsencesSummary v-else>
       <template #navigation>
-        <nav class="mb-2 flex w-fit flex-wrap border-b border-white/15 text-[11px]" aria-label="Monthly attendance reports">
+        <nav class="flex w-fit flex-wrap items-center text-[11px]" aria-label="Monthly attendance reports">
       <button type="button" @click="activeTab = 'attendance'" :class="activeTab === 'attendance' ? 'tab-active' : 'tab-inactive'">Monthly tardiness</button>
       <button type="button" @click="activeTab = 'absences'" :class="activeTab === 'absences' ? 'tab-active' : 'tab-inactive'">Absences and tardiness</button>
     </nav>

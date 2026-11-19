@@ -76,9 +76,9 @@ let myEventHandler = (e) => {
 
     <app-sidebar ref="sideBar" />
     <Backdrop />
-    <div class="flex-1 transition-all duration-300 ease-in-out"
+    <div class="min-w-0 flex-1 transition-all duration-300 ease-in-out"
       :class="[isExpanded || isHovered ? 'lg:ml-[200px]' : 'lg:ml-[72px]']">
-      <div class="p-4 mx-auto max-w-screen-2xl md:p-6">
+      <div class="w-full min-w-0 p-4 md:p-6">
         <!-- <slot></slot> -->
         <router-view v-slot="{ Component }">
           <transition name="slide-fade" mode="out-in">
